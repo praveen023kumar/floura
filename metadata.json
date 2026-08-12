@@ -1,0 +1,1 @@
+{"name":"floura","description":"Bespoke full-stack bakery management app providing offline-first IndexedDB storage, SQLite persistent sync, and interactive order specification customizers","requestFramePermissions":["camera"],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}

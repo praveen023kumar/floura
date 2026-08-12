@@ -1,0 +1,3 @@
+- `[x]` Update ChecklistView component to match Web design (Yesterday/Today date filters, completion analytics, task status filters, seed defaults)
+- `[x]` Update InventoryView component to match Web design (dynamic categories list, low stock alerts list, inline quantity adjustment triggers)
+- [x] Verify compilation with `npx tsc --noEmit`

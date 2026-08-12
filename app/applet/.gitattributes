@@ -1,0 +1,11 @@
+# Treat all binary files explicitly as binary to prevent line ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.sqlite binary
+
+# Ensure other files are auto-detected
+* text=auto

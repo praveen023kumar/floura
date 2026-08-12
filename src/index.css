@@ -1,0 +1,264 @@
+/* File Path: /src/index.css */
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-serif: "Literata", Georgia, serif;
+
+  --color-primary-brand: #be185d;
+  --color-primary-brand-light: #fce7f3;
+  --color-primary-brand-dark: #831843;
+  --color-sweet-pink: #db2777;
+  --color-sweet-pink-container: #fce7f3;
+  --color-warm-cocoa: #4c0519;
+  --color-cream: #fffafb;
+  --color-cream-dark: #0f172a;
+
+  /* Map zinc grays to premium high-contrast Slate palette */
+  --color-zinc-50: #f8fafc;
+  --color-zinc-100: #f1f5f9;
+  --color-zinc-105: #ebf0f5;
+  --color-zinc-150: #e2e8f0;
+  --color-zinc-200: #e2e8f0;
+  --color-zinc-250: #d7e0ea;
+  --color-zinc-300: #cbd5e1;
+  --color-zinc-305: #b9c9dc;
+  --color-zinc-350: #afbfd2;
+  --color-zinc-355: #cbd5e1;
+  --color-zinc-400: #94a3b8;
+  --color-zinc-404: #8ca1bc;
+  --color-zinc-405: #8299b5;
+  --color-zinc-455: #7388a4;
+  --color-zinc-500: #64748b;
+  --color-zinc-550: #64748b;
+  --color-zinc-600: #475569;
+  --color-zinc-650: #1e293b;
+  --color-zinc-655: #2d3a4d;
+  --color-zinc-700: #334155;
+  --color-zinc-705: #334155;
+  --color-zinc-750: #293548;
+  --color-zinc-800: #1e293b;
+  --color-zinc-850: #152238;
+  --color-zinc-855: #1e293b;
+  --color-zinc-805: #0f172a;
+  --color-zinc-900: #0f172a;
+  --color-zinc-950: #020617;
+
+  /* Map custom orange colors (used in dark mode components) to premium warm violet/lavender/indigo spectrum */
+  --color-orange-100: #e0e7ff;
+  --color-orange-300: #c7d2fe;
+  --color-orange-400: #a5b4fc;
+  --color-orange-500: #6366f1;
+  --color-orange-550: #4f46e5;
+  --color-orange-600: #4f46e5;
+  --color-orange-700: #3730a3;
+  --color-orange-800: #312e81;
+  --color-orange-900: #1e1b4b;
+
+  /* Map pink/sweet accents directly into vibrant raspberry and rose gold spectrum */
+  --color-pink-50: #fdf2f8;
+  --color-pink-100: #fbcfe8;
+  --color-pink-200: #f9a8d4;
+  --color-pink-300: #f472b6;
+  --color-pink-400: #ec4899;
+  --color-pink-500: #db2777;
+  --color-pink-600: #db2777;
+  --color-pink-700: #be185d;
+  --color-pink-800: #9d174d;
+  --color-pink-900: #831843;
+  --color-pink-950: #500724;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+/* Base custom classes to match the design */
+input, select, textarea {
+  font-family: var(--font-sans);
+}
+h1, h2, h3, h4, .font-serif-editor {
+  font-family: var(--font-serif);
+}
+
+.bakery-pattern {
+  background-image: radial-gradient(#b453090a 1.5px, transparent 1.5px), radial-gradient(#b453090a 1.5px, transparent 1.5px);
+  background-size: 40px 40px;
+  background-position: 0 0, 20px 20px;
+}
+.dark .bakery-pattern {
+  background-image: radial-gradient(#ffffff04 1.5px, transparent 1.5px), radial-gradient(#ffffff04 1.5px, transparent 1.5px);
+  background-size: 40px 40px;
+  background-position: 0 0, 20px 20px;
+}
+
+/* Smooth fade transitions for route switching */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 250ms ease-out, transform 250ms ease-out;
+}
+
+/* Printer-friendly styling using CSS Media Queries */
+@media print {
+  /* Hide the entire standard app container, sidebars, buttons, headers, and footer */
+  aside, nav, header, button, .print\:hidden, [role="button"] {
+    display: none !important;
+  }
+
+  /* Reset layout structure for printing to avoid extra height or overflow pagination */
+  html, body, #root, #root > div, #root > div > div, main {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Reset order detail wrapper container to prevent border/padding/shadow height leakage */
+  .order-detail-container {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Hide all interactive elements inside the detail view, leaving only the invoice */
+  .order-detail-container > :not(#printable-invoice) {
+    display: none !important;
+  }
+
+  /* Make ONLY our printable invoice block visible and force its position */
+  #printable-invoice {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+  }
+
+  /* Override spacing to keep the layout extremely compact and ensure it fits on 1 page */
+  #printable-invoice .pb-6,
+  #printable-invoice .mb-6 {
+    margin-bottom: 10px !important;
+    padding-bottom: 10px !important;
+  }
+
+  #printable-invoice .mb-8 {
+    margin-bottom: 10px !important;
+  }
+
+  #printable-invoice .mt-12 {
+    margin-top: 12px !important;
+    padding-top: 8px !important;
+  }
+
+  #printable-invoice .gap-8 {
+    gap: 12px !important;
+  }
+
+  #printable-invoice .p-4 {
+    padding: 12px !important;
+  }
+
+  /* Compact table row padding */
+  #printable-invoice table td {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+  }
+
+  #printable-invoice table th {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+  }
+
+  #printable-invoice h1 {
+    font-size: 24px !important;
+  }
+
+  #printable-invoice h2 {
+    font-size: 18px !important;
+  }
+
+  #printable-invoice h3 {
+    font-size: 11px !important;
+    margin-bottom: 2px !important;
+    padding-bottom: 1px !important;
+  }
+
+  /* Override dark-theme styles to protect printer ink */
+  body, html {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Custom bakes summary table and billing print specifications */
+  #printable-invoice table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  #printable-invoice th, #printable-invoice td {
+    border-bottom: 1px solid #cbd5e1 !important;
+    color: #000000 !important;
+  }
+
+  /* Simple clean fonts for physical paper printing */
+  #printable-invoice h1, #printable-invoice h2, #printable-invoice h3, #printable-invoice h4 {
+    color: #000000 !important;
+  }
+
+  /* Ensure page margins are clean and fit properly on standard letter/A4 pages */
+  @page {
+    size: portrait;
+    margin: 1cm;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

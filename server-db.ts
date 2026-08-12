@@ -1,0 +1,303 @@
+// File Path: /server-db.ts
+import sqlite3 from "sqlite3";
+import path from "path";
+import fs from "fs";
+import { Customer, Order, InventoryItem, Recipe, ChecklistItem } from "./src/types";
+
+const DB_FILE = path.join(process.cwd(), "patisserie.sqlite");
+
+// Helper to open SQLite database
+export function getDb(): Promise<sqlite3.Database> {
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(DB_FILE, (err) => {
+      if (err) reject(err);
+      else resolve(db);
+    });
+  });
+}
+
+// Helper to run a SQL command
+export function runSql(db: sqlite3.Database, sql: string, params: any[] = []): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+// Helper to query all rows
+export function querySqlAll<T>(db: sqlite3.Database, sql: string, params: any[] = []): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows as T[]);
+    });
+  });
+}
+
+// Initialize database with tables and default seed data
+export async function initDb() {
+  const db = await getDb();
+
+  // Create Customers Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS customers (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      mobile TEXT NOT NULL,
+      type TEXT NOT NULL,
+      totalOrders INTEGER NOT NULL DEFAULT 0,
+      memberSince TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com'
+    )
+  `);
+
+  // Create Orders Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS orders (
+      id TEXT PRIMARY KEY,
+      customerId TEXT NOT NULL,
+      customerName TEXT NOT NULL,
+      customerMobile TEXT NOT NULL,
+      eventType TEXT NOT NULL,
+      eventDate TEXT NOT NULL,
+      deliveryDate TEXT,
+      deliveryTime TEXT NOT NULL,
+      venueAddress TEXT,
+      cakeShape TEXT,
+      cakeWeight TEXT,
+      cakeFlavor TEXT,
+      preference TEXT,
+      layers TEXT,
+      cakeInscription TEXT,
+      referenceImage TEXT,
+      specialInstructions TEXT,
+      basePrice REAL,
+      decorationCharge REAL,
+      deliveryFee REAL,
+      totalAmount REAL,
+      status TEXT NOT NULL DEFAULT 'Pending',
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      paymentStatus TEXT NOT NULL DEFAULT 'Unpaid',
+      paidAmount REAL NOT NULL DEFAULT 0,
+      paymentHistory TEXT NOT NULL DEFAULT '[]'
+    )
+  `);
+
+  // Create Inventory Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS inventory (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      quantity REAL NOT NULL DEFAULT 0,
+      unit TEXT NOT NULL,
+      minStockLevel REAL NOT NULL DEFAULT 0,
+      supplier TEXT,
+      costPrice REAL NOT NULL DEFAULT 0,
+      updatedAt TEXT NOT NULL,
+      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com'
+    )
+  `);
+
+  // Create Recipes Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS recipes (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      stdYield REAL NOT NULL,
+      yieldUnit TEXT NOT NULL,
+      ingredients TEXT NOT NULL, -- JSON string array
+      imageUrl TEXT,
+      updatedAt TEXT NOT NULL,
+      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com'
+    )
+  `);
+
+  // Create Checklist Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS checklist (
+      id TEXT PRIMARY KEY,
+      text TEXT NOT NULL,
+      checked INTEGER NOT NULL DEFAULT 0,
+      date TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      isDeleted INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  // Create Custom Events Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS custom_events (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      date TEXT NOT NULL,
+      type TEXT NOT NULL,
+      notes TEXT,
+      createdAt TEXT NOT NULL,
+      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      isDeleted INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  // Create Dispatched Notifications Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS dispatched_notifications (
+      id TEXT PRIMARY KEY,
+      customerName TEXT NOT NULL,
+      customerMobile TEXT NOT NULL,
+      cakeSpec TEXT,
+      messageText TEXT NOT NULL,
+      dispatchedAt TEXT NOT NULL,
+      status TEXT NOT NULL,
+      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      isDeleted INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  // Create Scheduled Alerts Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS scheduled_alerts (
+      id TEXT PRIMARY KEY,
+      customerName TEXT NOT NULL,
+      customerMobile TEXT NOT NULL,
+      alertDate TEXT NOT NULL,
+      notes TEXT,
+      createdAt TEXT NOT NULL,
+      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      isDeleted INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  // Create Bakery Profile Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS bakery_profile (
+      id TEXT PRIMARY KEY,
+      bakeryName TEXT,
+      email TEXT,
+      phone TEXT,
+      address TEXT,
+      role TEXT,
+      currency TEXT,
+      dateFormat TEXT,
+      updatedAt TEXT NOT NULL,
+      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      isDeleted INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  // Create Users Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS users (
+      email TEXT PRIMARY KEY,
+      password_hash TEXT NOT NULL,
+      name TEXT NOT NULL,
+      avatar TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    )
+  `);
+
+  // Create Feedbacks Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS feedbacks (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      email TEXT,
+      category TEXT,
+      title TEXT,
+      message TEXT NOT NULL,
+      rating INTEGER,
+      imageUrl TEXT,
+      status TEXT NOT NULL DEFAULT 'Pending',
+      createdAt TEXT NOT NULL
+    )
+  `);
+
+  // Create Admin Users Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS admin_users (
+      email TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      salt TEXT NOT NULL,
+      role TEXT NOT NULL,
+      permissions TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    )
+  `);
+
+  // Safe schema migrations helper (adds user_email & isDeleted if absent in old sqlite tables)
+  const tables = ["customers", "orders", "inventory", "recipes", "checklist", "custom_events", "dispatched_notifications", "scheduled_alerts", "bakery_profile"];
+  for (const t of tables) {
+    try {
+      await runSql(db, `ALTER TABLE ${t} ADD COLUMN user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com'`);
+    } catch {
+      // Column already exists, ignore
+    }
+    try {
+      await runSql(db, `ALTER TABLE ${t} ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0`);
+    } catch {
+      // Column already exists, ignore
+    }
+  }
+
+  // Safe migration specifically for deliveryDate on orders table
+  try {
+    await runSql(db, `ALTER TABLE orders ADD COLUMN deliveryDate TEXT NOT NULL DEFAULT ''`);
+  } catch {
+    // Column already exists, ignore
+  }
+
+  // Safe migrations for payment fields on orders table
+  try {
+    await runSql(db, `ALTER TABLE orders ADD COLUMN paymentStatus TEXT NOT NULL DEFAULT 'Unpaid'`);
+  } catch {
+    // Column already exists, ignore
+  }
+  try {
+    await runSql(db, `ALTER TABLE orders ADD COLUMN paidAmount REAL NOT NULL DEFAULT 0`);
+  } catch {
+    // Column already exists, ignore
+  }
+  try {
+    await runSql(db, `ALTER TABLE orders ADD COLUMN paymentHistory TEXT NOT NULL DEFAULT '[]'`);
+  } catch {
+    // Column already exists, ignore
+  }
+
+  // Safe migrations for feedbacks table fields
+  try {
+    await runSql(db, `ALTER TABLE feedbacks ADD COLUMN title TEXT`);
+  } catch {
+    // Column already exists, ignore
+  }
+  try {
+    await runSql(db, `ALTER TABLE feedbacks ADD COLUMN imageUrl TEXT`);
+  } catch {
+    // Column already exists, ignore
+  }
+
+
+
+  // Seed initial bakery profile if table is empty
+  try {
+    const profileCount = await querySqlAll<any>(db, "SELECT count(*) as count FROM bakery_profile WHERE user_email = 'praveen023kumar@gmail.com'");
+    if (profileCount.length === 0 || profileCount[0].count === 0) {
+      await runSql(db, `
+        INSERT INTO bakery_profile (id, bakeryName, email, phone, address, role, currency, dateFormat, updatedAt, user_email, isDeleted)
+        VALUES ('active-profile', 'Sweet Home Bakery', 'praveen023kumar@gmail.com', '+1 (555) 012-3456', '456 Confectionary Boulevard, Suite A', 'Head Baker & Owner', '$', 'YYYY-MM-DD', ?, 'praveen023kumar@gmail.com', 0)
+      `, [new Date().toISOString()]);
+    }
+  } catch (err) {
+    console.error("Failed to seed initial bakery profile SQLite table:", err);
+  }
+
+  db.close();
+  console.log("SQLite database initialized successfully.");
+}
