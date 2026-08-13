@@ -212,7 +212,7 @@ export default function InventoryListView({
 
   return (
     <div className="space-y-6 text-left">
-      {/* View Header */}
+      {/* ── HEADER ── */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate flex items-center gap-2">
@@ -224,16 +224,13 @@ export default function InventoryListView({
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="hidden sm:inline-flex text-xs bg-white dark:bg-zinc-800 px-3.5 py-1.5 sm:px-4 sm:py-2.5 rounded-full border border-zinc-150 dark:border-zinc-700/60 font-semibold font-sans shadow-sm text-zinc-600 dark:text-zinc-400">
-            📅 Today: {new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
-          </span>
           <button
             type="button"
             onClick={() => setMobileFiltersOpen(true)}
-            className="lg:hidden relative flex items-center gap-1.5 bg-white dark:bg-zinc-800 text-xs font-bold py-2 px-3 sm:py-2.5 sm:px-4 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 cursor-pointer shadow-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary-brand"
+            className="lg:hidden relative flex items-center justify-center bg-white dark:bg-zinc-800 w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 cursor-pointer shadow-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary-brand shrink-0"
+            title="Filters"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
-            <span className="hidden xs:inline">Filters</span>
+            <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
             {activeFilterCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary-brand dark:bg-orange-400 text-white text-[9px] font-bold flex items-center justify-center">
                 {activeFilterCount}
@@ -241,11 +238,12 @@ export default function InventoryListView({
             )}
           </button>
           <button
+            type="button"
             onClick={() => navigate("/inventory/new")}
-            className="shrink-0 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white text-xs font-bold py-2 px-3 sm:py-2.5 sm:px-4 rounded-full flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95 whitespace-nowrap"
+            className="w-10 h-10 rounded-full bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all active:scale-95 shrink-0"
+            title="Add Product"
           >
-            <Plus className="w-4 h-4" />
-            <span className="hidden xs:inline">Add Product</span>
+            <Plus className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -378,9 +376,9 @@ export default function InventoryListView({
       {/* Main Stock Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Desktop Side Filters Card */}
-        <aside className="hidden lg:block lg:col-span-4 bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-150 dark:border-zinc-850 shadow-xs">
+        <aside className="hidden lg:block lg:col-span-3 bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-150 dark:border-zinc-850 shadow-xs">
           <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4 flex justify-between items-center">
-            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-105 uppercase tracking-wider">
+            <span className="text-xs font-bold text-zinc-808 dark:text-zinc-105 uppercase tracking-wider">
               Filter Desk
             </span>
             {activeFilterCount > 0 && (
@@ -397,7 +395,7 @@ export default function InventoryListView({
         </aside>
 
         {/* Right side: Stock Items grid */}
-        <div className="lg:col-span-8 space-y-4">
+        <div className="lg:col-span-9 space-y-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-800 shadow-xs flex flex-col min-h-[350px]">
             <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4 flex justify-between items-center">
               <span className="text-xs font-bold text-zinc-500 dark:text-zinc-550 uppercase tracking-wider">

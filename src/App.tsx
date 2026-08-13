@@ -28,7 +28,10 @@ import {
   X,
   MoreHorizontal,
   Sun,
-  Moon
+  Moon,
+  Calendar,
+  MessageSquare,
+  User
 } from "lucide-react";
 
 declare global {
@@ -40,6 +43,7 @@ declare global {
 // Components
 import Header from "./components/Header";
 import flouraLogo from "./assets/images/floura_logo.jpg";
+import Avatar from "./components/Avatar";
 import LandingPage from "./components/LandingPage";
 import InitialSyncLoader from "./components/InitialSyncLoader";
 import AdminDashboardView from "./components/AdminDashboardView";
@@ -136,9 +140,7 @@ function MainAppContent() {
     async function initPreferences() {
       try {
         const savedUser = await getPreference("patisserie_user");
-        const savedDarkModeDb = await getPreference("patisserie_dark_mode") === "true";
-        const savedDarkModeLocal = localStorage.getItem("patisserie_dark_mode") === "true";
-        const savedDarkMode = savedDarkModeDb || savedDarkModeLocal;
+        const savedDarkMode = localStorage.getItem("patisserie_dark_mode") === "true";
         const currency = await getPreference("floura_currency") || "$";
         const dateFormat = await getPreference("floura_date_format") || "YYYY-MM-DD";
         
@@ -191,7 +193,6 @@ function MainAppContent() {
       document.documentElement.classList.remove("dark");
       localStorage.setItem("patisserie_dark_mode", "false");
     }
-    setPreference("patisserie_dark_mode", String(darkMode));
   }, [darkMode]);
 
   // Scroll to top on route change
@@ -1248,128 +1249,194 @@ function MainAppContent() {
 
   return (
     <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 flex flex-col md:flex-row transition-colors duration-200">
-      {/* Sidebar - Desktop Layout (Responsive side menu mirroring design block) */}
-      <aside className="hidden md:flex w-64 shrink-0 bg-zinc-900 dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex-col justify-between sticky top-0 h-screen z-40 select-none">
-        <div className="flex flex-col">
+      {/* Sidebar - Desktop Layout (Responsive slim side menu mirroring design block) */}
+      <aside className="hidden md:flex w-20 shrink-0 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex-col justify-between sticky top-0 h-screen z-40 select-none py-6 items-center transition-all duration-200">
+        <div className="flex flex-col items-center w-full">
           {/* Logo Section */}
-          <div className="p-6 flex items-center justify-center">
-            <img 
-              src={flouraLogo} 
-              alt="Floura Logo" 
-              referrerPolicy="no-referrer"
-              className="w-12 h-12 rounded-full object-cover border border-zinc-750 shadow-sm select-none animate-fade-in" 
-            />
-          </div>
-
-          <div className="px-4 py-2">
-            <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-3">
-              PRIMARY SHELVES
-            </span>
+          <div className="mb-8 flex items-center justify-center">
+            <button
+              onClick={() => navigate("/landing")}
+              className="w-12 h-12 rounded-full cursor-pointer hover:rotate-6 transition-all duration-200 border-none outline-none overflow-hidden shrink-0 shadow-xs"
+              title="Floura Logo"
+            >
+              <img 
+                src={flouraLogo} 
+                alt="Floura Logo" 
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover select-none" 
+              />
+            </button>
           </div>
 
           {/* Navigation Links */}
-          <nav className="px-3 space-y-1">
+          <nav className="flex flex-col items-center gap-3 w-full px-2">
+            {/* Dashboard Link */}
             <button
               onClick={() => navigate("/dashboard")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "dashboard"
-                  ? "bg-primary-brand text-white shadow-md shadow-primary-brand/10 font-extrabold"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+                  ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
+                  : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
               }`}
             >
-              <LayoutDashboard className="w-4 h-4 shrink-0" />
-              <span>Dashboard</span>
+              <LayoutGrid className="w-5 h-5 shrink-0" />
+              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+                Dashboard
+              </span>
             </button>
 
+            {/* Orders Link */}
             <button
               onClick={() => navigate("/orders")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "orders" || currentScreen === "orders-form"
-                  ? "bg-primary-brand text-white shadow-md shadow-primary-brand/10 font-extrabold"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+                  ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
+                  : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
               }`}
             >
-              <ShoppingBag className="w-4 h-4 shrink-0" />
-              <span>Orders</span>
+              <Calendar className="w-5 h-5 shrink-0" />
+              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+                Orders
+              </span>
             </button>
 
+            {/* Recipes Link */}
+            <button
+              onClick={() => navigate("/recipes")}
+              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+                currentScreen === "recipes" || currentScreen === "recipes-form"
+                  ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
+                  : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+              }`}
+            >
+              <BookOpen className="w-5 h-5 shrink-0" />
+              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+                Recipes
+              </span>
+            </button>
+
+            {/* Inventory Link */}
+            <button
+              onClick={() => navigate("/inventory")}
+              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+                currentScreen === "inventory" || currentScreen === "inventory-form"
+                  ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
+                  : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+              }`}
+            >
+              <Boxes className="w-5 h-5 shrink-0" />
+              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+                Inventory
+              </span>
+            </button>
+
+            {/* Customers Link */}
             <button
               onClick={() => navigate("/customers")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "customers" || currentScreen === "customers-form"
-                  ? "bg-primary-brand text-white shadow-md shadow-primary-brand/10 font-extrabold"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+                  ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-950 dark:text-white shadow-xs font-extrabold"
+                  : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
               }`}
             >
-              <Users className="w-4 h-4 shrink-0" />
-              <span>Customers</span>
+              <Users className="w-5 h-5 shrink-0" />
+              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+                Customers
+              </span>
             </button>
 
+            {/* Debriefs Link */}
             <button
               onClick={() => navigate("/debriefs")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "debriefs"
-                  ? "bg-primary-brand text-white shadow-md shadow-primary-brand/10 font-extrabold"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+                  ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
+                  : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
               }`}
             >
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Debriefs</span>
+              <MessageSquare className="w-5 h-5 shrink-0" />
+              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+                Debriefs
+              </span>
             </button>
 
+            {/* Checklist Link */}
             <button
-              onClick={() => navigate("/more")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                currentScreen === "more"
-                  ? "bg-primary-brand text-white shadow-md shadow-primary-brand/10 font-extrabold"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+              onClick={() => navigate("/checklist")}
+              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+                currentScreen === "checklist"
+                  ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
+                  : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
               }`}
             >
-              <MoreHorizontal className="w-4 h-4 shrink-0" />
-              <span>More</span>
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+                Checklist
+              </span>
             </button>
           </nav>
         </div>
 
-        {/* Database Status Tracker */}
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
-          {syncStatus === "synced" && (
-            <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 flex items-center gap-2.5">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></div>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono tracking-tight font-bold">SYNCED LOCALLY</span>
-            </div>
-          )}
-          {syncStatus === "syncing" && (
-            <div className="bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20 flex items-center gap-2.5">
-              <RefreshCw className="w-3.5 h-3.5 text-indigo-500 dark:text-orange-400 animate-spin shrink-0" />
-              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono tracking-tight font-bold animate-pulse">SYNCING CHANGES</span>
-            </div>
-          )}
-          {syncStatus === "offline" && (
-            <div className="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 flex items-center gap-2.5">
-              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></div>
-              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono tracking-tight font-bold">OFFLINE MODE READY</span>
-            </div>
-          )}
-          {syncStatus === "error" && (
-            <div className="bg-red-500/10 p-3 rounded-xl border border-red-500/20 flex items-center gap-2.5">
-            </div>
-          )}
+        {/* Bottom Section */}
+        <div className="mt-auto flex flex-col items-center gap-4 w-full px-2">
+          {/* Settings / More Link */}
+          <button
+            onClick={() => navigate("/more")}
+            className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+              currentScreen === "more"
+                ? "bg-zinc-150 dark:bg-zinc-850 text-zinc-950 dark:text-white"
+                : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-550 dark:hover:text-zinc-200"
+            }`}
+          >
+            <UserCog className="w-5 h-5" />
+            <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+              More
+            </span>
+          </button>
         </div>
       </aside>
 
       {/* Main Content Pane */}
       <div className="flex-grow flex flex-col min-w-0">
-        {/* Universal header navigation */}
-        <Header
-          darkMode={darkMode}
-          setDarkMode={setDarkMode}
-          syncStatus={syncStatus}
-          onSync={triggerSync}
-          user={user}
-          onLogout={handleLogout}
-          bakeryName={bakeryProfile?.bakeryName}
-        />
+        {/* Mobile Top Brand Bar (Visible only on mobile/tablet dashboard screen) */}
+        {currentScreen === "dashboard" && (
+          <header className="md:hidden flex items-center justify-between px-5 h-16 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-900/40 sticky top-0 z-30 select-none shadow-xs">
+            <button
+              onClick={() => navigate("/landing")}
+              className="flex items-center gap-3 cursor-pointer border-none bg-transparent outline-none focus:outline-none p-0 active:scale-95 transition-all"
+              title="Go to Landing Page"
+            >
+              <img
+                src={flouraLogo}
+                alt="Floura Logo"
+                referrerPolicy="no-referrer"
+                className="w-9 h-9 rounded-2xl object-cover shrink-0 border border-zinc-100 dark:border-zinc-800 shadow-xs"
+              />
+              <span className="text-base font-extrabold tracking-tight text-zinc-900 dark:text-white font-sans">
+                Floura
+              </span>
+            </button>
+            
+            {/* User Profile Avatar Icon */}
+            <button
+              onClick={() => navigate("/profile")}
+              className="relative group cursor-pointer active:scale-95 shrink-0 border-none bg-transparent p-0 outline-none"
+              title="View Profile"
+            >
+              {user ? (
+                <Avatar
+                  avatarKey={user.avatar}
+                  name={user.name}
+                  className="w-9 h-9 text-xs ring-2 ring-zinc-100 dark:ring-zinc-850"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700">
+                  <User className="w-5 h-5 text-zinc-500" />
+                </div>
+              )}
+            </button>
+          </header>
+        )}
 
         {/* Main viewport Container */}
         <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-8">
@@ -1405,6 +1472,8 @@ function MainAppContent() {
                     else if (scName === "recipes-form") navigate("/recipes/new");
                     else if (scName === "debriefs") navigate("/debriefs");
                     else if (scName === "checklist") navigate("/checklist");
+                    else if (scName === "profile") navigate("/profile");
+                    else if (scName === "more") navigate("/more");
                   }}
                   productionCount={productionCount}
                   activeOrdersCount={activeOrdersCount}
@@ -1414,6 +1483,7 @@ function MainAppContent() {
                   onAlertClick={(orderId) => {
                     navigate(`/orders/${orderId}`);
                   }}
+                  user={user}
                 />
               } />
 
@@ -1543,6 +1613,10 @@ function MainAppContent() {
                   initialMoreTab="menu"
                   onLogout={handleLogout}
                   user={user}
+                  darkMode={darkMode}
+                  setDarkMode={setDarkMode}
+                  syncStatus={syncStatus}
+                  onSync={triggerSync}
                 />
               } />
 

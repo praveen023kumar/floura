@@ -304,13 +304,31 @@ export default function DebriefsView({ }: DebriefsViewProps) {
       exit={{ opacity: 0 }}
       className="space-y-6 text-left"
     >
-      {/* ── HEADER (Title only) ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 pb-2 border-b border-zinc-150/80 dark:border-zinc-800/80">
+      {/* ── HEADER ── */}
+      <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 sm:w-6 h-6 text-primary-brand dark:text-orange-400 shrink-0" />
+            <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-primary-brand dark:text-orange-400 shrink-0" />
             Kitchen Performance Dashboard
           </h2>
+          <p className="hidden sm:block text-xs text-zinc-550 font-sans mt-0.5">
+            Filtered performance metrics and completed bake analytics.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(true)}
+            className="lg:hidden relative flex items-center justify-center bg-white dark:bg-zinc-800 w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 cursor-pointer shadow-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary-brand shrink-0"
+            title="Filters"
+          >
+            <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary-brand dark:bg-orange-400 text-white text-[9px] font-bold flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -381,29 +399,16 @@ export default function DebriefsView({ }: DebriefsViewProps) {
         </div>
       )}
 
-      {/* Mobile Filter toggle button */}
-      <div className="flex justify-end gap-2 shrink-0 lg:hidden mt-2">
-        <button
-          type="button"
-          onClick={() => setMobileFiltersOpen(true)}
-          className="relative flex items-center gap-1.5 bg-white dark:bg-zinc-800 text-xs font-bold py-2 px-3 sm:py-2.5 sm:px-4 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 cursor-pointer shadow-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary-brand"
-        >
-          <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
-          <span>Filters</span>
-          {activeFilterCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary-brand dark:bg-orange-400 text-white text-[9px] font-bold flex items-center justify-center">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-      </div>
+
 
       {/* ── MAIN LAYOUT WITH FILTERS SIDEBAR ── */}
-      <div className="lg:flex lg:items-start lg:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Desktop side menu */}
-        <aside className="hidden lg:block w-60 shrink-0 sticky top-4 self-start bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl p-5 max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar text-left">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-xs font-bold text-zinc-800 dark:text-zinc-100 uppercase tracking-wide font-sans">Filters</h3>
+        <aside className="hidden lg:block lg:col-span-3 bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-150 dark:border-zinc-850 shadow-xs text-left">
+          <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4 flex justify-between items-center">
+            <span className="text-xs font-bold text-zinc-808 dark:text-zinc-105 uppercase tracking-wider">
+              Filter Desk
+            </span>
             {activeFilterCount > 0 && (
               <button
                 type="button"
@@ -477,8 +482,8 @@ export default function DebriefsView({ }: DebriefsViewProps) {
           )}
         </AnimatePresence>
 
-        {/* Main Content Area (Filtered) */}
-        <div className="flex-1 min-w-0 space-y-6 text-left">
+        {/* Main Content Area */}
+        <div className="lg:col-span-9 space-y-6 text-left">
           {/* Active Filters Alert Banner */}
           {(selectedFlavor || startDate || endDate) && (
             <div className="bg-amber-500/10 dark:bg-amber-500/20 border border-amber-200/45 dark:border-amber-500/30 rounded-2xl p-4 flex items-center justify-between text-xs text-amber-800 dark:text-amber-400 font-semibold shadow-2xs">

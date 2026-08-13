@@ -196,11 +196,11 @@ export default function ChecklistView({
       transition={{ duration: 0.25 }}
       className="space-y-6 text-left"
     >
-      {/* View Header */}
+      {/* ── HEADER ── */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate flex items-center gap-2">
-            <ClipboardList className="w-5 h-5 sm:w-6 h-6 text-primary-brand dark:text-orange-400 shrink-0" />
+            <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6 text-primary-brand dark:text-orange-400 shrink-0" />
             Daily Kitchen Checklist
           </h2>
           <p className="hidden sm:block text-xs text-zinc-550 font-sans mt-0.5">
@@ -211,10 +211,10 @@ export default function ChecklistView({
           <button
             type="button"
             onClick={() => setMobileFiltersOpen(true)}
-            className="lg:hidden relative flex items-center gap-1.5 bg-white dark:bg-zinc-800 text-xs font-bold py-2 px-3 sm:py-2.5 sm:px-4 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 cursor-pointer shadow-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary-brand"
+            className="lg:hidden relative flex items-center justify-center bg-white dark:bg-zinc-800 w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 cursor-pointer shadow-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary-brand shrink-0"
+            title="Filters"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
-            <span className="hidden xs:inline">Filters</span>
+            <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
             {activeFilterCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary-brand dark:bg-orange-400 text-white text-[9px] font-bold flex items-center justify-center">
                 {activeFilterCount}
@@ -224,10 +224,10 @@ export default function ChecklistView({
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="shrink-0 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white text-xs font-bold py-2 px-3 sm:py-2.5 sm:px-4 rounded-full flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95 whitespace-nowrap"
+            className="w-10 h-10 rounded-full bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all active:scale-95 shrink-0"
+            title="Add Task"
           >
-            <Plus className="w-4 h-4" />
-            <span className="hidden xs:inline">Add Task</span>
+            <Plus className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -256,7 +256,7 @@ export default function ChecklistView({
               className="lg:hidden fixed inset-y-0 left-0 z-50 w-[85vw] max-w-xs bg-white dark:bg-zinc-800 shadow-2xl flex flex-col text-left"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 dark:border-zinc-700 shrink-0">
-                <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-105 font-sans">Filters</h3>
+                <h3 className="text-sm font-bold text-zinc-808 dark:text-zinc-105 font-sans">Filters</h3>
                 <button
                   type="button"
                   aria-label="Close filters"
@@ -292,41 +292,6 @@ export default function ChecklistView({
         )}
       </AnimatePresence>
 
-      {/* Activity Progress Card (Next item after header) */}
-      <div className="bg-gradient-to-br from-primary-brand/10 via-white to-zinc-50/50 dark:from-orange-950/20 dark:via-zinc-900 dark:to-zinc-950/40 p-6 rounded-2xl border border-zinc-150 dark:border-zinc-800 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="w-14 h-14 bg-primary-brand/15 dark:bg-orange-500/15 rounded-full flex items-center justify-center text-primary-brand dark:text-orange-400 shrink-0">
-            <Activity className="w-7 h-7" />
-          </div>
-          <div className="space-y-2.5">
-            <h3 className="text-base font-bold text-zinc-850 dark:text-zinc-100 leading-snug">
-              {completionRate === 100 ? "All Clear! 🎉 Ready to Bake" : "Preparation Progress"}
-            </h3>
-            <div className="flex flex-col gap-2 items-start">
-              <span className="text-[10px] font-bold bg-primary-brand/15 dark:bg-orange-500/15 px-2.5 py-1.5 rounded-lg text-primary-brand dark:text-orange-400 whitespace-nowrap">
-                📅 {formatChecklistDate(selectedDate)}
-              </span>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                {completedCount} of {totalCount} tasks completed ({completionRate}%)
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="w-full md:w-80 space-y-1.5 shrink-0">
-          <div className="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-2 overflow-hidden">
-            <div
-              className="h-full bg-primary-brand dark:bg-orange-500 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${completionRate}%` }}
-            ></div>
-          </div>
-          <div className="flex justify-between text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider">
-            <span>START PREP</span>
-            <span>READY TO BAKE</span>
-          </div>
-        </div>
-      </div>
-
       {/* Active filter chips */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -334,7 +299,7 @@ export default function ChecklistView({
             <button
               type="button"
               onClick={() => setFilterMode("all")}
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
             >
               <span>Status: {filterMode}</span>
               <X className="w-3 h-3" aria-hidden="true" />
@@ -344,7 +309,7 @@ export default function ChecklistView({
             <button
               type="button"
               onClick={() => setSearchTerm("")}
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
             >
               <span>Search: "{searchTerm}"</span>
               <X className="w-3 h-3" aria-hidden="true" />
@@ -354,7 +319,7 @@ export default function ChecklistView({
             <button
               type="button"
               onClick={() => setSelectedDate(todayStr)}
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
             >
               <span>Date: Custom</span>
               <X className="w-3 h-3" aria-hidden="true" />
@@ -363,7 +328,7 @@ export default function ChecklistView({
           <button
             type="button"
             onClick={clearAllFilters}
-            className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 hover:text-zinc-655 hover:underline px-1.5 cursor-pointer"
+            className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-655 hover:underline px-1.5 cursor-pointer"
           >
             Clear all
           </button>
@@ -373,9 +338,9 @@ export default function ChecklistView({
       {/* Filters and Checklist Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Side Filter Card (Hidden on mobile) */}
-        <aside className="hidden lg:block lg:col-span-4 bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-150 dark:border-zinc-800 shadow-xs">
+        <aside className="hidden lg:block lg:col-span-3 bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-150 dark:border-zinc-800 shadow-xs">
           <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4 flex justify-between items-center">
-            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-105 uppercase tracking-wider">
+            <span className="text-xs font-bold text-zinc-808 dark:text-zinc-105 uppercase tracking-wider">
               Filter Desk
             </span>
             {activeFilterCount > 0 && (
@@ -391,8 +356,9 @@ export default function ChecklistView({
           {renderFilterGroups()}
         </aside>
 
-        {/* Right Side: Checklist Items (fillup checked) */}
-        <div className="lg:col-span-8 bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-800 shadow-xs min-h-[350px] flex flex-col">
+        {/* Right Side: Checklist Items */}
+        <div className="lg:col-span-9 space-y-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-800 shadow-xs min-h-[350px] flex flex-col">
           <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4 flex justify-between items-center">
             <span className="text-xs font-bold text-zinc-505 dark:text-zinc-550 uppercase tracking-wider">
               {filterMode.toUpperCase()} ITEMS ({filteredList.length})
@@ -526,6 +492,7 @@ export default function ChecklistView({
                 )}
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>

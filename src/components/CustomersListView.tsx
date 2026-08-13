@@ -262,11 +262,48 @@ export default function CustomersListView() {
 
   return (
     <div className="space-y-6">
-      <div className="lg:flex lg:items-start lg:gap-6">
+      {/* ── HEADER ── */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate">
+            Client Database
+          </h2>
+          <p className="hidden sm:block text-xs text-zinc-550 font-sans mt-0.5">
+            Track client loyalties and coordinate messaging triggers easily.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(true)}
+            className="lg:hidden relative flex items-center justify-center bg-white dark:bg-zinc-800 w-10 h-10 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 cursor-pointer shadow-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary-brand shrink-0"
+            title="Filters"
+          >
+            <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary-brand dark:bg-orange-400 text-white text-[9px] font-bold flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/customers/new")}
+            className="w-10 h-10 rounded-full bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all active:scale-95 shrink-0"
+            title="Add Customer"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Desktop side menu */}
-        <aside className="hidden lg:block w-60 shrink-0 sticky top-4 self-start bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl p-5 max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-xs font-bold text-zinc-800 dark:text-zinc-100 uppercase tracking-wide font-sans">Filters</h3>
+        <aside className="hidden lg:block lg:col-span-3 bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-150 dark:border-zinc-850 shadow-xs">
+          <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4 flex justify-between items-center">
+            <span className="text-xs font-bold text-zinc-808 dark:text-zinc-105 uppercase tracking-wider">
+              Filter Desk
+            </span>
             {activeFilterCount > 0 && (
               <button
                 type="button"
@@ -341,98 +378,60 @@ export default function CustomersListView() {
         </AnimatePresence>
 
         {/* Main content */}
-        <div className="flex-1 min-w-0 space-y-6">
+        <div className="lg:col-span-9 space-y-6">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18 }}
-            className="space-y-6"
+            className="space-y-4"
           >
-            {/* Header */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate">
-                    Client Database
-                  </h2>
-                  <p className="hidden sm:block text-xs text-zinc-500 font-sans mt-0.5">
-                    Track client loyalties and coordinate messaging triggers easily.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setMobileFiltersOpen(true)}
-                    className="lg:hidden relative flex items-center gap-1.5 bg-white dark:bg-zinc-800 text-xs font-bold py-2 px-3 sm:py-2.5 sm:px-4 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 cursor-pointer shadow-md hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary-brand"
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
-                    <span className="hidden xs:inline">Filters</span>
-                    {activeFilterCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary-brand dark:bg-orange-400 text-white text-[9px] font-bold flex items-center justify-center">
-                        {activeFilterCount}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate("/customers/new");
-                    }}
-                    className="shrink-0 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white text-xs font-bold py-2 px-3 sm:py-2.5 sm:px-4 rounded-full flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95 duration-200"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span className="hidden xs:inline">Add Customer</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Search row */}
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                <input
-                  type="text"
-                  placeholder="Search customers (ID, name, contact number)..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-white dark:bg-zinc-800 text-sm pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-850 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-400"
-                />
-              </div>
-
-              {/* Active filter chips */}
-              {(filterType !== "All" || sortBy !== "updated-newest") && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {filterType !== "All" && (
-                    <button
-                      type="button"
-                      onClick={() => setFilterType("All")}
-                      className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
-                    >
-                      {filterType} Customers
-                      <X className="w-3 h-3" aria-hidden="true" />
-                      <span className="sr-only">Remove type filter</span>
-                    </button>
-                  )}
-                  {sortBy !== "updated-newest" && (
-                    <button
-                      type="button"
-                      onClick={() => setSortBy("updated-newest")}
-                      className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
-                    >
-                      {sortOptions.find((o) => o.value === sortBy)?.label}
-                      <X className="w-3 h-3" aria-hidden="true" />
-                      <span className="sr-only">Remove sort option</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={clearAllFilters}
-                    className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-wider cursor-pointer transition-colors ml-1"
-                  >
-                    Clear all
-                  </button>
-                </div>
-              )}
+            {/* Search row */}
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Search customers (ID, name, contact number)..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-white dark:bg-zinc-800 text-sm pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-850 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-400"
+              />
             </div>
+
+            {/* Active filter chips */}
+            {(filterType !== "All" || sortBy !== "updated-newest") && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {filterType !== "All" && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterType("All")}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    {filterType} Customers
+                    <X className="w-3 h-3" aria-hidden="true" />
+                    <span className="sr-only">Remove type filter</span>
+                  </button>
+                )}
+                {sortBy !== "updated-newest" && (
+                  <button
+                    type="button"
+                    onClick={() => setSortBy("updated-newest")}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    {sortOptions.find((o) => o.value === sortBy)?.label}
+                    <X className="w-3 h-3" aria-hidden="true" />
+                    <span className="sr-only">Remove sort option</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-wider cursor-pointer transition-colors ml-1"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
 
             {/* Profile database matching exact screenshots profiles */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

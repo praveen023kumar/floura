@@ -1,34 +1,41 @@
 // File Path: /src/components/DashboardView.tsx
-import { type ChecklistItem } from "../types";
-import { formatPrice } from "../utils/format";
+import { useState } from "react";
+import { motion } from "motion/react";
 import {
-  ArrowRight,
-  PlusCircle,
-  FolderPlus,
-  BookOpen,
-  Check,
+  Search,
+  Bell,
+  Plus,
+  ChevronRight,
+  Sparkles,
+  CheckCircle2,
   TrendingUp,
   Truck,
   AlertTriangle,
-  CheckCircle,
+  FolderPlus,
+  BookOpen,
+  Calendar,
+  Check
 } from "lucide-react";
-import { motion } from "motion/react";
+import { formatPrice } from "../utils/format";
 import { useDashboard } from "../hooks/useDashboard";
+import { type Order, type ChecklistItem } from "../types";
 
 interface DashboardViewProps {
-  onNavigate: (screen: "dashboard" | "orders" | "customers" | "inventory" | "recipes" | "orders-form" | "customers-form" | "inventory-form" | "recipes-form" | "debriefs" | "checklist") => void;
+  onNavigate: (screen: "dashboard" | "orders" | "customers" | "inventory" | "recipes" | "orders-form" | "customers-form" | "inventory-form" | "recipes-form" | "debriefs" | "checklist" | "profile" | "more") => void;
   productionCount: { completed: number; progress: number };
   activeOrdersCount: number;
   lowStockCount: number;
   checklist: ChecklistItem[];
   onToggleChecklistItem: (id: string, checked: boolean, date?: string) => void;
   onAlertClick?: (orderId: string) => void;
+  user: { name: string; avatar: string } | null;
 }
 
 export default function DashboardView({
   onNavigate,
   checklist,
   onToggleChecklistItem,
+  user,
 }: DashboardViewProps) {
   const {
     lowStockCount,
@@ -36,220 +43,467 @@ export default function DashboardView({
     todayStr,
     todayProfit,
     todayDeliveryCount,
+    activeOrders,
+    lowStockItems,
+    averageProfitMarginPercent,
   } = useDashboard({ checklist });
 
-  const completedCount = todayMappedChecklist.filter((i) => i.checked).length;
-  const totalCount = todayMappedChecklist.length;
-  const allDone = totalCount > 0 && completedCount === totalCount;
+  const [scheduleDate, setScheduleDate] = useState(todayStr);
+
+  // Compute checklist stats
+  const completedChecklistCount = todayMappedChecklist.filter((i) => i.checked).length;
+  const totalChecklistCount = todayMappedChecklist.length;
+  const checklistPercent = totalChecklistCount > 0 ? Math.round((completedChecklistCount / totalChecklistCount) * 100) : 0;
+
+  // Filter orders for selected schedule date
+  const scheduleOrders = activeOrders.filter(o => o.deliveryDate === scheduleDate);
+
+  // Helper to map order delivery time to timeline column indexes
+  const getTimelinePosition = (timeStr: string) => {
+    if (!timeStr) return { start: 5, span: 2 }; // Default/Fallback
+    const hour = parseInt(timeStr.split(":")[0]);
+    if (hour < 11) return { start: 1, span: 2 };      // 09:00 am slot
+    if (hour < 13) return { start: 2, span: 2 };      // 12:00 pm slot
+    if (hour < 15) return { start: 3, span: 2 };      // 02:00 pm slot
+    if (hour < 16) return { start: 4, span: 2 };      // 03:00 pm slot
+    if (hour < 17) return { start: 5, span: 2 };      // 04:00 pm slot
+    return { start: 6, span: 1 };                     // 06:00 pm slot
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
-      className="space-y-5"
+      className="space-y-6 pb-12 text-zinc-800 dark:text-zinc-100"
     >
-      {/* Welcome Header */}
-      <div className="flex justify-between items-center">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="text-3xl font-bold text-primary-brand dark:text-orange-400 font-serif tracking-tight">
-            Hello, Chef.
-          </h2>
-          <p className="text-zinc-500 dark:text-zinc-400 font-sans text-xs sm:text-sm font-medium">
-            Floura Kitchen pulse for today.
+      {/* ================= HEADER SECTION ================= */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Welcome message */}
+        <div className="flex flex-col text-left">
+          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white font-sans">
+            Welcome Back, Chef!
+          </h1>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm font-medium mt-1">
+            Floura Kitchen pulse for today. Track inventory levels, prep lists, and scheduled dispatches.
           </p>
         </div>
-        <button
-          onClick={() => onNavigate("orders-form")}
-          className="flex items-center justify-center w-11 h-11 bg-primary-brand dark:bg-pink-700 hover:bg-primary-brand-dark hover:scale-102 text-white rounded-2xl shadow-md shadow-pink-700/10 cursor-pointer active:scale-95 transition-all"
-          title="New Order"
-        >
-          <PlusCircle className="w-6 h-6 stroke-[2.2]" />
-        </button>
       </div>
 
-      {/* 1. Today — Profit & Delivery Order Count */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        {/* Today's Profit */}
-        <div
-          onClick={() => onNavigate("orders")}
-          className="bg-[#F4FDF9] dark:bg-emerald-950/10 rounded-2xl p-4 sm:p-5 border border-emerald-100/60 dark:border-emerald-900/20 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all cursor-pointer shadow-xs flex flex-col justify-between min-h-[120px] sm:min-h-[140px]"
-        >
-          <div className="flex justify-between items-start">
-            <p className="text-[9px] sm:text-[11px] font-bold tracking-wider uppercase text-emerald-700 dark:text-emerald-450 font-sans">
-              Today's Profit
-            </p>
-            <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+      {/* ================= MAIN DASHBOARD GRID ================= */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        
+        {/* LEFT COLUMN: Main content area (Spans 2 columns on large screens) */}
+        <div className="xl:col-span-2 space-y-6">
+          
+          {/* 1. TOP CARDS: Subject progress style widgets showing Floura metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            {/* Card 1: Today's Profit */}
+            <div
+              onClick={() => onNavigate("orders")}
+              className="bg-white dark:bg-zinc-900 border border-zinc-150/80 dark:border-zinc-800 rounded-3xl p-5 hover:shadow-md dark:hover:shadow-zinc-950/30 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer shadow-xs flex flex-col justify-between h-[130px]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-sky-50 dark:bg-sky-950/50 shrink-0">
+                  <TrendingUp className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+                </div>
+                <span className="text-xs font-bold text-zinc-750 dark:text-zinc-300 tracking-tight leading-tight">
+                  Today's Profit
+                </span>
+              </div>
+
+              <div className="space-y-2 mt-4">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
+                    {formatPrice(todayProfit)}
+                  </span>
+                  <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500">
+                    Margin {Math.round(averageProfitMarginPercent || 75)}%
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full rounded-full bg-sky-600 transition-all duration-550"
+                    style={{ width: `${Math.round(averageProfitMarginPercent || 75)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Today's Deliveries */}
+            <div
+              onClick={() => onNavigate("orders")}
+              className="bg-white dark:bg-zinc-900 border border-zinc-150/80 dark:border-zinc-800 rounded-3xl p-5 hover:shadow-md dark:hover:shadow-zinc-950/30 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer shadow-xs flex flex-col justify-between h-[130px]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-indigo-50 dark:bg-indigo-950/50 shrink-0">
+                  <Truck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <span className="text-xs font-bold text-zinc-750 dark:text-zinc-300 tracking-tight leading-tight">
+                  Today's Deliveries
+                </span>
+              </div>
+
+              <div className="space-y-2 mt-4">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
+                    {todayDeliveryCount}
+                  </span>
+                  <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500">
+                    {todayDeliveryCount === 0 ? "No dispatches" : `${todayDeliveryCount} due today`}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full rounded-full bg-indigo-600 transition-all duration-550"
+                    style={{ width: todayDeliveryCount > 0 ? "100%" : "0%" }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Daily Prep Checklist Overview */}
+            <div
+              onClick={() => onNavigate("checklist")}
+              className="bg-white dark:bg-zinc-900 border border-zinc-150/80 dark:border-zinc-800 rounded-3xl p-5 hover:shadow-md dark:hover:shadow-zinc-950/30 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer shadow-xs flex flex-col justify-between h-[130px]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-pink-50 dark:bg-pink-950/50 shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-pink-600 dark:text-pink-400" />
+                </div>
+                <span className="text-xs font-bold text-zinc-750 dark:text-zinc-300 tracking-tight leading-tight">
+                  Daily Prep Checklist
+                </span>
+              </div>
+
+              <div className="space-y-2 mt-4">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
+                    {checklistPercent}%
+                  </span>
+                  <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500">
+                    {completedChecklistCount}/{totalChecklistCount} Tasks
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full rounded-full bg-pink-600 transition-all duration-550"
+                    style={{ width: `${checklistPercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* 2. SCHEDULE CARD: Dynamic Delivery Schedule (Filtered by selected Date) */}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-150/80 dark:border-zinc-800 rounded-3xl p-5 shadow-xs">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-base font-extrabold text-zinc-900 dark:text-white font-sans tracking-tight">
+                  My Schedule
+                </h2>
+                <p className="text-[10px] text-zinc-450 dark:text-zinc-500 font-medium">
+                  Showing delivery timelines based on chosen date
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Selected Date Pick input */}
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="px-2 py-1 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-750 text-zinc-800 dark:text-white rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                />
+                <button 
+                  onClick={() => onNavigate("orders-form")}
+                  className="flex items-center justify-center w-7 h-7 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-750 rounded-lg text-zinc-650 dark:text-zinc-300 transition-all cursor-pointer active:scale-95"
+                  title="New Order"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Time labels axis */}
+            <div className="relative">
+              <div className="grid grid-cols-6 border-b border-zinc-100 dark:border-zinc-800 pb-2 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 select-none">
+                <div>09:00 am</div>
+                <div>12:00 pm</div>
+                <div>02:00 pm</div>
+                <div className="text-zinc-800 dark:text-white font-extrabold bg-zinc-100 dark:bg-zinc-800/80 px-1.5 py-0.5 rounded-md text-center max-w-[65px] mx-auto">03:00 pm</div>
+                <div className="text-center">04:00 pm</div>
+                <div className="text-right">06:00 pm</div>
+              </div>
+
+              {/* Grid timeline visual layout */}
+              <div className="grid grid-cols-6 gap-2 mt-4 min-h-[90px] relative">
+                {/* Vertical dotted grid lines */}
+                <div className="absolute inset-0 flex justify-between pointer-events-none select-none opacity-40">
+                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
+                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
+                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
+                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
+                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
+                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
+                </div>
+
+                {scheduleOrders.length > 0 ? (
+                  // Map today's actual pending orders to timeline slots based on deliveryTime
+                  scheduleOrders.slice(0, 4).map((order, idx) => {
+                    const pos = getTimelinePosition(order.deliveryTime);
+                    const colors = [
+                      { col: "pink" },
+                      { col: "indigo" },
+                      { col: "sky" },
+                      { col: "emerald" }
+                    ][idx % 4];
+
+                    return (
+                      <div 
+                        key={order.id}
+                        onClick={() => onNavigate("orders")}
+                        className={`col-start-${pos.start} col-span-${pos.span} bg-${colors.col}-50/50 dark:bg-${colors.col}-950/20 border border-${colors.col}-100 dark:border-${colors.col}-900/30 rounded-2xl p-3 flex flex-col justify-between hover:scale-102 hover:shadow-xs active:scale-98 transition-all cursor-pointer relative z-10`}
+                      >
+                        <div className={`w-1.5 h-6 bg-${colors.col}-500 rounded-full absolute left-2 top-3`}></div>
+                        <div className="pl-3.5">
+                          <p className={`text-xs font-bold text-${colors.col}-700 dark:text-${colors.col}-300 truncate`}>
+                            {order.customerName}
+                          </p>
+                          <p className={`text-[9px] font-semibold text-${colors.col}-500/80 mt-0.5`}>
+                            {order.deliveryTime || "04:00 pm"} ({order.cakeFlavor})
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  // Empty state visual showing no scheduled dispatches
+                  <div className="col-span-6 flex flex-col items-center justify-center py-6 text-zinc-400 dark:text-zinc-555">
+                    <Calendar className="w-8 h-8 text-zinc-300 dark:text-zinc-800 mb-2" />
+                    <p className="text-xs font-semibold">No deliveries scheduled on this date</p>
+                    <p className="text-[10px] text-zinc-400/80">Click the "+" icon above to schedule a new bake dispatch.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <div>
-            <h3 className="text-xl sm:text-3xl font-serif font-bold text-emerald-800 dark:text-emerald-300 mt-1 truncate">
-              {formatPrice(todayProfit)}
+
+          {/* 3. SHOW: Daily Inventory Check list manager */}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-150/80 dark:border-zinc-800 rounded-3xl p-5 shadow-xs">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-base font-extrabold text-zinc-900 dark:text-white font-sans tracking-tight">
+                  Daily Inventory Check
+                </h3>
+                <p className="text-[10px] text-zinc-450 mt-0.5">Toggle prep items to update your local inventory checkoff</p>
+              </div>
+              <button 
+                onClick={() => onNavigate("checklist")}
+                className="text-xs font-bold text-zinc-400 hover:text-zinc-650 dark:text-zinc-500 dark:hover:text-zinc-350 cursor-pointer"
+              >
+                Manage Tasks
+              </button>
+            </div>
+
+            {/* Checklist items list */}
+            {todayMappedChecklist.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                {todayMappedChecklist.map((item) => (
+                  <div 
+                    key={item.id}
+                    onClick={() => onToggleChecklistItem(item.id, !item.checked, todayStr)}
+                    className={`flex items-center gap-3 p-3 border rounded-2xl transition-all cursor-pointer select-none active:scale-98 ${
+                      item.checked
+                        ? "bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/30 text-emerald-850 dark:text-emerald-300"
+                        : "bg-zinc-50/30 dark:bg-zinc-900/20 border-zinc-150 dark:border-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                      item.checked
+                        ? "bg-emerald-500 border-emerald-500 text-white"
+                        : "border-zinc-300 dark:border-zinc-700"
+                    }`}>
+                      {item.checked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                    </div>
+                    <span className={`text-xs font-semibold truncate flex-1 text-left ${item.checked ? "line-through opacity-70" : ""}`}>
+                      {item.text}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-zinc-400 dark:text-zinc-600 flex flex-col items-center">
+                <CheckCircle2 className="w-8 h-8 text-zinc-300 dark:text-zinc-800 mb-2" />
+                <p className="text-xs font-semibold">No prep checklist items scheduled for today</p>
+                <button 
+                  onClick={() => onNavigate("checklist")}
+                  className="mt-2 text-[10px] font-bold text-amber-500 hover:underline"
+                >
+                  Create checklists
+                </button>
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* RIGHT COLUMN: Sidebar Panel (Stock alerts, Quick Actions, Upcoming Queue) */}
+        <div className="space-y-6">
+          
+          {/* 1. SHOW: Low Stock Alerts widget */}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-150/80 dark:border-zinc-800 rounded-3xl p-5 shadow-xs">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-extrabold text-zinc-900 dark:text-white font-sans tracking-tight">
+                Low Stock Alerts
+              </h3>
+              <button 
+                onClick={() => onNavigate("inventory")}
+                className="text-xs font-bold text-zinc-400 hover:text-zinc-650 dark:text-zinc-500 dark:hover:text-zinc-350 cursor-pointer"
+              >
+                Stock Room
+              </button>
+            </div>
+
+            {/* Stock list */}
+            {lowStockCount > 0 ? (
+              <div className="space-y-2.5">
+                {lowStockItems.slice(0, 5).map((item, idx) => (
+                  <div 
+                    key={idx}
+                    onClick={() => onNavigate("inventory")}
+                    className="flex items-center justify-between p-2.5 bg-amber-50/20 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/30 rounded-2xl cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-all"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span className="text-xs font-extrabold text-zinc-800 dark:text-zinc-200 truncate max-w-[130px] text-left">
+                        {item.name}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-black text-amber-600 dark:text-amber-400">
+                        {item.quantity} {item.unit}
+                      </span>
+                      <p className="text-[8px] font-semibold text-zinc-400 dark:text-zinc-500 mt-0.5">
+                        Min: {item.minStockLevel} {item.unit}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-6 text-center text-zinc-400 dark:text-zinc-600 flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 flex items-center justify-center mb-2">
+                  <Check className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <p className="text-xs font-semibold">Ingredient levels are healthy</p>
+                <p className="text-[9px] text-zinc-400/80 mt-0.5">All stocks are above minimal levels.</p>
+              </div>
+            )}
+          </div>
+
+          {/* 2. SHOW: Quick Actions buttons */}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-150/80 dark:border-zinc-800 rounded-3xl p-5 shadow-xs">
+            <h3 className="text-base font-extrabold text-zinc-900 dark:text-white font-sans tracking-tight mb-4 text-left">
+              Quick Actions
             </h3>
-            <p className="text-[9px] sm:text-[11px] text-emerald-600 dark:text-emerald-500 font-semibold mt-1 truncate">
-              From completed deliveries
-            </p>
-          </div>
-        </div>
+            
+            <div className="grid grid-cols-3 gap-3">
+              {/* Add Order */}
+              <button
+                onClick={() => onNavigate("orders-form")}
+                className="group bg-amber-500 hover:bg-amber-600 text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer text-center min-h-[90px]"
+              >
+                <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center transition-transform group-hover:scale-105">
+                  <Plus className="w-4 h-4 text-white stroke-[2.5]" />
+                </div>
+                <span className="text-[10px] font-bold tracking-tight">New Order</span>
+              </button>
 
-        {/* Today's Delivery Order Count */}
-        <div
-          onClick={() => onNavigate("orders")}
-          className="bg-pink-50/40 dark:bg-pink-950/10 rounded-2xl p-4 sm:p-5 border border-pink-100/50 dark:border-pink-900/20 hover:border-pink-300 dark:hover:border-pink-800 transition-all cursor-pointer shadow-xs flex flex-col justify-between min-h-[120px] sm:min-h-[140px]"
-        >
-          <div className="flex justify-between items-start">
-            <p className="text-[9px] sm:text-[11px] font-bold tracking-wider uppercase text-pink-650 dark:text-pink-400 font-sans">
-              Today's Deliveries
-            </p>
-            <div className="w-7 h-7 rounded-full bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center shrink-0">
-              <Truck className="w-3.5 h-3.5 text-pink-500 dark:text-pink-400" />
+              {/* Add Stock */}
+              <button
+                onClick={() => onNavigate("inventory-form")}
+                className="group bg-rose-500 hover:bg-rose-600 text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer text-center min-h-[90px]"
+              >
+                <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center transition-transform group-hover:scale-105">
+                  <FolderPlus className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-[10px] font-bold tracking-tight">Add Stock</span>
+              </button>
+
+              {/* View Recipes */}
+              <button
+                onClick={() => onNavigate("recipes")}
+                className="group bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-2xl p-3 flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 shadow-xs cursor-pointer text-center min-h-[90px]"
+              >
+                <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-pink-950/40 flex items-center justify-center transition-transform group-hover:scale-105">
+                  <BookOpen className="w-4 h-4 text-amber-600 dark:text-pink-400" />
+                </div>
+                <span className="text-[10px] font-bold tracking-tight">Recipes</span>
+              </button>
             </div>
           </div>
-          <div>
-            <h3 className="text-xl sm:text-3xl font-serif font-bold text-zinc-800 dark:text-zinc-100 mt-1">
-              {todayDeliveryCount}
-            </h3>
-            <p className="text-[9px] sm:text-[11px] text-pink-600 dark:text-pink-400 font-semibold mt-1 truncate">
-              {todayDeliveryCount === 0 ? "No deliveries today" : `Order${todayDeliveryCount !== 1 ? "s" : ""} due today`}
-            </p>
+
+          {/* 3. UPCOMING DELIVERIES QUEUE */}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-150/80 dark:border-zinc-800 rounded-3xl p-5 shadow-xs">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-extrabold text-zinc-900 dark:text-white font-sans tracking-tight">
+                Upcoming Queue
+              </h3>
+              <button 
+                onClick={() => onNavigate("orders")}
+                className="text-xs font-bold text-zinc-400 hover:text-zinc-650 dark:text-zinc-500 dark:hover:text-zinc-350 cursor-pointer"
+              >
+                View All
+              </button>
+            </div>
+
+            {/* Upcoming queue items */}
+            <div className="space-y-3">
+              {activeOrders.length > 0 ? (
+                activeOrders.slice(0, 3).map((order) => (
+                  <div
+                    key={order.id}
+                    className="p-3 border border-zinc-100 dark:border-zinc-800 bg-zinc-50/20 dark:bg-zinc-950/20 rounded-2xl flex flex-col gap-2.5"
+                  >
+                    <div className="flex justify-between items-start text-left">
+                      <div>
+                        <h4 className="text-xs font-extrabold text-zinc-800 dark:text-zinc-200">
+                          {order.customerName}
+                        </h4>
+                        <p className="text-[9px] font-semibold text-zinc-400 dark:text-zinc-500 mt-0.5">
+                          {order.cakeFlavor} Cake ({order.cakeWeight})
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-[9px] font-bold text-zinc-450 dark:text-zinc-500">
+                        {order.deliveryDate} at {order.deliveryTime || "04:00 pm"}
+                      </span>
+
+                      <button 
+                        onClick={() => onNavigate("orders")}
+                        className="flex items-center justify-center px-2 py-1.5 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300 font-bold text-[9px] rounded-lg hover:bg-zinc-50 active:scale-95 transition-all cursor-pointer shadow-xs"
+                      >
+                        Details
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-6 text-center text-zinc-400 dark:text-zinc-600 flex flex-col items-center">
+                  <Truck className="w-8 h-8 text-zinc-300 dark:text-zinc-800 mb-2" />
+                  <p className="text-xs font-semibold">Production queue is empty</p>
+                </div>
+              )}
+            </div>
           </div>
+
         </div>
+
       </div>
-
-      {/* 2. Daily Inventory Check */}
-      <div
-        onClick={() => onNavigate("checklist")}
-        className={`rounded-2xl p-4 sm:p-5 border cursor-pointer transition-all shadow-xs flex items-center justify-between gap-4 ${
-          allDone
-            ? "bg-emerald-50/40 dark:bg-emerald-950/10 border-emerald-100/60 dark:border-emerald-900/20 hover:border-emerald-300 dark:hover:border-emerald-700"
-            : "bg-white dark:bg-zinc-800 border-zinc-100 dark:border-zinc-700/60 hover:border-zinc-300 dark:hover:border-zinc-600"
-        }`}
-      >
-        <div className="flex items-center gap-3.5">
-          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-            allDone
-              ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-              : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
-          }`}>
-            {allDone
-              ? <CheckCircle className="w-5 h-5" />
-              : <Check className="w-5 h-5" />
-            }
-          </div>
-          <div>
-            <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-              Daily Inventory Check
-            </p>
-            <p className={`text-xs font-semibold mt-0.5 ${
-              allDone
-                ? "text-emerald-700 dark:text-emerald-400"
-                : "text-amber-700 dark:text-amber-400"
-            }`}>
-              {totalCount === 0
-                ? "No items for today"
-                : allDone
-                ? "All items verified"
-                : `${totalCount - completedCount} item${totalCount - completedCount !== 1 ? "s" : ""} pending`}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {totalCount > 0 && !allDone && (
-            <span className="w-8 h-8 rounded-full bg-amber-500 dark:bg-amber-600 text-white text-sm font-bold flex items-center justify-center">
-              {totalCount - completedCount}
-            </span>
-          )}
-          <ArrowRight className={`w-4 h-4 ${
-            allDone ? "text-emerald-500 dark:text-emerald-400" : "text-zinc-400 dark:text-zinc-500"
-          }`} />
-        </div>
-      </div>
-
-      {/* 3. Low Stock Alert */}
-      <div
-        onClick={() => onNavigate("inventory")}
-        className={`rounded-2xl p-4 sm:p-5 border cursor-pointer transition-all shadow-xs flex items-center justify-between gap-4 ${
-          lowStockCount > 0
-            ? "bg-amber-50/60 dark:bg-amber-950/10 border-amber-200/60 dark:border-amber-900/30 hover:border-amber-400 dark:hover:border-amber-700"
-            : "bg-emerald-50/40 dark:bg-emerald-950/10 border-emerald-100/60 dark:border-emerald-900/20 hover:border-emerald-300 dark:hover:border-emerald-700"
-        }`}
-      >
-        <div className="flex items-center gap-3.5">
-          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-            lowStockCount > 0
-              ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
-              : "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-          }`}>
-            {lowStockCount > 0
-              ? <AlertTriangle className="w-5 h-5" />
-              : <CheckCircle className="w-5 h-5" />
-            }
-          </div>
-          <div>
-            <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-              Low Stock Alert
-            </p>
-            <p className={`text-xs font-semibold mt-0.5 ${
-              lowStockCount > 0
-                ? "text-amber-700 dark:text-amber-400"
-                : "text-emerald-700 dark:text-emerald-400"
-            }`}>
-              {lowStockCount > 0
-                ? `${lowStockCount} ingredient${lowStockCount !== 1 ? "s" : ""} below minimum level`
-                : "All stocks are healthy"}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {lowStockCount > 0 && (
-            <span className="w-8 h-8 rounded-full bg-amber-500 dark:bg-amber-600 text-white text-sm font-bold flex items-center justify-center">
-              {lowStockCount}
-            </span>
-          )}
-          <ArrowRight className={`w-4 h-4 ${
-            lowStockCount > 0 ? "text-amber-500 dark:text-amber-400" : "text-emerald-500 dark:text-emerald-400"
-          }`} />
-        </div>
-      </div>
-
-      {/* 4. Quick Actions */}
-      <section className="flex flex-col gap-3">
-        <h3 className="text-base sm:text-lg font-serif font-bold text-zinc-800 dark:text-zinc-200 pl-1">
-          Quick Actions
-        </h3>
-        <div className="grid grid-cols-3 gap-3">
-          <button
-            onClick={() => onNavigate("orders-form")}
-            className="group bg-primary-brand hover:bg-primary-brand/95 text-white rounded-3xl p-4 sm:p-5 flex flex-col items-center justify-center gap-2 transition-all active:scale-95 shadow-sm cursor-pointer text-center min-h-[100px]"
-          >
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center transition-transform group-hover:scale-105">
-              <PlusCircle className="w-5 h-5 text-white stroke-[2.2]" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold tracking-tight">New Order</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate("inventory-form")}
-            className="group bg-sweet-pink hover:bg-sweet-pink/95 text-white rounded-3xl p-4 sm:p-5 flex flex-col items-center justify-center gap-2 transition-all active:scale-95 shadow-sm cursor-pointer text-center min-h-[100px]"
-          >
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center transition-transform group-hover:scale-105">
-              <FolderPlus className="w-5 h-5 text-white stroke-[2.2]" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold tracking-tight">Add Stock</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate("recipes")}
-            className="group bg-[#F1F5F9] dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-3xl p-4 sm:p-5 flex flex-col items-center justify-center gap-2 transition-all active:scale-95 shadow-xs cursor-pointer text-center min-h-[100px]"
-          >
-            <div className="w-10 h-10 rounded-full bg-[#FCE7F3] dark:bg-pink-950/40 flex items-center justify-center transition-transform group-hover:scale-105">
-              <BookOpen className="w-5 h-5 text-primary-brand dark:text-pink-400 stroke-[2.2]" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold tracking-tight text-zinc-850 dark:text-zinc-250">Recipes</span>
-          </button>
-        </div>
-      </section>
     </motion.div>
   );
 }
