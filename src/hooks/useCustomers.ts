@@ -92,11 +92,14 @@ export function useCustomers({
       if (paginatedCustomers.length === 0) return;
       try {
         const counts: { [id: string]: number } = {};
-        const allOrders = await localDb.orders.toArray();
-        paginatedCustomers.forEach((c) => {
-          const count = allOrders.filter(o => o.customerId === c.id && o.isDeleted !== 1).length;
-          counts[c.id] = count;
-        });
+        await Promise.all(
+          paginatedCustomers.map(async (c) => {
+            const count = await localDb.orders
+              .filter(o => o.customerId === c.id && o.isDeleted !== 1)
+              .count();
+            counts[c.id] = count;
+          })
+        );
         setCustomerOrderCounts(counts);
       } catch (err) {
         console.error("Failed to fetch customer order counts:", err);
@@ -114,11 +117,12 @@ export function useCustomers({
         return;
       }
       try {
-        const [customer, allOrders] = await Promise.all([
+        const [customer, custOrders] = await Promise.all([
           localDb.customers.get(selectedCustomerId),
-          localDb.orders.toArray()
+          localDb.orders
+            .filter(o => o.customerId === selectedCustomerId && o.isDeleted !== 1)
+            .toArray()
         ]);
-        const custOrders = allOrders.filter(o => o.customerId === selectedCustomerId && o.isDeleted !== 1);
         setSelectedCustomer(customer || null);
         custOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         setSelectedCustomerOrders(custOrders);
@@ -138,29 +142,29 @@ export function useCustomers({
   useEffect(() => {
     async function loadDbCustomers() {
       try {
-        const allCustomers = await localDb.customers.filter(c => c.isDeleted !== 1).toArray();
-
-        let matched = allCustomers;
-
-        if (searchTerm) {
-          const term = searchTerm.toLowerCase();
-          matched = matched.filter(c => 
-            c.name.toLowerCase().includes(term) ||
-            c.id.toLowerCase().includes(term) ||
-            c.mobile.includes(term)
-          );
-        }
-
-        if (filterType !== "All") {
-          matched = matched.filter(c => c.type === filterType);
-        }
-
-        matched.sort((a, b) => new Date(b.updatedAt || b.memberSince || 0).getTime() - new Date(a.updatedAt || a.memberSince || 0).getTime());
-
-        setFilteredCount(matched.length);
-
         const startIndex = (customersCurrentPage - 1) * customersItemsPerPage;
-        const pageSlice = matched.slice(startIndex, startIndex + customersItemsPerPage);
+        let collection = localDb.customers.orderBy("updatedAt").reverse();
+        
+        collection = collection.filter(c => {
+          if (c.isDeleted === 1) return false;
+          if (filterType !== "All" && c.type !== filterType) return false;
+          if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            return (
+              c.name.toLowerCase().includes(term) ||
+              c.id.toLowerCase().includes(term) ||
+              c.mobile.includes(term)
+            );
+          }
+          return true;
+        });
+
+        const [totalCount, pageSlice] = await Promise.all([
+          collection.count(),
+          collection.offset(startIndex).limit(customersItemsPerPage).toArray()
+        ]);
+
+        setFilteredCount(totalCount);
         setPaginatedCustomers(pageSlice);
       } catch (err) {
         console.error("Failed to query customers from localDb:", err);

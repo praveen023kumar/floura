@@ -36,15 +36,18 @@ export default function RecipeCreateView({
   const defaultYieldUnits = useMemo(() => ["G", "KG", "Pieces"], []);
   const [dynamicYieldUnits, setDynamicYieldUnits] = useState<string[]>(defaultYieldUnits);
 
-  // Load category and unit suggestions from DB recipes
+  // Load category and unit suggestions from DB categories and recipes
   useEffect(() => {
     async function loadOptions() {
       try {
-        const allRecipes = await localDb.recipes.toArray();
-        const allUsedCategories = allRecipes.map((r) => r.category).filter(Boolean);
-        const allUsedUnits = allRecipes.map((r) => r.yieldUnit).filter(Boolean);
+        const [dbCats, activeRecipes] = await Promise.all([
+          localDb.categories.filter(c => c.type === "recipe" && c.isDeleted !== 1).toArray(),
+          localDb.recipes.filter(r => r.isDeleted !== 1).toArray()
+        ]);
+        const catNames = dbCats.map(c => c.name);
+        const allUsedUnits = activeRecipes.map((r) => r.yieldUnit).filter(Boolean);
 
-        setDynamicRecipeCategories(Array.from(new Set([...defaultRecipeCategories, ...allUsedCategories])));
+        setDynamicRecipeCategories(Array.from(new Set([...defaultRecipeCategories, ...catNames])));
         setDynamicYieldUnits(Array.from(new Set([...defaultYieldUnits, ...allUsedUnits])));
       } catch (err) {
         console.error("Failed to load recipes metadata for auto-complete:", err);

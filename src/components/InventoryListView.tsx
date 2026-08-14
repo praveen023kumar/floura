@@ -36,7 +36,6 @@ export default function InventoryListView({
   const [dynamicCategories, setDynamicCategories] = useState<string[]>(defaultCategories);
   const [lowStockCount, setLowStockCount] = useState<number>(0);
   const [lowStockItemsList, setLowStockItemsList] = useState<InventoryItem[]>([]);
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
 
   const [paginatedInventory, setPaginatedInventory] = useState<InventoryItem[]>([]);
   const [filteredCount, setFilteredCount] = useState<number>(0);
@@ -63,14 +62,15 @@ export default function InventoryListView({
   useEffect(() => {
     async function fetchInventoryMetadata() {
       try {
-        const allItems = await localDb.inventory.filter((i: any) => i.isDeleted !== 1).toArray();
-        setInventoryItems(allItems);
+        const [dbCats, lowStock] = await Promise.all([
+          localDb.categories.filter(c => c.type === "inventory" && c.isDeleted !== 1).toArray(),
+          localDb.inventory.filter(i => i.isDeleted !== 1 && i.quantity < i.minStockLevel).toArray()
+        ]);
         
-        const allUsedCategories = allItems.map((item) => item.category).filter(Boolean);
-        const combinedCats = Array.from(new Set([...defaultCategories, ...allUsedCategories]));
+        const catNames = dbCats.map(c => c.name);
+        const combinedCats = Array.from(new Set([...defaultCategories, ...catNames]));
         setDynamicCategories(combinedCats);
 
-        const lowStock = allItems.filter((item) => item.quantity < item.minStockLevel);
         setLowStockItemsList(lowStock);
         setLowStockCount(lowStock.length);
       } catch (err) {
@@ -84,30 +84,29 @@ export default function InventoryListView({
   useEffect(() => {
     async function loadDbInventory() {
       try {
-        let query = localDb.inventory.filter((i: any) => i.isDeleted !== 1);
-        let matched = await query.toArray();
-
-        if (searchTerm) {
-          const s = searchTerm.toLowerCase();
-          matched = matched.filter(item => 
-            item.name.toLowerCase().includes(s) || 
-            (item.supplier || "").toLowerCase().includes(s)
-          );
-        }
-
-        if (selectedCategory !== "All") {
-          matched = matched.filter(item => item.category === selectedCategory);
-        }
-
-        if (showOnlyLowStock) {
-          matched = matched.filter(item => item.quantity < item.minStockLevel);
-        }
-
-        matched.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
-
-        setFilteredCount(matched.length);
         const startIndex = (inventoryCurrentPage - 1) * inventoryItemsPerPage;
-        const pageSlice = matched.slice(startIndex, startIndex + inventoryItemsPerPage);
+        let collection = localDb.inventory.orderBy("updatedAt").reverse();
+
+        collection = collection.filter(i => {
+          if (i.isDeleted === 1) return false;
+          if (selectedCategory !== "All" && i.category !== selectedCategory) return false;
+          if (showOnlyLowStock && !(i.quantity < i.minStockLevel)) return false;
+          if (searchTerm) {
+            const s = searchTerm.toLowerCase();
+            return (
+              i.name.toLowerCase().includes(s) || 
+              (i.supplier || "").toLowerCase().includes(s)
+            );
+          }
+          return true;
+        });
+
+        const [totalCount, pageSlice] = await Promise.all([
+          collection.count(),
+          collection.offset(startIndex).limit(inventoryItemsPerPage).toArray()
+        ]);
+
+        setFilteredCount(totalCount);
         setPaginatedInventory(pageSlice);
       } catch (err) {
         console.error("Failed to query inventory from localDb:", err);

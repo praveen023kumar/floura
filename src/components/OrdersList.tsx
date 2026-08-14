@@ -64,6 +64,7 @@ export default function OrdersList({
     setOrdersItemsPerPage,
     paginatedOrders,
     ordersTotalPages,
+    filteredCount,
     filteredOrders,
     sortBy,
     setSortBy,
@@ -73,6 +74,8 @@ export default function OrdersList({
     setCustomStartDate,
     customEndDate,
     setCustomEndDate,
+    paymentFilter,
+    setPaymentFilter,
     handleSetViewMode,
     handleStartEdit,
     handleCompleteOrderSave,
@@ -91,8 +94,8 @@ export default function OrdersList({
   const [calSelectedDate, setCalSelectedDate] = React.useState<string | null>(null);
 
   const activeFilterCount = viewTab === "list"
-    ? (filter !== "active" ? 1 : 0) + (dateFilter !== "all" ? 1 : 0)
-    : (filter !== "active" ? 1 : 0);
+    ? (filter !== "active" ? 1 : 0) + (dateFilter !== "all" ? 1 : 0) + (paymentFilter !== "all" ? 1 : 0)
+    : (filter !== "active" ? 1 : 0) + (paymentFilter !== "all" ? 1 : 0);
 
   const statusOptions = [
     { value: "active", label: "Active Orders" },
@@ -122,12 +125,20 @@ export default function OrdersList({
     { value: "amount-lowest", label: "Amount: Low to High" }
   ] as const;
 
+  const paymentStatusOptions = [
+    { value: "all", label: "All Payments" },
+    { value: "Partially Paid", label: "Partially" },
+    { value: "Unpaid", label: "No Payment" },
+    { value: "Fully Paid", label: "Completed" },
+  ] as const;
+
   const clearAllFilters = () => {
     setFilter("active");
     setDateFilter("all");
     setSearchTerm("");
     setCustomStartDate("");
     setCustomEndDate("");
+    setPaymentFilter("all");
   };
 
   // ── Calendar helpers ──────────────────────────────────────────────────────────
@@ -216,6 +227,36 @@ export default function OrdersList({
                   {opt.label}
                 </span>
               ) : opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Payment Status facet */}
+      <div className="pt-5 border-t border-zinc-100 dark:border-zinc-800">
+        <h3 className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider font-sans mb-2.5">
+          Payment Status
+        </h3>
+        <div className="space-y-0.5" role="radiogroup" aria-label="Filter orders by payment status">
+          {paymentStatusOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={paymentFilter === opt.value}
+              onClick={() => setPaymentFilter(opt.value)}
+              className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-xs font-semibold text-left cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-primary-brand ${
+                paymentFilter === opt.value
+                  ? "bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                paymentFilter === opt.value ? "border-primary-brand dark:border-orange-400" : "border-zinc-300 dark:border-zinc-600"
+              }`}>
+                {paymentFilter === opt.value && <span className="w-1.5 h-1.5 rounded-full bg-primary-brand dark:bg-orange-400" />}
+              </span>
+              {opt.label}
             </button>
           ))}
         </div>
@@ -1015,14 +1056,14 @@ export default function OrdersList({
         </AnimatePresence>
 
         {/* Pagination controls for Orders */}
-        {viewTab === "list" && filteredOrders.length > 0 && (
+        {viewTab === "list" && filteredCount > 0 && (
           <div className="flex flex-row items-center justify-between gap-3 pt-5 mt-6 border-t border-zinc-200/60 dark:border-zinc-800/80 w-full">
             {/* Showing details */}
             <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium whitespace-nowrap">
               <span className="hidden sm:inline">Showing </span>
               <span className="font-semibold text-zinc-800 dark:text-zinc-200">{(ordersCurrentPage - 1) * ordersItemsPerPage + 1}</span>–
-              <span className="font-semibold text-zinc-800 dark:text-zinc-200">{Math.min(ordersCurrentPage * ordersItemsPerPage, filteredOrders.length)}</span> of{" "}
-              <span className="font-semibold text-zinc-800 dark:text-zinc-200">{filteredOrders.length}</span>
+              <span className="font-semibold text-zinc-800 dark:text-zinc-200">{Math.min(ordersCurrentPage * ordersItemsPerPage, filteredCount)}</span> of{" "}
+              <span className="font-semibold text-zinc-800 dark:text-zinc-200">{filteredCount}</span>
               <span className="hidden sm:inline"> orders</span>
               <span className="sm:hidden"> orders</span>
             </div>

@@ -845,6 +845,7 @@ async function startServer() {
         dispatchedNotifications = [],
         scheduledAlerts = [],
         bakeryProfile = [],
+        categories = [],
         pullAll = false
       } = req.body;
 
@@ -1052,6 +1053,21 @@ async function startServer() {
             `, [bp.id, bp.bakeryName, bp.email, bp.phone, bp.address, bp.role, bp.currency, bp.dateFormat, bp.updatedAt, userEmail, bp.isDeleted !== undefined ? bp.isDeleted : 0]);
           }
 
+          // Sync Categories
+          for (const cat of categories as any[]) {
+            await runSql(db, `
+              INSERT INTO categories (id, name, type, updatedAt, user_email, isDeleted)
+              VALUES (?, ?, ?, ?, ?, ?)
+              ON CONFLICT(id) DO UPDATE SET
+                name=excluded.name,
+                type=excluded.type,
+                updatedAt=excluded.updatedAt,
+                user_email=excluded.user_email,
+                isDeleted=excluded.isDeleted
+              WHERE excluded.updatedAt > categories.updatedAt OR categories.updatedAt IS NULL
+            `, [cat.id, cat.name, cat.type, cat.updatedAt, userEmail, cat.isDeleted !== undefined ? cat.isDeleted : 0]);
+          }
+
           await runSql(db, "COMMIT");
         } catch (err) {
           await runSql(db, "ROLLBACK");
@@ -1099,6 +1115,8 @@ async function startServer() {
         let allScheduledAlerts = [];
         let allBakeryProfile = [];
 
+        let allCategories = [];
+
         if (page === 1) {
           allInventory = await querySqlAll<any>(db, "SELECT * FROM inventory WHERE user_email = ? ORDER BY updatedAt DESC", [userEmail]);
           allRecipes = await querySqlAll<any>(db, "SELECT * FROM recipes WHERE user_email = ?", [userEmail]);
@@ -1107,6 +1125,7 @@ async function startServer() {
           allDispatchedNotifications = await querySqlAll<any>(db, "SELECT * FROM dispatched_notifications WHERE user_email = ? ORDER BY dispatchedAt DESC", [userEmail]);
           allScheduledAlerts = await querySqlAll<any>(db, "SELECT * FROM scheduled_alerts WHERE user_email = ? ORDER BY createdAt DESC", [userEmail]);
           allBakeryProfile = await querySqlAll<any>(db, "SELECT * FROM bakery_profile WHERE user_email = ? ORDER BY updatedAt DESC", [userEmail]);
+          allCategories = await querySqlAll<any>(db, "SELECT * FROM categories WHERE user_email = ?", [userEmail]);
         }
 
         const decryptedCustomers = allCustomers.map(decryptRow);
@@ -1170,6 +1189,7 @@ async function startServer() {
           customScheduledAlerts: decryptedScheduledAlerts, // matching Dexie payload property
           scheduledAlerts: decryptedScheduledAlerts,
           bakeryProfile: decryptedBakeryProfile,
+          categories: allCategories,
           syncTime: new Date().toISOString()
         });
       });

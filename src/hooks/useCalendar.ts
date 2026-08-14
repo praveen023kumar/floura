@@ -60,9 +60,17 @@ export function useCalendar({
   useEffect(() => {
     async function loadData() {
       try {
+        const targetYear = currentDate.getFullYear();
+        const targetMonth = currentDate.getMonth();
+        const yearMonthPrefix = `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}`;
+
         const [loadedOrders, loadedCustomers] = await Promise.all([
-          localDb.orders.filter(o => o.isDeleted !== 1).toArray(),
-          localDb.customers.filter(c => c.isDeleted !== 1).toArray()
+          localDb.orders.filter(o => {
+            if (o.isDeleted === 1) return false;
+            const dateStr = o.deliveryDate || o.eventDate;
+            return dateStr && dateStr.startsWith(yearMonthPrefix);
+          }).toArray(),
+          localDb.customers.filter(c => c.isDeleted !== 1).limit(200).toArray()
         ]);
         setOrders(loadedOrders);
         setCustomers(loadedCustomers);
@@ -71,7 +79,7 @@ export function useCalendar({
       }
     }
     loadData();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, currentDate]);
 
   useEffect(() => {
     if (selectedDateStr) {

@@ -28,7 +28,9 @@ export function useDebriefs() {
   useEffect(() => {
     async function loadOrders() {
       try {
-        const loaded = await localDb.orders.filter(o => o.isDeleted !== 1).toArray();
+        const loaded = await localDb.orders
+          .filter(o => o.status === "Completed" && o.isDeleted !== 1)
+          .toArray();
         setOrders(loaded);
       } catch (err) {
         console.error("Failed to load completed orders in DebriefsView:", err);
@@ -38,7 +40,7 @@ export function useDebriefs() {
   }, [refreshTrigger]);
 
   const completedOrders = useMemo(() => {
-    return orders.filter((o) => o.status === "Completed");
+    return orders;
   }, [orders]);
 
   const filteredCompletedOrders = useMemo(() => {

@@ -52,9 +52,9 @@ export function useDashboard({ checklist }: UseDashboardProps) {
       try {
         const today = new Date().toISOString().split("T")[0];
 
-        const [allOrders, allInventory] = await Promise.all([
+        const [allOrders, lowStockRaw] = await Promise.all([
           localDb.orders.filter(o => o.isDeleted !== 1).toArray(),
-          localDb.inventory.filter((i: any) => i.isDeleted !== 1).toArray()
+          localDb.inventory.filter((i: any) => i.isDeleted !== 1 && i.quantity < i.minStockLevel).toArray()
         ]);
 
         const completedOrders = allOrders.filter((o) => o.status === "Completed");
@@ -67,7 +67,6 @@ export function useDashboard({ checklist }: UseDashboardProps) {
 
         const activeOrdersCount = progressOrders.length;
 
-        const lowStockRaw = allInventory.filter((i) => i.quantity < i.minStockLevel);
         const lowStockCount = lowStockRaw.length;
         const lowStockItems = lowStockRaw.map((i) => ({
           name: i.name,

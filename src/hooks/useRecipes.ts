@@ -99,35 +99,48 @@ export function useRecipes({
     }));
   }, [selectedRecipe, desiredUnits]);
 
-  const dynamicCategories = useMemo(() => {
-    const defaultCats = ["Cakes", "Viennoiserie", "Tarts", "Confectionary", "Classic", "Pastry"];
-    const allUsedCategories = recipeList.map(r => r.category).filter(Boolean);
-    return Array.from(new Set([...defaultCats, ...allUsedCategories]));
-  }, [recipeList]);
+  const [dynamicCategories, setDynamicCategories] = useState<string[]>(["Cakes", "Viennoiserie", "Tarts", "Confectionary", "Classic", "Pastry"]);
+
+  // Load categories from categories table
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const dbCats = await localDb.categories
+          .filter(c => c.type === "recipe" && c.isDeleted !== 1)
+          .toArray();
+        const catNames = dbCats.map(c => c.name);
+        const defaultCats = ["Cakes", "Viennoiserie", "Tarts", "Confectionary", "Classic", "Pastry"];
+        setDynamicCategories(Array.from(new Set([...defaultCats, ...catNames])));
+      } catch (err) {
+        console.error("Failed to load recipe categories:", err);
+      }
+    }
+    loadCategories();
+  }, [refreshTrigger]);
 
   // Load paginated recipes dynamically
   useEffect(() => {
     async function loadDbRecipes() {
       try {
-        let matched = await localDb.recipes.toArray();
-        setRecipeList(matched);
-
-        if (searchTerm) {
-          const s = searchTerm.toLowerCase();
-          matched = matched.filter(r => 
-            r.name.toLowerCase().includes(s)
-          );
-        }
-
-        if (selectedCategory !== "All") {
-          matched = matched.filter(r => r.category === selectedCategory);
-        }
-
-        matched.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
-
-        setFilteredCount(matched.length);
         const startIndex = (recipesCurrentPage - 1) * recipesItemsPerPage;
-        const pageSlice = matched.slice(startIndex, startIndex + recipesItemsPerPage);
+        
+        let collection = localDb.recipes.orderBy("updatedAt").reverse();
+        collection = collection.filter(r => {
+          if (r.isDeleted === 1) return false;
+          if (selectedCategory !== "All" && r.category !== selectedCategory) return false;
+          if (searchTerm) {
+            const s = searchTerm.toLowerCase();
+            return r.name.toLowerCase().includes(s);
+          }
+          return true;
+        });
+
+        const [totalCount, pageSlice] = await Promise.all([
+          collection.count(),
+          collection.offset(startIndex).limit(recipesItemsPerPage).toArray()
+        ]);
+
+        setFilteredCount(totalCount);
         setPaginatedRecipes(pageSlice);
       } catch (err) {
         console.error("Failed to query recipes from localDb:", err);

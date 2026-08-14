@@ -262,6 +262,7 @@ function MainAppContent() {
           await localDb.dispatchedNotifications.clear();
           await localDb.scheduledAlerts.clear();
           await localDb.bakeryProfile.clear();
+          await localDb.categories.clear();
         } catch (e) {
           console.error("Failed to clear local db on user change:", e);
         }
@@ -355,7 +356,8 @@ function MainAppContent() {
         localDb.customEvents.clear(),
         localDb.dispatchedNotifications.clear(),
         localDb.scheduledAlerts.clear(),
-        localDb.bakeryProfile.clear()
+        localDb.bakeryProfile.clear(),
+        localDb.categories.clear()
       ]);
 
       while (hasMore) {
@@ -395,7 +397,8 @@ function MainAppContent() {
           customEvents: isFirstPage ? (data.customEvents || []) : [],
           dispatchedNotifications: isFirstPage ? (data.dispatchedNotifications || []) : [],
           scheduledAlerts: isFirstPage ? (data.scheduledAlerts || []) : [],
-          bakeryProfile: isFirstPage ? (data.bakeryProfile || []) : []
+          bakeryProfile: isFirstPage ? (data.bakeryProfile || []) : [],
+          categories: isFirstPage ? (data.categories || []) : []
         });
 
         isFirstPage = false;
@@ -437,7 +440,8 @@ function MainAppContent() {
         dirtyCustomEvents,
         dirtyDispatchedNotifications,
         dirtyScheduledAlerts,
-        dirtyBakeryProfile
+        dirtyBakeryProfile,
+        dirtyCategories
       ] = await Promise.all([
         localDb.customers.where("localChange").equals(1).toArray(),
         localDb.orders.where("localChange").equals(1).toArray(),
@@ -447,7 +451,8 @@ function MainAppContent() {
         localDb.customEvents.where("localChange").equals(1).toArray(),
         localDb.dispatchedNotifications.where("localChange").equals(1).toArray(),
         localDb.scheduledAlerts.where("localChange").equals(1).toArray(),
-        localDb.bakeryProfile.where("localChange").equals(1).toArray()
+        localDb.bakeryProfile.where("localChange").equals(1).toArray(),
+        localDb.categories.where("localChange").equals(1).toArray()
       ]);
 
       const hasDirtyChanges =
@@ -459,7 +464,8 @@ function MainAppContent() {
         dirtyCustomEvents.length > 0 ||
         dirtyDispatchedNotifications.length > 0 ||
         dirtyScheduledAlerts.length > 0 ||
-        dirtyBakeryProfile.length > 0;
+        dirtyBakeryProfile.length > 0 ||
+        dirtyCategories.length > 0;
 
       // If no dirty changes are present, we fast-path exit!
       if (!hasDirtyChanges) {
@@ -485,7 +491,8 @@ function MainAppContent() {
           customEvents: dirtyCustomEvents,
           dispatchedNotifications: dirtyDispatchedNotifications,
           scheduledAlerts: dirtyScheduledAlerts,
-          bakeryProfile: dirtyBakeryProfile
+          bakeryProfile: dirtyBakeryProfile,
+          categories: dirtyCategories
         }),
       });
 
@@ -510,7 +517,8 @@ function MainAppContent() {
           localDb.customEvents,
           localDb.dispatchedNotifications,
           localDb.scheduledAlerts,
-          localDb.bakeryProfile
+          localDb.bakeryProfile,
+          localDb.categories
         ], async () => {
           const updates = [];
           for (const c of dirtyCustomers) updates.push(localDb.customers.update(c.id, { localChange: 0 }));
@@ -522,6 +530,7 @@ function MainAppContent() {
           for (const dn of dirtyDispatchedNotifications) updates.push(localDb.dispatchedNotifications.update(dn.id, { localChange: 0 }));
           for (const sa of dirtyScheduledAlerts) updates.push(localDb.scheduledAlerts.update(sa.id, { localChange: 0 }));
           for (const bp of dirtyBakeryProfile) updates.push(localDb.bakeryProfile.update(bp.id, { localChange: 0 }));
+          for (const cat of dirtyCategories) updates.push(localDb.categories.update(cat.id, { localChange: 0 }));
           await Promise.all(updates);
         });
 
@@ -1250,13 +1259,13 @@ function MainAppContent() {
   return (
     <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 flex flex-col md:flex-row transition-colors duration-200">
       {/* Sidebar - Desktop Layout (Responsive slim side menu mirroring design block) */}
-      <aside className="hidden md:flex w-20 shrink-0 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex-col justify-between sticky top-0 h-screen z-40 select-none py-6 items-center transition-all duration-200">
+      <aside className="desktop-sidebar hidden md:flex w-20 shrink-0 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex-col justify-between sticky top-0 h-screen z-40 select-none py-6 items-center transition-all duration-200 overflow-y-auto no-scrollbar">
         <div className="flex flex-col items-center w-full">
           {/* Logo Section */}
-          <div className="mb-8 flex items-center justify-center">
+          <div className="sidebar-logo-container mb-8 flex items-center justify-center">
             <button
               onClick={() => navigate("/landing")}
-              className="w-12 h-12 rounded-full cursor-pointer hover:rotate-6 transition-all duration-200 border-none outline-none overflow-hidden shrink-0 shadow-xs"
+              className="sidebar-logo-btn w-12 h-12 rounded-full cursor-pointer hover:rotate-6 transition-all duration-200 border-none outline-none overflow-hidden shrink-0 shadow-xs"
               title="Floura Logo"
             >
               <img 
@@ -1269,11 +1278,11 @@ function MainAppContent() {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex flex-col items-center gap-3 w-full px-2">
+          <nav className="sidebar-nav flex flex-col items-center gap-3 w-full px-2">
             {/* Dashboard Link */}
             <button
               onClick={() => navigate("/dashboard")}
-              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+              className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "dashboard"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
                   : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
@@ -1288,7 +1297,7 @@ function MainAppContent() {
             {/* Orders Link */}
             <button
               onClick={() => navigate("/orders")}
-              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+              className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "orders" || currentScreen === "orders-form"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
                   : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
@@ -1303,7 +1312,7 @@ function MainAppContent() {
             {/* Recipes Link */}
             <button
               onClick={() => navigate("/recipes")}
-              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+              className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "recipes" || currentScreen === "recipes-form"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
                   : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
@@ -1318,7 +1327,7 @@ function MainAppContent() {
             {/* Inventory Link */}
             <button
               onClick={() => navigate("/inventory")}
-              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+              className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "inventory" || currentScreen === "inventory-form"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
                   : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
@@ -1333,9 +1342,9 @@ function MainAppContent() {
             {/* Customers Link */}
             <button
               onClick={() => navigate("/customers")}
-              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+              className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "customers" || currentScreen === "customers-form"
-                  ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-950 dark:text-white shadow-xs font-extrabold"
+                  ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-955 dark:text-white shadow-xs font-extrabold"
                   : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
               }`}
             >
@@ -1348,7 +1357,7 @@ function MainAppContent() {
             {/* Debriefs Link */}
             <button
               onClick={() => navigate("/debriefs")}
-              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+              className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "debriefs"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
                   : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
@@ -1363,7 +1372,7 @@ function MainAppContent() {
             {/* Checklist Link */}
             <button
               onClick={() => navigate("/checklist")}
-              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+              className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "checklist"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
                   : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
@@ -1378,11 +1387,11 @@ function MainAppContent() {
         </div>
 
         {/* Bottom Section */}
-        <div className="mt-auto flex flex-col items-center gap-4 w-full px-2">
+        <div className="sidebar-bottom mt-auto flex flex-col items-center gap-4 w-full px-2">
           {/* Settings / More Link */}
           <button
             onClick={() => navigate("/more")}
-            className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+            className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
               currentScreen === "more"
                 ? "bg-zinc-150 dark:bg-zinc-850 text-zinc-950 dark:text-white"
                 : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-550 dark:hover:text-zinc-200"

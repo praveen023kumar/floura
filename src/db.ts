@@ -1,6 +1,6 @@
 // File Path: /src/db.ts
 import Dexie, { type Table } from "dexie";
-import { Customer, Order, InventoryItem, Recipe, ChecklistItem, CustomEvent, DispatchedNotification, CustomScheduledAlert, BakeryProfile } from "./types";
+import { Customer, Order, InventoryItem, Recipe, ChecklistItem, CustomEvent, DispatchedNotification, CustomScheduledAlert, BakeryProfile, Category } from "./types";
 import CryptoJS from "crypto-js";
 
 const SECRET_KEY = "floura_kitchen_super_secret_db_key_2026";
@@ -26,19 +26,23 @@ function setupTableEncryption(table: any) {
     const id = obj.id;
     const localChange = obj.localChange !== undefined ? obj.localChange : 0;
     const isDeleted = obj.isDeleted !== undefined ? obj.isDeleted : 0;
+    const updatedAt = obj.updatedAt;
+    const createdAt = obj.createdAt;
     
     const { id: _, localChange: __, isDeleted: ___, ...rest } = obj;
     const encrypted = encryptData(rest);
     
     // Mutate the original object in-place for Dexie/IndexedDB to store
     for (const key of Object.keys(obj)) {
-      if (key !== "id" && key !== "localChange" && key !== "isDeleted") {
+      if (key !== "id" && key !== "localChange" && key !== "isDeleted" && key !== "updatedAt" && key !== "createdAt") {
         delete obj[key];
       }
     }
     obj.encryptedData = encrypted;
     obj.localChange = localChange;
     obj.isDeleted = isDeleted;
+    if (updatedAt !== undefined) obj.updatedAt = updatedAt;
+    if (createdAt !== undefined) obj.createdAt = createdAt;
   });
 
   table.hook("updating", (mods: any, primKey: any, obj: any) => {
@@ -54,6 +58,8 @@ function setupTableEncryption(table: any) {
     const id = mergedFull.id;
     const localChange = mergedFull.localChange !== undefined ? mergedFull.localChange : 0;
     const isDeleted = mergedFull.isDeleted !== undefined ? mergedFull.isDeleted : 0;
+    const updatedAt = mergedFull.updatedAt;
+    const createdAt = mergedFull.createdAt;
     
     const { id: _, localChange: __, isDeleted: ___, encryptedData: ____, ...rest } = mergedFull;
     const encrypted = encryptData(rest);
@@ -63,10 +69,12 @@ function setupTableEncryption(table: any) {
       localChange,
       isDeleted
     };
+    if (updatedAt !== undefined) updatedMods.updatedAt = updatedAt;
+    if (createdAt !== undefined) updatedMods.createdAt = createdAt;
 
     // Set other properties to undefined so they are deleted from IndexedDB
     for (const key of Object.keys(mods)) {
-      if (key !== "id" && key !== "localChange" && key !== "isDeleted" && key !== "encryptedData") {
+      if (key !== "id" && key !== "localChange" && key !== "isDeleted" && key !== "encryptedData" && key !== "updatedAt" && key !== "createdAt") {
         updatedMods[key] = undefined;
       }
     }
@@ -82,6 +90,8 @@ function setupTableEncryption(table: any) {
         id: obj.id,
         localChange: obj.localChange !== undefined ? obj.localChange : 0,
         isDeleted: obj.isDeleted !== undefined ? obj.isDeleted : 0,
+        updatedAt: obj.updatedAt,
+        createdAt: obj.createdAt,
         ...decrypted
       };
     } catch (err) {
@@ -101,6 +111,7 @@ export class PatisserieDatabase extends Dexie {
   dispatchedNotifications!: Table<DispatchedNotification & { localChange?: number }>;
   scheduledAlerts!: Table<CustomScheduledAlert & { localChange?: number }>;
   bakeryProfile!: Table<BakeryProfile & { localChange?: number }>;
+  categories!: Table<Category & { localChange?: number }>;
   preferences!: Table<{ key: string; value: any }>;
 
   constructor() {
@@ -115,6 +126,20 @@ export class PatisserieDatabase extends Dexie {
       dispatchedNotifications: "id, customerName, customerMobile, cakeSpec, messageText, dispatchedAt, status, localChange, isDeleted",
       scheduledAlerts: "id, customerName, customerMobile, alertDate, createdAt, localChange, isDeleted",
       bakeryProfile: "id, bakeryName, email, phone, address, role, currency, dateFormat, updatedAt, localChange, isDeleted",
+      preferences: "key"
+    });
+
+    this.version(3).stores({
+      customers: "id, name, mobile, type, totalOrders, memberSince, updatedAt, localChange, isDeleted",
+      orders: "id, customerId, customerName, customerMobile, eventType, eventDate, deliveryTime, cakeShape, cakeWeight, cakeFlavor, status, createdAt, updatedAt, localChange, isDeleted",
+      inventory: "id, name, category, quantity, unit, minStockLevel, supplier, costPrice, updatedAt, localChange, isDeleted",
+      recipes: "id, name, category, stdYield, yieldUnit, updatedAt, localChange, isDeleted",
+      checklist: "id, text, checked, date, updatedAt, localChange, isDeleted",
+      customEvents: "id, title, date, type, createdAt, localChange, isDeleted",
+      dispatchedNotifications: "id, customerName, customerMobile, cakeSpec, messageText, dispatchedAt, status, localChange, isDeleted",
+      scheduledAlerts: "id, customerName, customerMobile, alertDate, createdAt, localChange, isDeleted",
+      bakeryProfile: "id, bakeryName, email, phone, address, role, currency, dateFormat, updatedAt, localChange, isDeleted",
+      categories: "id, name, type, updatedAt, localChange, isDeleted",
       preferences: "key"
     });
 
@@ -165,6 +190,7 @@ export async function seedLocalDbFromPayload(payload: {
   dispatchedNotifications: DispatchedNotification[];
   scheduledAlerts: CustomScheduledAlert[];
   bakeryProfile?: BakeryProfile[];
+  categories?: Category[];
 }) {
   await localDb.transaction("rw", [
     localDb.customers,
@@ -175,7 +201,8 @@ export async function seedLocalDbFromPayload(payload: {
     localDb.customEvents,
     localDb.dispatchedNotifications,
     localDb.scheduledAlerts,
-    localDb.bakeryProfile
+    localDb.bakeryProfile,
+    localDb.categories
   ], async () => {
 
 
@@ -241,6 +268,15 @@ export async function seedLocalDbFromPayload(payload: {
         const existing = await localDb.bakeryProfile.get(bp.id);
         if (!existing || !existing.localChange || new Date(bp.updatedAt) > new Date(existing.updatedAt || 0)) {
           await localDb.bakeryProfile.put({ ...bp, localChange: 0 });
+        }
+      }
+    }
+
+    if (payload.categories) {
+      for (const cat of payload.categories) {
+        const existing = await localDb.categories.get(cat.id);
+        if (!existing || !existing.localChange || new Date(cat.updatedAt) > new Date(existing.updatedAt || 0)) {
+          await localDb.categories.put({ ...cat, localChange: 0 });
         }
       }
     }

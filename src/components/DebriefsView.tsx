@@ -679,48 +679,54 @@ export default function DebriefsView({ }: DebriefsViewProps) {
                       }`}
                   >
                     {/* Header Info */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-zinc-100 dark:border-zinc-750/80 pb-4">
-                      <div className="flex items-start gap-3">
-                        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${hasDifficultiesLogged
+                    <div className="flex flex-col gap-3.5 border-b border-zinc-100 dark:border-zinc-750/80 pb-4">
+                      {/* Row 1: Title & Status Icon */}
+                      <div className="flex items-center gap-3 w-full">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${hasDifficultiesLogged
                             ? "bg-amber-50 dark:bg-amber-950/40 text-amber-500"
                             : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500"
                           }`}>
                           {hasDifficultiesLogged ? <AlertTriangle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
                         </div>
-                        <div>
-                          <h3 className="font-serif font-extrabold text-base text-zinc-800 dark:text-zinc-150">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-serif font-extrabold text-base text-zinc-800 dark:text-zinc-150 leading-tight">
                             {o.customerName}'s {o.eventType} Cake
                           </h3>
-                          <div className="flex flex-wrap gap-2 items-center mt-1 text-xs text-zinc-400 font-medium">
-                            <span className="bg-zinc-100 dark:bg-zinc-700 text-zinc-650 dark:text-zinc-300 px-2 py-0.5 rounded-md font-mono">
-                              {o.cakeFlavor}
-                            </span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1 font-semibold text-zinc-500 dark:text-zinc-400">
-                              <Calendar className="w-3.5 h-3.5" />
-                              {formatDate(o.eventDate)}
-                            </span>
-                            {marginVal >= 60 && (
-                              <>
-                                <span>•</span>
-                                <span className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-0.5">
-                                  <Sparkles className="w-3 h-3" /> High Margin Gem
-                                </span>
-                              </>
-                            )}
-                          </div>
                         </div>
                       </div>
 
-                      <div className="flex gap-2 shrink-0">
-                        <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-850 dark:text-emerald-400 px-3.5 py-2 rounded-xl text-xs font-black font-serif text-right border border-emerald-100/50 dark:border-emerald-900/30">
-                          <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-wider mb-0.5">Captured Profit</span>
-                          {formatPrice(o.profitAmount || 0)}
-                          <span className="text-[10px] font-mono font-bold text-zinc-500 ml-1">({marginVal.toFixed(0)}% margin)</span>
+                      {/* Row 2: Metadata (Flavor & Date & Margin Tag) */}
+                      <div className="flex flex-wrap gap-x-2.5 gap-y-1.5 items-center text-xs text-zinc-400 dark:text-zinc-550 font-medium">
+                        <span className="bg-zinc-100 dark:bg-zinc-700/60 text-zinc-650 dark:text-zinc-300 px-2 py-0.5 rounded-md font-mono text-[11px]">
+                          {o.cakeFlavor}
+                        </span>
+                        <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                        <span className="flex items-center gap-1 font-semibold text-zinc-500 dark:text-zinc-400">
+                          <Calendar className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
+                          {formatDate(o.eventDate)}
+                        </span>
+                        {marginVal >= 60 && (
+                          <>
+                            <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                            <span className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-0.5">
+                              <Sparkles className="w-3 h-3" /> High Margin Gem
+                            </span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Row 3: Financial Details Grid */}
+                      <div className="grid grid-cols-2 gap-3 w-full pt-0.5">
+                        <div className="bg-emerald-500/5 dark:bg-emerald-500/10 text-emerald-850 dark:text-emerald-400 px-3.5 py-2.5 rounded-xl border border-emerald-100/50 dark:border-emerald-950/30">
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 dark:text-zinc-500 block tracking-wider mb-1">Captured Profit</span>
+                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <span className="text-base font-extrabold font-serif text-emerald-700 dark:text-emerald-400">{formatPrice(o.profitAmount || 0)}</span>
+                            <span className="text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400">({marginVal.toFixed(0)}% margin)</span>
+                          </div>
                         </div>
-                        <div className="bg-zinc-50 dark:bg-zinc-900/40 text-zinc-600 dark:text-zinc-350 px-3.5 py-2 rounded-xl text-xs font-bold font-mono text-right border border-zinc-100 dark:border-zinc-750">
-                          <span className="text-[10px] uppercase font-bold text-zinc-405 block tracking-wider mb-0.5">Total Sale</span>
-                          {formatPrice(o.totalAmount)}
+                        <div className="bg-zinc-50/50 dark:bg-zinc-900/30 text-zinc-650 dark:text-zinc-350 px-3.5 py-2.5 rounded-xl border border-zinc-100 dark:border-zinc-800/50">
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 dark:text-zinc-500 block tracking-wider mb-1">Total Sale</span>
+                          <span className="text-base font-extrabold font-mono text-zinc-800 dark:text-zinc-200 block">{formatPrice(o.totalAmount)}</span>
                         </div>
                       </div>
                     </div>

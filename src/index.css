@@ -262,3 +262,64 @@ h1, h2, h3, h4, .font-serif-editor {
   animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Height-responsive styling for desktop sidebar to prevent overflow on low screens */
+@media (max-height: 720px) {
+  .desktop-sidebar {
+    padding-top: 1rem !important; /* py-4 equivalent */
+    padding-bottom: 1rem !important;
+  }
+  .desktop-sidebar .sidebar-logo-container {
+    margin-bottom: 1.5rem !important; /* mb-6 equivalent */
+  }
+  .desktop-sidebar .sidebar-logo-btn {
+    width: 2.75rem !important; /* w-11 equivalent */
+    height: 2.75rem !important;
+  }
+  .desktop-sidebar .sidebar-nav {
+    gap: 0.5rem !important; /* gap-2 equivalent */
+  }
+  .desktop-sidebar .sidebar-btn {
+    width: 2.5rem !important; /* w-10 equivalent */
+    height: 2.5rem !important;
+  }
+  .desktop-sidebar .sidebar-bottom {
+    margin-top: auto !important;
+    gap: 0.5rem !important;
+  }
+}
+
+@media (max-height: 580px) {
+  .desktop-sidebar {
+    padding-top: 0.5rem !important; /* py-2 equivalent */
+    padding-bottom: 0.5rem !important;
+  }
+  .desktop-sidebar .sidebar-logo-container {
+    margin-bottom: 0.75rem !important; /* mb-3 equivalent */
+  }
+  .desktop-sidebar .sidebar-logo-btn {
+    width: 2.25rem !important; /* w-9 equivalent */
+    height: 2.25rem !important;
+  }
+  .desktop-sidebar .sidebar-nav {
+    gap: 0.25rem !important; /* gap-1 equivalent */
+  }
+  .desktop-sidebar .sidebar-btn {
+    width: 2.25rem !important; /* w-9 equivalent */
+    height: 2.25rem !important;
+  }
+  .desktop-sidebar .sidebar-bottom {
+    gap: 0.25rem !important;
+  }
+}
+
+

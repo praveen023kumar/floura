@@ -141,6 +141,14 @@ export interface BakeryProfile {
   isDeleted?: number;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  type: 'recipe' | 'inventory';
+  updatedAt: string; // ISO string
+  isDeleted?: number;
+}
+
 export interface SyncPayload {
   customers: Customer[];
   orders: Order[];
@@ -151,6 +159,7 @@ export interface SyncPayload {
   dispatchedNotifications: DispatchedNotification[];
   scheduledAlerts: CustomScheduledAlert[];
   bakeryProfile?: BakeryProfile[];
+  categories?: Category[];
   lastSyncTime: string; // ISO string
 }
 
@@ -165,5 +174,6 @@ export interface SyncResponse {
   dispatchedNotifications: DispatchedNotification[];
   scheduledAlerts: CustomScheduledAlert[];
   bakeryProfile?: BakeryProfile[];
+  categories?: Category[];
   syncTime: string;
 }

@@ -192,6 +192,18 @@ export async function initDb() {
     )
   `);
 
+  // Create Categories Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      isDeleted INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
   // Create Users Table
   await runSql(db, `
     CREATE TABLE IF NOT EXISTS users (
@@ -233,7 +245,7 @@ export async function initDb() {
   `);
 
   // Safe schema migrations helper (adds user_email & isDeleted if absent in old sqlite tables)
-  const tables = ["customers", "orders", "inventory", "recipes", "checklist", "custom_events", "dispatched_notifications", "scheduled_alerts", "bakery_profile"];
+  const tables = ["customers", "orders", "inventory", "recipes", "checklist", "custom_events", "dispatched_notifications", "scheduled_alerts", "bakery_profile", "categories"];
   for (const t of tables) {
     try {
       await runSql(db, `ALTER TABLE ${t} ADD COLUMN user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com'`);
@@ -296,6 +308,32 @@ export async function initDb() {
     }
   } catch (err) {
     console.error("Failed to seed initial bakery profile SQLite table:", err);
+  }
+
+  // Seed default categories if table is empty
+  try {
+    const catCount = await querySqlAll<any>(db, "SELECT count(*) as count FROM categories WHERE user_email = 'praveen023kumar@gmail.com'");
+    if (catCount.length === 0 || catCount[0].count === 0) {
+      const now = new Date().toISOString();
+      const defaultRecipeCats = ["Cakes", "Viennoiserie", "Tarts", "Confectionary", "Classic", "Pastry"];
+      for (const cat of defaultRecipeCats) {
+        const id = `cat-recipe-${cat.toLowerCase().replace(/\s+/g, '-')}`;
+        await runSql(db, `
+          INSERT INTO categories (id, name, type, updatedAt, user_email, isDeleted)
+          VALUES (?, ?, 'recipe', ?, 'praveen023kumar@gmail.com', 0)
+        `, [id, cat, now]);
+      }
+      const defaultInvCats = ["Dry Goods", "Dairy", "Produce", "Packaging", "Flour", "Chocolate"];
+      for (const cat of defaultInvCats) {
+        const id = `cat-inv-${cat.toLowerCase().replace(/\s+/g, '-')}`;
+        await runSql(db, `
+          INSERT INTO categories (id, name, type, updatedAt, user_email, isDeleted)
+          VALUES (?, ?, 'inventory', ?, 'praveen023kumar@gmail.com', 0)
+        `, [id, cat, now]);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to seed default categories SQLite table:", err);
   }
 
   db.close();

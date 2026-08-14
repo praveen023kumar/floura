@@ -40,6 +40,7 @@ export function useOrders({
   const [dateFilter, setDateFilter] = useState<string>("all");
   const [customStartDate, setCustomStartDate] = useState<string>("");
   const [customEndDate, setCustomEndDate] = useState<string>("");
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
 
   // Order completion captures
   const [completingOrder, setCompletingOrder] = useState<Order | null>(null);
@@ -251,15 +252,18 @@ export function useOrders({
   useEffect(() => {
     async function loadSelectOptions() {
       try {
-        let query = localDb.customers.filter(c => c.isDeleted !== 1);
-        if (customerSearch) {
-          const lower = customerSearch.toLowerCase();
-          query = query.filter(c => 
-            c.name.toLowerCase().includes(lower) || 
-            c.mobile.includes(lower) ||
-            c.id.toLowerCase().includes(lower)
-          );
-        }
+        const query = localDb.customers.filter(c => {
+          if (c.isDeleted === 1) return false;
+          if (customerSearch) {
+            const lower = customerSearch.toLowerCase();
+            return (
+              c.name.toLowerCase().includes(lower) || 
+              c.mobile.includes(lower) ||
+              c.id.toLowerCase().includes(lower)
+            );
+          }
+          return true;
+        });
         const matched = await query.limit(50).toArray();
         const opts = matched.map(c => ({ value: c.id, label: `${c.name} (${c.mobile})` }));
 
@@ -280,145 +284,142 @@ export function useOrders({
     loadSelectOptions();
   }, [customerSearch, formData.customerId, refreshTrigger]);
 
-  // Reset pagination on search, filter, dateFilter, sort, viewTab, calMonth, calYear
+  // Reset pagination on search, filter, dateFilter, sort, viewTab, calMonth, calYear, paymentFilter
   useEffect(() => {
     setOrdersCurrentPage(1);
-  }, [searchTerm, filter, sortBy, dateFilter, customStartDate, customEndDate, viewTab, calMonth, calYear]);
+  }, [searchTerm, filter, sortBy, dateFilter, customStartDate, customEndDate, viewTab, calMonth, calYear, paymentFilter]);
 
   // Paginated and sorted orders
   useEffect(() => {
     async function loadDbOrders() {
       try {
-        const allOrders = await localDb.orders.filter(o => o.isDeleted !== 1).toArray();
-
-        let matched = allOrders;
-
-        if (viewTab === "calendar") {
-          // Apply status filter only
-          if (filter === "active") {
-            matched = matched.filter(o => o.status !== "Completed" && o.status !== "Cancelled");
-          } else if (filter === "archived") {
-            matched = matched.filter(o => o.status === "Completed" || o.status === "Cancelled");
-          } else if (filter !== "all") {
-            matched = matched.filter(o => o.status === filter);
-          }
-
-          // Apply current month date filter only
-          const targetYear = calYear !== undefined ? calYear : new Date().getFullYear();
-          const targetMonth = calMonth !== undefined ? calMonth : new Date().getMonth();
-          const yearMonthPrefix = `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}`;
-          matched = matched.filter(o => {
-            const dateStr = o.deliveryDate || o.eventDate;
-            return dateStr && dateStr.startsWith(yearMonthPrefix);
-          });
-        } else {
-          // Standard List View filtering (original logic)
-          if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            matched = matched.filter(o => 
-              (o.customerName || "").toLowerCase().includes(term) ||
-              (o.id || "").toLowerCase().includes(term) ||
-              (o.eventType || "").toLowerCase().includes(term) ||
-              (o.cakeFlavor || "").toLowerCase().includes(term) ||
-              (o.paymentStatus || "unpaid").toLowerCase().includes(term)
-            );
-          }
-
-          if (filter === "active") {
-            matched = matched.filter(o => o.status !== "Completed" && o.status !== "Cancelled");
-          } else if (filter === "archived") {
-            matched = matched.filter(o => o.status === "Completed" || o.status === "Cancelled");
-          } else if (filter !== "all") {
-            matched = matched.filter(o => o.status === filter);
-          }
-
-          // Apply date filters based on deliveryDate (fallback to eventDate)
-          if (dateFilter === "future") {
-            const getLocalDateString = (offsetDays = 0) => {
-              const d = new Date();
-              if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
-              const yyyy = d.getFullYear();
-              const mm = String(d.getMonth() + 1).padStart(2, '0');
-              const dd = String(d.getDate()).padStart(2, '0');
-              return `${yyyy}-${mm}-${dd}`;
-            };
-            const todayStr = getLocalDateString(0);
-            matched = matched.filter(o => (o.deliveryDate || o.eventDate) > todayStr);
-          } else if (dateFilter === "today") {
-            const getLocalDateString = (offsetDays = 0) => {
-              const d = new Date();
-              if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
-              const yyyy = d.getFullYear();
-              const mm = String(d.getMonth() + 1).padStart(2, '0');
-              const dd = String(d.getDate()).padStart(2, '0');
-              return `${yyyy}-${mm}-${dd}`;
-            };
-            const todayStr = getLocalDateString(0);
-            matched = matched.filter(o => (o.deliveryDate || o.eventDate) === todayStr);
-          } else if (dateFilter === "tomorrow") {
-            const getLocalDateString = (offsetDays = 0) => {
-              const d = new Date();
-              if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
-              const yyyy = d.getFullYear();
-              const mm = String(d.getMonth() + 1).padStart(2, '0');
-              const dd = String(d.getDate()).padStart(2, '0');
-              return `${yyyy}-${mm}-${dd}`;
-            };
-            const tomorrowStr = getLocalDateString(1);
-            matched = matched.filter(o => (o.deliveryDate || o.eventDate) === tomorrowStr);
-          } else if (dateFilter === "custom") {
-            if (customStartDate) {
-              matched = matched.filter(o => (o.deliveryDate || o.eventDate) >= customStartDate);
-            }
-            if (customEndDate) {
-              matched = matched.filter(o => (o.deliveryDate || o.eventDate) <= customEndDate);
-            }
-          }
-        }
-
-        // Apply Sorting (irrelevant for calendar rendering, but useful for paginatedOrders list below/above and fallback)
-        matched.sort((a, b) => {
-          if (sortBy === "delivery-soonest") {
-            const dateA = a.deliveryDate || a.eventDate || "";
-            const dateB = b.deliveryDate || b.eventDate || "";
-            if (dateA !== dateB) return dateA.localeCompare(dateB);
-            return (a.deliveryTime || "").localeCompare(b.deliveryTime || "");
-          } else if (sortBy === "delivery-latest") {
-            const dateA = a.deliveryDate || a.eventDate || "";
-            const dateB = b.deliveryDate || b.eventDate || "";
-            if (dateA !== dateB) return dateB.localeCompare(dateA);
-            return (b.deliveryTime || "").localeCompare(a.deliveryTime || "");
-          } else if (sortBy === "created-newest") {
-            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return timeB - timeA;
-          } else if (sortBy === "created-oldest") {
-            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return timeA - timeB;
-          } else if (sortBy === "amount-highest") {
-            return (b.totalAmount || 0) - (a.totalAmount || 0);
-          } else if (sortBy === "amount-lowest") {
-            return (a.totalAmount || 0) - (b.totalAmount || 0);
-          }
-          // Default fallback
-          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return timeB - timeA;
-        });
-
-        setFilteredCount(matched.length);
-        setFilteredOrders(matched);
+        const getLocalDateString = (offsetDays = 0) => {
+          const d = new Date();
+          if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd}`;
+        };
 
         const startIndex = (ordersCurrentPage - 1) * ordersItemsPerPage;
-        const pageSlice = matched.slice(startIndex, startIndex + ordersItemsPerPage);
-        setPaginatedOrders(pageSlice);
+        const isCreatedSort = sortBy === "created-newest" || sortBy === "created-oldest" || !sortBy;
+        const isCalendar = viewTab === "calendar";
+
+        let collection;
+        if (isCreatedSort && !isCalendar) {
+          collection = localDb.orders.orderBy("createdAt");
+          if (sortBy !== "created-oldest") {
+            collection = collection.reverse();
+          }
+        } else {
+          collection = localDb.orders.toCollection();
+        }
+
+        const query = collection.filter(o => {
+          if (o.isDeleted === 1) return false;
+
+          // Apply payment status filter
+          if (paymentFilter !== "all" && (o.paymentStatus || "Unpaid") !== paymentFilter) return false;
+
+          if (isCalendar) {
+            // Apply status filter only
+            if (filter === "active") {
+              if (o.status === "Completed" || o.status === "Cancelled") return false;
+            } else if (filter === "archived") {
+              if (o.status !== "Completed" && o.status !== "Cancelled") return false;
+            } else if (filter !== "all") {
+              if (o.status !== filter) return false;
+            }
+
+            // Apply current month date filter only
+            const targetYear = calYear !== undefined ? calYear : new Date().getFullYear();
+            const targetMonth = calMonth !== undefined ? calMonth : new Date().getMonth();
+            const yearMonthPrefix = `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}`;
+            const dateStr = o.deliveryDate || o.eventDate;
+            if (!dateStr || !dateStr.startsWith(yearMonthPrefix)) return false;
+          } else {
+            // Standard List View filtering
+            if (searchTerm) {
+              const term = searchTerm.toLowerCase();
+              const matchesSearch = 
+                (o.customerName || "").toLowerCase().includes(term) ||
+                (o.id || "").toLowerCase().includes(term) ||
+                (o.eventType || "").toLowerCase().includes(term) ||
+                (o.cakeFlavor || "").toLowerCase().includes(term) ||
+                (o.paymentStatus || "unpaid").toLowerCase().includes(term);
+              if (!matchesSearch) return false;
+            }
+
+            if (filter === "active") {
+              if (o.status === "Completed" || o.status === "Cancelled") return false;
+            } else if (filter === "archived") {
+              if (o.status !== "Completed" && o.status !== "Cancelled") return false;
+            } else if (filter !== "all") {
+              if (o.status !== filter) return false;
+            }
+
+            // Apply date filters based on deliveryDate (fallback to eventDate)
+            const dateStr = o.deliveryDate || o.eventDate;
+            if (dateFilter === "future") {
+              const todayStr = getLocalDateString(0);
+              if (!(dateStr && dateStr > todayStr)) return false;
+            } else if (dateFilter === "today") {
+              const todayStr = getLocalDateString(0);
+              if (!(dateStr && dateStr === todayStr)) return false;
+            } else if (dateFilter === "tomorrow") {
+              const tomorrowStr = getLocalDateString(1);
+              if (!(dateStr && dateStr === tomorrowStr)) return false;
+            } else if (dateFilter === "custom") {
+              if (customStartDate && !(dateStr && dateStr >= customStartDate)) return false;
+              if (customEndDate && !(dateStr && dateStr <= customEndDate)) return false;
+            }
+          }
+          return true;
+        });
+
+        if (isCalendar) {
+          const matched = await query.toArray();
+          setFilteredCount(matched.length);
+          setFilteredOrders(matched);
+          setPaginatedOrders([]);
+        } else if (isCreatedSort) {
+          const [totalCount, pageSlice] = await Promise.all([
+            query.count(),
+            query.offset(startIndex).limit(ordersItemsPerPage).toArray()
+          ]);
+          setFilteredCount(totalCount);
+          setFilteredOrders(pageSlice);
+          setPaginatedOrders(pageSlice);
+        } else {
+          const matched = await query.toArray();
+          matched.sort((a, b) => {
+            if (sortBy === "delivery-soonest") {
+              const dateA = a.deliveryDate || a.eventDate || "";
+              const dateB = b.deliveryDate || b.eventDate || "";
+              if (dateA !== dateB) return dateA.localeCompare(dateB);
+              return (a.deliveryTime || "").localeCompare(b.deliveryTime || "");
+            } else if (sortBy === "delivery-latest") {
+              const dateA = a.deliveryDate || a.eventDate || "";
+              const dateB = b.deliveryDate || b.eventDate || "";
+              if (dateA !== dateB) return dateB.localeCompare(dateA);
+              return (b.deliveryTime || "").localeCompare(a.deliveryTime || "");
+            } else if (sortBy === "amount-highest") {
+              return (b.totalAmount || 0) - (a.totalAmount || 0);
+            } else { // "amount-lowest"
+              return (a.totalAmount || 0) - (b.totalAmount || 0);
+            }
+          });
+          setFilteredCount(matched.length);
+          setFilteredOrders(matched);
+          setPaginatedOrders(matched.slice(startIndex, startIndex + ordersItemsPerPage));
+        }
       } catch (err) {
         console.error("Failed to query orders from localDb:", err);
       }
     }
     loadDbOrders();
-  }, [refreshTrigger, searchTerm, filter, ordersCurrentPage, ordersItemsPerPage, sortBy, dateFilter, customStartDate, customEndDate, calMonth, calYear, viewTab]);
+  }, [refreshTrigger, searchTerm, filter, ordersCurrentPage, ordersItemsPerPage, sortBy, dateFilter, customStartDate, customEndDate, calMonth, calYear, viewTab, paymentFilter]);
 
   const ordersTotalPages = useMemo(() => {
     return Math.ceil(filteredCount / ordersItemsPerPage);
@@ -918,6 +919,8 @@ export function useOrders({
     setCustomStartDate,
     customEndDate,
     setCustomEndDate,
+    paymentFilter,
+    setPaymentFilter,
     handleSetViewMode,
     handleStartEdit,
     startCamera,

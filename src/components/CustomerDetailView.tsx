@@ -35,13 +35,12 @@ export default function CustomerDetailView() {
     async function fetchSelectedDetails() {
       if (!id) return;
       try {
-        const [customer, allOrders] = await Promise.all([
+        const [customer, custOrders] = await Promise.all([
           localDb.customers.get(id),
-          localDb.orders.toArray()
+          localDb.orders.filter(o => o.customerId === id && o.isDeleted !== 1).toArray()
         ]);
         setSelectedCustomer(customer || null);
 
-        const custOrders = allOrders.filter(o => o.customerId === id && o.isDeleted !== 1);
         custOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         setSelectedCustomerOrders(custOrders);
       } catch (err) {
