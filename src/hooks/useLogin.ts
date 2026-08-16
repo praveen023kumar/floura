@@ -48,7 +48,8 @@ export function useLogin({ onLogin }: UseLoginProps) {
                 name: data.user.name,
                 email: data.user.email,
                 avatar: data.user.avatar,
-                token: data.token
+                token: data.token,
+                isNew: data.isNew
               });
             }, 800);
           } else if (data.status === "error") {
@@ -147,7 +148,8 @@ export function useLogin({ onLogin }: UseLoginProps) {
                     name: data.user.name,
                     email: data.user.email,
                     avatar: data.user.avatar,
-                    token: data.token
+                    token: data.token,
+                    isNew: data.isNew
                   });
                 }, 800);
               } else if (data.status === "error") {

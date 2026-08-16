@@ -124,6 +124,8 @@ function MainAppContent() {
   // User Authenticated State
   const [user, setUser] = useState<{ name: string; email: string; avatar: string; token?: string } | null>(null);
   const [initializing, setInitializing] = useState<boolean>(true);
+  const [isLoadingFromDb, setIsLoadingFromDb] = useState<boolean>(true);
+  const [profileChecked, setProfileChecked] = useState<boolean>(false);
 
   // accessibility Dark Mode State
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -243,12 +245,17 @@ function MainAppContent() {
   // When user logging in or changing accounts, handle partition switching
   useEffect(() => {
     async function handleUserSwitch() {
-      if (!user) return;
+      if (!user) {
+        setIsLoadingFromDb(false);
+        return;
+      }
       if ((user as any).role === "admin" || (user as any).role === "superadmin") {
         setSyncStatus("synced");
+        setIsLoadingFromDb(false);
         return;
       }
       
+      setIsLoadingFromDb(true);
       const lastSyncedEmail = await getPreference("patisserie_last_synced_email");
       if (lastSyncedEmail && lastSyncedEmail !== user.email) {
         // Switch user: reset local database cache to prevent leaks, then sync
@@ -272,6 +279,7 @@ function MainAppContent() {
       // Load data in parallel for optimal startup performance
       try {
         await refreshReactStates();
+        setProfileChecked(true);
 
         const [custCount, ordCount] = await Promise.all([
           localDb.customers.count(),
@@ -300,6 +308,8 @@ function MainAppContent() {
         }
       } catch (err) {
         console.error("Failed to load IndexedDB data in parallel:", err);
+      } finally {
+        setIsLoadingFromDb(false);
       }
     }
 
@@ -553,6 +563,7 @@ function MainAppContent() {
   }
 
   const handleLogin = async (authenticatedUser: { name: string; email: string; avatar: string; token?: string; isNew?: boolean; role?: string }) => {
+    console.log("[Auth Debug] handleLogin received authenticatedUser:", authenticatedUser);
     if (authenticatedUser.role === "admin" || authenticatedUser.role === "superadmin") {
       setUser({
         name: authenticatedUser.name,
@@ -649,22 +660,12 @@ function MainAppContent() {
   };
 
   const handleLogout = async () => {
-    await removePreference("patisserie_user");
-    await removePreference("patisserie_last_synced_email");
     try {
-      await Promise.all([
-        localDb.customers.clear(),
-        localDb.orders.clear(),
-        localDb.inventory.clear(),
-        localDb.recipes.clear(),
-        localDb.checklist.clear(),
-        localDb.customEvents.clear(),
-        localDb.dispatchedNotifications.clear(),
-        localDb.scheduledAlerts.clear(),
-        localDb.bakeryProfile.clear()
-      ]);
+      // Completely delete the local IndexedDB database and open a fresh schema instance
+      await localDb.delete();
+      await localDb.open();
     } catch (e) {
-      console.warn("Could not wipe IndexedDB tables on logout:", e);
+      console.warn("Could not delete IndexedDB database on logout:", e);
     }
 
     // Reset local memory states to prevent UI remnants
@@ -1134,7 +1135,7 @@ function MainAppContent() {
     };
   }, [completedOrdersCount, activeOrdersCount]);
 
-  if (initializing) {
+  if (initializing || isLoadingFromDb) {
     return (
       <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 flex flex-col items-center justify-center p-4">
         <motion.div
@@ -1209,6 +1210,14 @@ function MainAppContent() {
     return <LandingPage user={user} onLogin={handleLogin} onLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} />;
   }
 
+  // Force onboarding for new users who haven't completed bakery profile setup
+  // Guard: only redirect after the first IndexedDB read has completed (profileChecked)
+  // to avoid false redirects on page refresh before data loads
+  const isGettingStarted = location.pathname === "/getting-started";
+  if (profileChecked && !bakeryProfile && !isGettingStarted) {
+    return <Navigate to="/getting-started" replace />;
+  }
+
   if (currentScreen === "getting-started") {
     return (
       <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 flex flex-col transition-colors duration-200">
@@ -1239,11 +1248,9 @@ function MainAppContent() {
                       localChange: 1,
                       updatedAt: new Date().toISOString()
                     });
+                    setBakeryProfile(updatedProfile);
                     if (typeof navigator !== "undefined" && navigator.onLine) {
                       triggerSync();
-                    } else {
-                      const fresh = await localDb.bakeryProfile.toArray();
-                      setBakeryProfile(fresh.filter((bp: any) => bp.isDeleted !== 1)[0] || null);
                     }
                   }}
                 />
@@ -1583,11 +1590,9 @@ function MainAppContent() {
                       localChange: 1,
                       updatedAt: new Date().toISOString()
                     });
+                    setBakeryProfile(updatedProfile);
                     if (typeof navigator !== "undefined" && navigator.onLine) {
                       triggerSync();
-                    } else {
-                      const fresh = await localDb.bakeryProfile.toArray();
-                      setBakeryProfile(fresh.filter((bp: any) => bp.isDeleted !== 1)[0] || null);
                     }
                   }}
                 />
@@ -1607,11 +1612,9 @@ function MainAppContent() {
                       localChange: 1,
                       updatedAt: new Date().toISOString()
                     });
+                    setBakeryProfile(updatedProfile);
                     if (typeof navigator !== "undefined" && navigator.onLine) {
                       triggerSync();
-                    } else {
-                      const fresh = await localDb.bakeryProfile.toArray();
-                      setBakeryProfile(fresh.filter((bp: any) => bp.isDeleted !== 1)[0] || null);
                     }
                   }}
                 />

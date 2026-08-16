@@ -1,17 +1,35 @@
-// File Path: /server-db.ts
 import sqlite3 from "sqlite3";
 import path from "path";
 import fs from "fs";
-import { Customer, Order, InventoryItem, Recipe, ChecklistItem } from "./src/types";
+import { initSecurityDb } from "./security.model";
 
 const DB_FILE = path.join(process.cwd(), "patisserie.sqlite");
 
-// Helper to open SQLite database
+// Helper to open SQLite database with security constraints and configurations
 export function getDb(): Promise<sqlite3.Database> {
   return new Promise((resolve, reject) => {
     const db = new sqlite3.Database(DB_FILE, (err) => {
-      if (err) reject(err);
-      else resolve(db);
+      if (err) {
+        reject(err);
+      } else {
+        try {
+          // Set filesystem permissions to owner read/write only (chmod 600)
+          if (fs.existsSync(DB_FILE)) {
+            fs.chmodSync(DB_FILE, 0o600);
+          }
+
+          // Apply security and reliability Pragmas
+          db.serialize(() => {
+            db.run("PRAGMA journal_mode = WAL;");
+            db.run("PRAGMA foreign_keys = ON;");
+            db.run("PRAGMA busy_timeout = 5000;");
+          });
+
+          resolve(db);
+        } catch (e) {
+          reject(e);
+        }
+      }
     });
   });
 }
@@ -249,53 +267,35 @@ export async function initDb() {
   for (const t of tables) {
     try {
       await runSql(db, `ALTER TABLE ${t} ADD COLUMN user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com'`);
-    } catch {
-      // Column already exists, ignore
-    }
+    } catch {}
     try {
       await runSql(db, `ALTER TABLE ${t} ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0`);
-    } catch {
-      // Column already exists, ignore
-    }
+    } catch {}
   }
 
   // Safe migration specifically for deliveryDate on orders table
   try {
     await runSql(db, `ALTER TABLE orders ADD COLUMN deliveryDate TEXT NOT NULL DEFAULT ''`);
-  } catch {
-    // Column already exists, ignore
-  }
+  } catch {}
 
   // Safe migrations for payment fields on orders table
   try {
     await runSql(db, `ALTER TABLE orders ADD COLUMN paymentStatus TEXT NOT NULL DEFAULT 'Unpaid'`);
-  } catch {
-    // Column already exists, ignore
-  }
+  } catch {}
   try {
     await runSql(db, `ALTER TABLE orders ADD COLUMN paidAmount REAL NOT NULL DEFAULT 0`);
-  } catch {
-    // Column already exists, ignore
-  }
+  } catch {}
   try {
     await runSql(db, `ALTER TABLE orders ADD COLUMN paymentHistory TEXT NOT NULL DEFAULT '[]'`);
-  } catch {
-    // Column already exists, ignore
-  }
+  } catch {}
 
   // Safe migrations for feedbacks table fields
   try {
     await runSql(db, `ALTER TABLE feedbacks ADD COLUMN title TEXT`);
-  } catch {
-    // Column already exists, ignore
-  }
+  } catch {}
   try {
     await runSql(db, `ALTER TABLE feedbacks ADD COLUMN imageUrl TEXT`);
-  } catch {
-    // Column already exists, ignore
-  }
-
-
+  } catch {}
 
   // Seed initial bakery profile if table is empty
   try {
@@ -338,4 +338,7 @@ export async function initDb() {
 
   db.close();
   console.log("SQLite database initialized successfully.");
+
+  // Chain load security database tables
+  await initSecurityDb();
 }

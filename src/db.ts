@@ -15,6 +15,8 @@ export function decryptData(ciphertext: string): any {
 }
 
 function setupTableEncryption(table: any) {
+  const primKeyName = table.name === "preferences" ? "key" : "id";
+
   table.hook("creating", (primKey: any, obj: any) => {
     if (!obj) return;
     
@@ -23,18 +25,23 @@ function setupTableEncryption(table: any) {
       return;
     }
     
-    const id = obj.id;
     const localChange = obj.localChange !== undefined ? obj.localChange : 0;
     const isDeleted = obj.isDeleted !== undefined ? obj.isDeleted : 0;
     const updatedAt = obj.updatedAt;
     const createdAt = obj.createdAt;
     
-    const { id: _, localChange: __, isDeleted: ___, ...rest } = obj;
+    const rest = { ...obj };
+    delete rest[primKeyName];
+    delete rest.localChange;
+    delete rest.isDeleted;
+    delete rest.updatedAt;
+    delete rest.createdAt;
+    
     const encrypted = encryptData(rest);
     
     // Mutate the original object in-place for Dexie/IndexedDB to store
     for (const key of Object.keys(obj)) {
-      if (key !== "id" && key !== "localChange" && key !== "isDeleted" && key !== "updatedAt" && key !== "createdAt") {
+      if (key !== primKeyName && key !== "localChange" && key !== "isDeleted" && key !== "updatedAt" && key !== "createdAt") {
         delete obj[key];
       }
     }
@@ -55,13 +62,19 @@ function setupTableEncryption(table: any) {
     const decryptedObj = obj.encryptedData ? decryptData(obj.encryptedData) : {};
     const mergedFull = { ...obj, ...decryptedObj, ...mods };
     
-    const id = mergedFull.id;
     const localChange = mergedFull.localChange !== undefined ? mergedFull.localChange : 0;
     const isDeleted = mergedFull.isDeleted !== undefined ? mergedFull.isDeleted : 0;
     const updatedAt = mergedFull.updatedAt;
     const createdAt = mergedFull.createdAt;
     
-    const { id: _, localChange: __, isDeleted: ___, encryptedData: ____, ...rest } = mergedFull;
+    const rest = { ...mergedFull };
+    delete rest[primKeyName];
+    delete rest.localChange;
+    delete rest.isDeleted;
+    delete rest.encryptedData;
+    delete rest.updatedAt;
+    delete rest.createdAt;
+    
     const encrypted = encryptData(rest);
 
     const updatedMods: any = {
@@ -74,7 +87,7 @@ function setupTableEncryption(table: any) {
 
     // Set other properties to undefined so they are deleted from IndexedDB
     for (const key of Object.keys(mods)) {
-      if (key !== "id" && key !== "localChange" && key !== "isDeleted" && key !== "encryptedData" && key !== "updatedAt" && key !== "createdAt") {
+      if (key !== primKeyName && key !== "localChange" && key !== "isDeleted" && key !== "encryptedData" && key !== "updatedAt" && key !== "createdAt") {
         updatedMods[key] = undefined;
       }
     }
@@ -86,14 +99,15 @@ function setupTableEncryption(table: any) {
     if (!obj || !obj.encryptedData) return obj;
     try {
       const decrypted = decryptData(obj.encryptedData);
-      return {
-        id: obj.id,
+      const result: any = {
         localChange: obj.localChange !== undefined ? obj.localChange : 0,
         isDeleted: obj.isDeleted !== undefined ? obj.isDeleted : 0,
         updatedAt: obj.updatedAt,
         createdAt: obj.createdAt,
         ...decrypted
       };
+      result[primKeyName] = obj[primKeyName];
+      return result;
     } catch (err) {
       console.error("Transparent decryption failed on database read:", err);
       return obj;
@@ -143,7 +157,7 @@ export class PatisserieDatabase extends Dexie {
       preferences: "key"
     });
 
-    const tablesToEncrypt = ["customers", "orders", "inventory", "recipes", "checklist", "customEvents", "dispatchedNotifications", "scheduledAlerts", "bakeryProfile"];
+    const tablesToEncrypt = ["customers", "orders", "inventory", "recipes", "checklist", "customEvents", "dispatchedNotifications", "scheduledAlerts", "bakeryProfile", "categories", "preferences"];
     for (const tableName of tablesToEncrypt) {
       const table = this.table(tableName);
       setupTableEncryption(table);

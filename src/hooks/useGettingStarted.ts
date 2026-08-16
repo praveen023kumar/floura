@@ -16,7 +16,8 @@ export function useGettingStarted({
   onUpdateBakeryProfile,
 }: UseGettingStartedProps) {
   const navigate = useNavigate();
-  const [step, setStep] = useState<"welcome" | "form">("welcome");
+  // Start directly on the customization form step to avoid confirmation gates
+  const [step, setStep] = useState<"welcome" | "form">("form");
   
   const [chefName, setChefName] = useState(user?.name || "");
   const [bakeryName, setBakeryName] = useState("");
@@ -38,9 +39,11 @@ export function useGettingStarted({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + user.token
+            "Authorization": "Bearer " + user.token,
+            "x-user-email": user.email
           },
           body: JSON.stringify({
+            userEmail: user.email,
             email: user.email,
             name: chefName,
             avatar: "chef"
@@ -89,6 +92,75 @@ export function useGettingStarted({
     }
   };
 
+  const handleSkipWithDefaults = async () => {
+    setSaving(true);
+    try {
+      const finalChef = user?.name || "Chef Paul";
+      const finalBakery = "Sweet Home Bakery";
+      const finalEmail = user?.email || "chef@example.com";
+      const finalPhone = "+1 (555) 012-3456";
+      const finalAddress = "456 Confectionary Boulevard, Suite A";
+      const finalRole = "Head Baker & Owner";
+      const finalCurrency = "$";
+      const finalDateFormat = "YYYY-MM-DD";
+
+      if (user?.token) {
+        await fetch(getApiUrl("/api/auth/profile"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + user.token,
+            "x-user-email": user.email
+          },
+          body: JSON.stringify({
+            userEmail: user.email,
+            email: user.email,
+            name: finalChef,
+            avatar: "chef"
+          })
+        });
+      }
+
+      onUpdateProfile({ name: finalChef, email: user?.email || "", avatar: "chef", token: user?.token });
+      
+      if (onUpdateBakeryProfile) {
+        await onUpdateBakeryProfile({
+          id: "active-profile",
+          bakeryName: finalBakery,
+          email: finalEmail,
+          phone: finalPhone,
+          address: finalAddress,
+          role: finalRole,
+          currency: finalCurrency,
+          dateFormat: finalDateFormat,
+          isDeleted: 0
+        });
+      }
+
+      setFormatConfig(finalCurrency, finalDateFormat);
+
+      await setPreference("patisserie_bakery_name", finalBakery);
+      await setPreference("patisserie_bakery_email", finalEmail);
+      await setPreference("patisserie_bakery_phone", finalPhone);
+      await setPreference("patisserie_bakery_address", finalAddress);
+      await setPreference("patisserie_bakery_role", finalRole);
+      await setPreference("floura_currency", finalCurrency);
+      await setPreference("floura_date_format", finalDateFormat);
+      
+      await removePreference("patisserie_is_new_user");
+      
+      window.dispatchEvent(new Event("floura_settings_changed"));
+      
+      window.showToast?.("Workspace initialized with premium defaults!", "success");
+      navigate("/dashboard");
+    } catch (err) {
+      console.error(err);
+      navigate("/dashboard");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return {
     step,
     setStep,
@@ -111,5 +183,6 @@ export function useGettingStarted({
     saving,
     setSaving,
     handleCustomSetupSubmit,
+    handleSkipWithDefaults,
   };
 }
