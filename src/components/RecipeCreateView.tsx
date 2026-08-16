@@ -125,7 +125,7 @@ export default function RecipeCreateView({
   };
 
   return (
-    <div className="max-w-xl mx-auto space-y-6 text-left">
+    <div className="space-y-6 text-left">
       {/* Header with back button */}
       <div className="flex items-center gap-4 bg-white dark:bg-zinc-800 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-700/60 shadow-sm">
         <button
@@ -153,139 +153,148 @@ export default function RecipeCreateView({
         className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-zinc-150 dark:border-zinc-800"
       >
         <form onSubmit={handleCreateRecipeSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Recipe Title</label>
-              <input
-                required
-                type="text"
-                placeholder="e.g. French Croissants"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="bg-zinc-50 dark:bg-zinc-800 text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand focus:outline-none dark:text-zinc-100"
-              />
+          <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-4 custom-scrollbar text-left">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
+              {/* Left Column: Recipe Information */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Recipe Title</label>
+                    <input
+                      required
+                      type="text"
+                      placeholder="e.g. French Croissants"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="bg-zinc-50 dark:bg-zinc-800 text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand focus:outline-none dark:text-zinc-100"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Category</label>
+                    <CreatableSelect
+                      styles={customSelectStyles}
+                      placeholder="Select or type..."
+                      value={category ? { value: category, label: category } : null}
+                      options={dynamicRecipeCategories.map((c) => ({ value: c, label: c }))}
+                      onChange={(opt) => setCategory(opt?.value || "")}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Base Yield Volume</label>
+                    <input
+                      required
+                      type="number"
+                      placeholder="1000"
+                      value={stdYield}
+                      onChange={(e) => {
+                        let val = e.target.value;
+                        if (val === "") {
+                          setStdYield("");
+                        } else {
+                          if (/^0\d+/.test(val)) {
+                            val = val.replace(/^0+/, "");
+                          }
+                          setStdYield(parseInt(val, 10) || 0);
+                        }
+                      }}
+                      className="bg-zinc-50 dark:bg-zinc-800 text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand focus:outline-none dark:text-zinc-100"
+                    />
+                  </div>
+                  
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Unit</label>
+                    <CreatableSelect
+                      styles={customSelectStyles}
+                      placeholder="Select or type..."
+                      value={yieldUnit ? { value: yieldUnit, label: yieldUnit } : null}
+                      options={dynamicYieldUnits.map((u) => ({ value: u, label: u }))}
+                      onChange={(opt) => setYieldUnit(opt?.value || "")}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Reference Image URL (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="https://images.unsplash.com/... or keep blank for default"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    className="bg-zinc-50 dark:bg-zinc-800 text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand focus:outline-none dark:text-zinc-100"
+                  />
+                </div>
+              </div>
+
+              {/* Right Column: Ingredients Table */}
+              <div className="space-y-4">
+                <div className="space-y-2 pt-2">
+                  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Formula Ingredients List</label>
+
+                  <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm bg-white dark:bg-zinc-800">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 font-bold uppercase tracking-wider">
+                          <th className="px-4 py-2.5 bg-zinc-50 dark:bg-zinc-900">Ingredient Name</th>
+                          <th className="px-4 py-2.5">Quantity (Grams)</th>
+                          <th className="px-4 py-2.5 w-16"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-250/50 dark:divide-zinc-700/55">
+                        {formIngredients.map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="px-4 py-1.5">
+                              <input
+                                required
+                                type="text"
+                                placeholder="e.g. Vanilla Extract"
+                                value={item.name}
+                                onChange={(e) => handleIngredientChange(idx, "name", e.target.value)}
+                                className="w-full bg-transparent border-none p-0 focus:ring-0 text-xs text-zinc-800 dark:text-zinc-250 font-bold focus:outline-none"
+                              />
+                            </td>
+                            <td className="px-4 py-1.5">
+                              <input
+                                required
+                                type="number"
+                                placeholder="0"
+                                value={item.qty}
+                                onChange={(e) => handleIngredientChange(idx, "qty", e.target.value)}
+                                className="w-full bg-transparent border-none p-0 focus:ring-0 text-xs text-zinc-850 dark:text-zinc-250 font-bold focus:outline-none font-mono"
+                              />
+                            </td>
+                            <td className="px-4 py-1.5 text-right">
+                              {formIngredients.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveIngredientRow(idx)}
+                                  className="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg cursor-pointer transition-colors"
+                                  title="Remove row"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddIngredientRow}
+                    className="px-3.5 py-2 bg-zinc-50 dark:bg-zinc-850 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-350 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-97"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Ingredient Row
+                  </button>
+                </div>
+              </div>
             </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Category</label>
-              <CreatableSelect
-                styles={customSelectStyles}
-                placeholder="Select or type..."
-                value={category ? { value: category, label: category } : null}
-                options={dynamicRecipeCategories.map((c) => ({ value: c, label: c }))}
-                onChange={(opt) => setCategory(opt?.value || "")}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Base Yield Volume</label>
-              <input
-                required
-                type="number"
-                placeholder="1000"
-                value={stdYield}
-                onChange={(e) => {
-                  let val = e.target.value;
-                  if (val === "") {
-                    setStdYield("");
-                  } else {
-                    if (/^0\d+/.test(val)) {
-                      val = val.replace(/^0+/, "");
-                    }
-                    setStdYield(parseInt(val, 10) || 0);
-                  }
-                }}
-                className="bg-zinc-50 dark:bg-zinc-800 text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand focus:outline-none dark:text-zinc-100"
-              />
-            </div>
-            
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Unit</label>
-              <CreatableSelect
-                styles={customSelectStyles}
-                placeholder="Select or type..."
-                value={yieldUnit ? { value: yieldUnit, label: yieldUnit } : null}
-                options={dynamicYieldUnits.map((u) => ({ value: u, label: u }))}
-                onChange={(opt) => setYieldUnit(opt?.value || "")}
-              />
-            </div>
-          </div>
-
-          {/* Dynamic ingredients rows adding */}
-          <div className="space-y-2 pt-2">
-            <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Formula Ingredients List</label>
-
-            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm bg-white dark:bg-zinc-800">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 font-bold uppercase tracking-wider">
-                    <th className="px-4 py-2.5 bg-zinc-50 dark:bg-zinc-900">Ingredient Name</th>
-                    <th className="px-4 py-2.5">Quantity (Grams)</th>
-                    <th className="px-4 py-2.5 w-16"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-250/50 dark:divide-zinc-700/55">
-                  {formIngredients.map((item, idx) => (
-                    <tr key={idx}>
-                      <td className="px-4 py-1.5">
-                        <input
-                          required
-                          type="text"
-                          placeholder="e.g. Vanilla Extract"
-                          value={item.name}
-                          onChange={(e) => handleIngredientChange(idx, "name", e.target.value)}
-                          className="w-full bg-transparent border-none p-0 focus:ring-0 text-xs text-zinc-800 dark:text-zinc-250 font-bold focus:outline-none"
-                        />
-                      </td>
-                      <td className="px-4 py-1.5">
-                        <input
-                          required
-                          type="number"
-                          placeholder="0"
-                          value={item.qty}
-                          onChange={(e) => handleIngredientChange(idx, "qty", e.target.value)}
-                          className="w-full bg-transparent border-none p-0 focus:ring-0 text-xs text-zinc-850 dark:text-zinc-250 font-bold focus:outline-none font-mono"
-                        />
-                      </td>
-                      <td className="px-4 py-1.5 text-right">
-                        {formIngredients.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveIngredientRow(idx)}
-                            className="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg cursor-pointer transition-colors"
-                            title="Remove row"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleAddIngredientRow}
-              className="px-3.5 py-2 bg-zinc-50 dark:bg-zinc-850 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-350 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-97"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Ingredient Row
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Reference Image URL (Optional)</label>
-            <input
-              type="text"
-              placeholder="https://images.unsplash.com/... or keep blank for default"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              className="bg-zinc-50 dark:bg-zinc-800 text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand focus:outline-none dark:text-zinc-100"
-            />
           </div>
 
           <div className="flex gap-3 pt-6 border-t border-zinc-100 dark:border-zinc-800">

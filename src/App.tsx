@@ -1212,7 +1212,7 @@ function MainAppContent() {
   if (currentScreen === "getting-started") {
     return (
       <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 flex flex-col transition-colors duration-200">
-        <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 flex items-center justify-center">
+        <main className="flex-grow w-full mx-auto px-4 sm:px-6 py-12 flex items-center justify-center">
           <Suspense fallback={
             <div className="py-24 flex flex-col items-center justify-center text-center">
               <motion.div
@@ -1259,7 +1259,7 @@ function MainAppContent() {
   return (
     <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 flex flex-col md:flex-row transition-colors duration-200">
       {/* Sidebar - Desktop Layout (Responsive slim side menu mirroring design block) */}
-      <aside className="desktop-sidebar hidden md:flex w-20 shrink-0 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex-col justify-between sticky top-0 h-screen z-40 select-none py-6 items-center transition-all duration-200 overflow-y-auto no-scrollbar">
+      <aside className="desktop-sidebar hidden md:flex w-20 shrink-0 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex-col justify-between sticky top-0 h-screen z-40 select-none py-6 items-center transition-all duration-200 overflow-visible">
         <div className="flex flex-col items-center w-full">
           {/* Logo Section */}
           <div className="sidebar-logo-container mb-8 flex items-center justify-center">
@@ -1448,7 +1448,7 @@ function MainAppContent() {
         )}
 
         {/* Main viewport Container */}
-        <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-8">
+        <main className="flex-grow w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-8">
           <Suspense fallback={
             <div className="py-24 flex flex-col items-center justify-center text-center">
               <motion.div

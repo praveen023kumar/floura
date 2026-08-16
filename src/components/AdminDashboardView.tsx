@@ -309,7 +309,7 @@ export default function AdminDashboardView({ user, onLogout, darkMode, setDarkMo
       </header>
 
       {/* Main Container */}
-      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 py-8">
+      <main className="flex-grow w-full mx-auto px-4 sm:px-6 py-8">
         
         {loading ? (
           <div className="py-32 flex flex-col items-center justify-center text-center">

@@ -187,7 +187,7 @@ export default function MoreView({
     <>
       <div
         id="more-page-container"
-        className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-8 text-zinc-800 dark:text-zinc-100"
+        className="w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 text-zinc-800 dark:text-zinc-100"
       >
         {/* ======================================================
             PAGE HEADER

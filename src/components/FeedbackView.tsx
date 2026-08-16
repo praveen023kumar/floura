@@ -161,7 +161,7 @@ export default function FeedbackView({ user }: FeedbackViewProps) {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-6 animate-fade-in text-left">
+    <div className="w-full mx-auto px-4 py-6 animate-fade-in text-left">
       {/* Header section with back nav */}
       <div className="flex items-center justify-between mb-6">
         <button

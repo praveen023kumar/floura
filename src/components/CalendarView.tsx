@@ -94,7 +94,7 @@ export default function CalendarView({
 
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-6 text-left" id="calendar-operations-view">
+    <div className="w-full mx-auto px-4 py-6 text-left" id="calendar-operations-view">
       
       {/* View Header Redesigned like Daily Kitchen Checklist */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">

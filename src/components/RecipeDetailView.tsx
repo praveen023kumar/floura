@@ -58,7 +58,7 @@ export default function RecipeDetailView() {
 
   if (!recipe) {
     return (
-      <div className="max-w-xl mx-auto space-y-6 text-left">
+      <div className="space-y-6 text-left">
         <div className="flex items-center gap-4 bg-white dark:bg-zinc-800 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-700/60 shadow-sm">
           <button
             type="button"

@@ -27,7 +27,7 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 shadow-sm transition-colors duration-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex justify-between items-center">
+      <div className="w-full mx-auto px-4 sm:px-6 h-16 flex justify-between items-center">
         {/* Brand Logo */}
         <div className="flex items-center gap-2.5">
           <img 

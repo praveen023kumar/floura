@@ -212,7 +212,7 @@ export default function OrderCreate({
         initial={{ opacity: 0, x: 10 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -10 }}
-        className="bg-white dark:bg-zinc-800 rounded-3xl p-6 border border-zinc-100 dark:border-zinc-700/60 shadow-sm max-w-2xl mx-auto"
+        className="bg-white dark:bg-zinc-800 rounded-3xl p-6 border border-zinc-100 dark:border-zinc-700/60 shadow-sm w-full mx-auto"
       >
         <div className="flex items-start gap-3 mb-6 text-left">
           <button
@@ -232,7 +232,7 @@ export default function OrderCreate({
         </div>
 
         {/* Multi-step progress stepper */}
-        <div className="mb-10 select-none max-w-md mx-auto">
+        <div className="mb-10 select-none max-w-2xl mx-auto">
           <div className="relative flex items-center justify-between px-2">
             <div className="absolute left-6 right-6 top-5 h-[3px] bg-zinc-100 dark:bg-zinc-750 z-0 rounded-full" />
             
@@ -324,7 +324,8 @@ export default function OrderCreate({
         </div>
 
         <form onSubmit={handleFormSubmit} className="space-y-6 text-left">
-          <AnimatePresence mode="wait">
+          <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-6 custom-scrollbar text-left">
+            <AnimatePresence mode="wait">
             {currentStep === 1 && (
               <motion.div
                 key="step-1"
@@ -332,7 +333,7 @@ export default function OrderCreate({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
                 transition={{ duration: 0.15 }}
-                className="space-y-6"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-6"
               >
                 {/* Customer Details Area */}
                 <section className="bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-2xl space-y-4">
@@ -520,7 +521,7 @@ export default function OrderCreate({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
                 transition={{ duration: 0.15 }}
-                className="space-y-6"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-6"
               >
                 {/* Cake details and weights */}
                 <section className="bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-2xl space-y-4">
@@ -783,7 +784,7 @@ export default function OrderCreate({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
                 transition={{ duration: 0.15 }}
-                className="space-y-6"
+                className={`grid grid-cols-1 ${editingOrderId ? "sm:grid-cols-2" : "sm:grid-cols-3"} gap-6`}
               >
                 {/* Review Specs Summary Card */}
                 <section className="bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-700/60 space-y-3">
@@ -1023,6 +1024,7 @@ export default function OrderCreate({
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
 
           {/* Stepper Navigation Buttons */}
           <div className="flex items-center gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-700/60">

@@ -107,7 +107,7 @@ export default function OrderDetail({
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -10 }}
-            className="order-detail-container bg-white dark:bg-zinc-800 rounded-3xl p-6 border border-zinc-100 dark:border-zinc-700/60 shadow-sm max-w-4xl mx-auto space-y-6"
+            className="order-detail-container bg-white dark:bg-zinc-800 rounded-3xl p-6 border border-zinc-100 dark:border-zinc-700/60 shadow-sm w-full mx-auto space-y-6"
           >
             {/* Header section */}
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 pb-5 border-b border-zinc-100 dark:border-zinc-700/60 print:hidden">
@@ -837,7 +837,7 @@ export default function OrderDetail({
             </div>
           </motion.div>
         ) : (
-          <div className="flex flex-col items-center justify-center p-12 space-y-4 bg-white dark:bg-zinc-800 rounded-3xl border border-zinc-100 dark:border-zinc-700/60 shadow-sm max-w-4xl mx-auto min-h-[300px] text-center">
+          <div className="flex flex-col items-center justify-center p-12 space-y-4 bg-white dark:bg-zinc-800 rounded-3xl border border-zinc-100 dark:border-zinc-700/60 shadow-sm w-full mx-auto min-h-[300px] text-center">
             <RefreshCw className="w-6 h-6 animate-spin text-primary-brand dark:text-orange-400 mx-auto" />
             <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 font-sans">Loading order details...</p>
           </div>

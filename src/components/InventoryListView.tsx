@@ -402,7 +402,7 @@ export default function InventoryListView({
               </span>
             </div>
 
-            <div className="flex-1 flex flex-col gap-3.5 overflow-y-auto max-h-[600px] pr-1.5 custom-scrollbar">
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto max-h-[600px] pr-1.5 custom-scrollbar">
               {paginatedInventory.length > 0 ? (
                 paginatedInventory.map((item) => {
                   const isLow = item.quantity < item.minStockLevel;
@@ -494,7 +494,7 @@ export default function InventoryListView({
                   );
                 })
               ) : (
-                <div className="flex-grow flex flex-col items-center justify-center py-12 text-zinc-400 text-sm">
+                <div className="col-span-full flex flex-col items-center justify-center py-12 text-zinc-400 text-sm">
                   <Inbox className="w-12 h-12 text-zinc-350 dark:text-zinc-700 mx-auto mb-3 opacity-60" />
                   <p className="font-bold text-zinc-500 dark:text-zinc-450">No Stock Records Discovered</p>
                   <p className="text-xs text-zinc-400 dark:text-zinc-550 mt-1 max-w-[280px] text-center">

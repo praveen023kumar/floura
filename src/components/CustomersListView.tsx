@@ -449,7 +449,7 @@ export default function CustomersListView() {
             )}
 
             {/* Profile database matching exact screenshots profiles */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto max-h-[600px] pr-1.5 custom-scrollbar">
               {paginatedCustomers.length > 0 ? (
                 paginatedCustomers.map((c) => (
                   <div
@@ -570,7 +570,7 @@ export default function CustomersListView() {
                   </div>
                 ))
               ) : (
-                <div className="col-span-1 md:col-span-2 text-center py-12 text-zinc-400 text-sm">
+                <div className="col-span-full text-center py-12 text-zinc-400 text-sm">
                   No customers found matching search keywords.
                 </div>
               )}
