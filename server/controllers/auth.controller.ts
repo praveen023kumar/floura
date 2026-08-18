@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import CryptoJS from "crypto-js";
 import path from "path";
 import fs from "fs";
-import { findUserByEmail, updateUserSignature, createUser, updateUserProfile } from "../models/user.model";
+import { findUserByEmail, updateUserSignature, createUser, updateUserProfile, hasBakeryProfile } from "../models/user.model";
 import { checkLoginLockout, recordFailedLoginAttempt, resetFailedLoginAttempts, writeAuditLog, validateEmail } from "../middleware/security.middleware";
 
 // In-memory sessions map for secure Tauri system-browser external Google logins
@@ -213,6 +213,10 @@ export async function externalComplete(req: Request, res: Response) {
     let isNew = false;
 
     if (existingUser) {
+      const userHasProfile = await hasBakeryProfile(emailKey);
+      if (!userHasProfile) {
+        isNew = true;
+      }
       if (existingUser.name && existingUser.name !== "Chef Paul" && existingUser.name !== "Chef undefined" && existingUser.name !== "Chef null") {
         finalName = existingUser.name;
       } else if (name) {
@@ -321,8 +325,10 @@ export async function login(req: Request, res: Response) {
 
       await updateUserSignature(emailKey, signatureToken, finalName, finalAvatar);
 
+      const userHasProfile = await hasBakeryProfile(emailKey);
       loginResult = {
         status: "success",
+        isNew: !userHasProfile ? true : undefined,
         user: {
           name: finalName,
           email: existingUser.email,

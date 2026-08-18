@@ -60,6 +60,13 @@ export async function unblockIp(ip: string) {
 
 export function ipBlockingMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const ip = req.ip || req.socket.remoteAddress || "unknown";
+
+  // Exempt loopback IP from blocking to prevent developer lockout
+  const isLoopback = ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" || ip === "localhost" || ip === "unknown";
+  if (isLoopback) {
+    return next();
+  }
+
   const cached = blockedIpsCache.get(ip);
   if (cached) {
     if (cached.blockedUntil > Date.now()) {
@@ -154,6 +161,18 @@ const clientRequestTimestamps = new Map<string, number[]>();
 
 export function botDetectionMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const ip = req.ip || req.socket.remoteAddress || "unknown";
+
+  // Exempt loopback IP from bot detection to prevent developer lockout
+  const isLoopback = ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" || ip === "localhost" || ip === "unknown";
+  if (isLoopback) {
+    return next();
+  }
+
+  // Only apply bot detection to API requests (static assets can load in large parallel bursts on refresh)
+  if (!req.path.startsWith("/api")) {
+    return next();
+  }
+
   const userAgent = req.headers["user-agent"] || "";
 
   const suspiciousUserAgents = [

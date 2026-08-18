@@ -45,23 +45,6 @@ export default function RecipesView() {
 
   const renderFilterGroups = () => (
     <div className="space-y-5">
-      {/* Search Input */}
-      <div className="space-y-1.5">
-        <label className="text-[10px] text-zinc-455 dark:text-zinc-500 font-bold uppercase tracking-wider font-sans">
-          Search Formula
-        </label>
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-550" />
-          <input
-            type="text"
-            placeholder="Search name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-zinc-50 dark:bg-zinc-950 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-755 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-500 font-medium"
-          />
-        </div>
-      </div>
-
       {/* Category Choices */}
       <div className="space-y-2">
         <label className="text-[10px] text-zinc-450 dark:text-zinc-500 font-bold uppercase tracking-wider font-sans">
@@ -187,38 +170,7 @@ export default function RecipesView() {
         )}
       </AnimatePresence>
 
-      {/* Active filter chips */}
-      {activeFilterCount > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {selectedCategory !== "All" && (
-            <button
-              type="button"
-              onClick={() => setSelectedCategory("All")}
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
-            >
-              <span>Category: {selectedCategory}</span>
-              <X className="w-3 h-3" aria-hidden="true" />
-            </button>
-          )}
-          {searchTerm.trim() && (
-            <button
-              type="button"
-              onClick={() => setSearchTerm("")}
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
-            >
-              <span>Search: "{searchTerm}"</span>
-              <X className="w-3 h-3" aria-hidden="true" />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={clearAllFilters}
-            className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-655 hover:underline px-1.5 cursor-pointer"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
+
 
       {/* Main Recipes Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -255,6 +207,53 @@ export default function RecipesView() {
                 {filteredCount} {filteredCount === 1 ? 'Recipe' : 'Recipes'}
               </span>
             </div>
+
+            {/* Search Input */}
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-550" />
+                <input
+                  type="text"
+                  placeholder="Search recipes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-755 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-500 font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Active filter chips */}
+            {activeFilterCount > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 mb-4">
+                {selectedCategory !== "All" && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("All")}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
+                  >
+                    <span>Category: {selectedCategory}</span>
+                    <X className="w-3 h-3" aria-hidden="true" />
+                  </button>
+                )}
+                {searchTerm.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
+                  >
+                    <span>Search: "{searchTerm}"</span>
+                    <X className="w-3 h-3" aria-hidden="true" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-655 hover:underline px-1.5 cursor-pointer"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
 
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto max-h-[600px] pr-1.5 custom-scrollbar pb-2">
               {paginatedRecipes.length > 0 ? (

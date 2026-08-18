@@ -124,9 +124,11 @@ export function useRecipes({
       try {
         const startIndex = (recipesCurrentPage - 1) * recipesItemsPerPage;
         
-        let collection = localDb.recipes.orderBy("updatedAt").reverse();
-        collection = collection.filter(r => {
-          if (r.isDeleted === 1) return false;
+        // Query the database to retrieve all active (non-deleted) decrypted recipes
+        const allRecipes = await localDb.recipes.filter((r: any) => r.isDeleted !== 1).toArray();
+
+        // Perform all filtering in memory using the decrypted objects
+        const matched = allRecipes.filter(r => {
           if (selectedCategory !== "All" && r.category !== selectedCategory) return false;
           if (searchTerm) {
             const s = searchTerm.toLowerCase();
@@ -135,13 +137,16 @@ export function useRecipes({
           return true;
         });
 
-        const [totalCount, pageSlice] = await Promise.all([
-          collection.count(),
-          collection.offset(startIndex).limit(recipesItemsPerPage).toArray()
-        ]);
+        // Perform sorting in memory (newest updated first)
+        matched.sort((a, b) => {
+          const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+          const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+          return bTime - aTime;
+        });
 
-        setFilteredCount(totalCount);
-        setPaginatedRecipes(pageSlice);
+        // Set counts and paginated results
+        setFilteredCount(matched.length);
+        setPaginatedRecipes(matched.slice(startIndex, startIndex + recipesItemsPerPage));
       } catch (err) {
         console.error("Failed to query recipes from localDb:", err);
       }

@@ -2,7 +2,7 @@
 import React, { useMemo } from "react";
 import { type Order } from "../types";
 import { useNavigate } from "react-router-dom";
-import { formatPrice, formatDate, getCurrencySymbol } from "../utils/format";
+import { formatPrice, formatDate, getCurrencySymbol, getOrderSeqId } from "../utils/format";
 import { getStatusColors } from "../utils/orderStatus";
 import { calculatePaidAmount, getPaymentStatus } from "../../shared/calculations";
 import {
@@ -46,6 +46,7 @@ export default function OrdersList({
   const [calYear, setCalYear] = React.useState(today.getFullYear());
 
   const {
+    orders,
     filter,
     setFilter,
     searchTerm,
@@ -608,7 +609,7 @@ export default function OrdersList({
                               <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{o.cakeFlavor}</p>
                               <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono mt-0.5 flex items-center gap-0.5">
                                 <Hash className="w-2.5 h-2.5" aria-hidden="true" />
-                                {o.id.slice(0, 8).toUpperCase()}
+                                {getOrderSeqId(o.id, orders)}
                               </p>
                             </div>
                           </div>

@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { type Order } from "../types";
 import { useNavigate } from "react-router-dom";
-import { formatPrice, formatDate, getCurrencySymbol } from "../utils/format";
+import { formatPrice, formatDate, getCurrencySymbol, getOrderSeqId } from "../utils/format";
 import { getStatusColors } from "../utils/orderStatus";
 import {
   ArrowLeft,
@@ -40,6 +40,7 @@ export default function OrderDetail({
 }: OrderDetailProps) {
   const navigate = useNavigate();
   const {
+    orders,
     selectedOrder,
     completingOrder,
     setCompletingOrder,
@@ -126,7 +127,7 @@ export default function OrderDetail({
                       Order Details
                     </h2>
                     <span className="text-[11px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2 py-0.5 rounded font-mono uppercase font-bold tracking-tight">
-                      #{selectedOrder.id}
+                      #{getOrderSeqId(selectedOrder.id, orders)}
                     </span>
                   </div>
                   
@@ -685,7 +686,7 @@ export default function OrderDetail({
                     INVOICE
                   </h2>
                   <div className="text-xs text-zinc-650 mt-3 space-y-1 font-mono">
-                    <p><span className="font-sans font-semibold text-zinc-500 text-[10px] uppercase block">Invoice ID:</span> #{selectedOrder.id}</p>
+                    <p><span className="font-sans font-semibold text-zinc-500 text-[10px] uppercase block">Invoice ID:</span> #{getOrderSeqId(selectedOrder.id, orders)}</p>
                     <p><span className="font-sans font-semibold text-zinc-500 text-[10px] uppercase block mt-1">Date Created:</span> {formatDate(selectedOrder.createdAt)}</p>
                     <p><span className="font-sans font-semibold text-zinc-500 text-[10px] uppercase block mt-1">Status:</span> <span className="font-bold">{selectedOrder.status.toUpperCase()}</span></p>
                   </div>

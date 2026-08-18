@@ -62,10 +62,12 @@ export default function InventoryListView({
   useEffect(() => {
     async function fetchInventoryMetadata() {
       try {
-        const [dbCats, lowStock] = await Promise.all([
+        const [dbCats, allItems] = await Promise.all([
           localDb.categories.filter(c => c.type === "inventory" && c.isDeleted !== 1).toArray(),
-          localDb.inventory.filter(i => i.isDeleted !== 1 && i.quantity < i.minStockLevel).toArray()
+          localDb.inventory.filter(i => i.isDeleted !== 1).toArray()
         ]);
+        
+        const lowStock = allItems.filter(i => i.quantity < i.minStockLevel);
         
         const catNames = dbCats.map(c => c.name);
         const combinedCats = Array.from(new Set([...defaultCategories, ...catNames]));
@@ -85,10 +87,12 @@ export default function InventoryListView({
     async function loadDbInventory() {
       try {
         const startIndex = (inventoryCurrentPage - 1) * inventoryItemsPerPage;
-        let collection = localDb.inventory.orderBy("updatedAt").reverse();
+        
+        // Retrieve all active decrypted inventory records
+        const allItems = await localDb.inventory.filter(i => i.isDeleted !== 1).toArray();
 
-        collection = collection.filter(i => {
-          if (i.isDeleted === 1) return false;
+        // Perform filtering in memory
+        const matched = allItems.filter(i => {
           if (selectedCategory !== "All" && i.category !== selectedCategory) return false;
           if (showOnlyLowStock && !(i.quantity < i.minStockLevel)) return false;
           if (searchTerm) {
@@ -101,13 +105,15 @@ export default function InventoryListView({
           return true;
         });
 
-        const [totalCount, pageSlice] = await Promise.all([
-          collection.count(),
-          collection.offset(startIndex).limit(inventoryItemsPerPage).toArray()
-        ]);
+        // Perform sorting in memory (newest updated first)
+        matched.sort((a, b) => {
+          const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+          const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+          return bTime - aTime;
+        });
 
-        setFilteredCount(totalCount);
-        setPaginatedInventory(pageSlice);
+        setFilteredCount(matched.length);
+        setPaginatedInventory(matched.slice(startIndex, startIndex + inventoryItemsPerPage));
       } catch (err) {
         console.error("Failed to query inventory from localDb:", err);
       }
@@ -411,46 +417,67 @@ export default function InventoryListView({
                   return (
                     <div
                       key={item.id}
-                      className="bg-white dark:bg-zinc-850 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border border-zinc-150 dark:border-zinc-750/70 hover:border-zinc-250 dark:hover:bg-zinc-800/80 hover:shadow-xs transition-all relative"
+                      className="bg-white dark:bg-zinc-850 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-750/70 hover:border-zinc-250 dark:hover:bg-zinc-800/80 hover:shadow-sm transition-all flex flex-col justify-between h-full relative"
                     >
-                      <div className="flex-1 min-w-0 space-y-2.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest bg-zinc-100 dark:bg-zinc-900 px-2.5 py-0.5 rounded-md">
-                            {item.category}
+                      {/* Card Header: Category & Stock Status badge */}
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <span className="text-[10px] font-bold text-zinc-550 dark:text-zinc-400 uppercase tracking-widest bg-zinc-100 dark:bg-zinc-900 px-2.5 py-0.5 rounded-md">
+                          {item.category}
+                        </span>
+                        {isLow ? (
+                          <span className="bg-rose-50 text-rose-600 dark:bg-rose-955/30 dark:text-rose-400 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider flex items-center gap-1.5 border border-rose-100 dark:border-rose-900/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                            Low Stock
                           </span>
+                        ) : (
+                          <span className="bg-emerald-50 text-emerald-600 dark:bg-emerald-955/20 dark:text-emerald-400 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider flex items-center gap-1.5 border border-emerald-100 dark:border-emerald-900/10">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            In Stock
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Card Body: Title, Supplier and stock progress status */}
+                      <div className="flex-1 flex flex-col justify-between gap-4">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-100 tracking-tight text-left leading-tight">
+                            {item.name}
+                          </h4>
                           {item.supplier && (
-                            <span className="text-[10px] text-zinc-405 truncate max-w-[150px]">
-                              • {item.supplier}
-                            </span>
-                          )}
-                          {isLow && (
-                            <span className="bg-rose-50 text-rose-600 dark:bg-rose-955/30 dark:text-rose-400 text-[9px] px-2 py-0.5 rounded-md font-extrabold uppercase tracking-wider flex items-center gap-1 animate-pulse border border-rose-100 dark:border-rose-900/20">
-                              ⚠️ Low Stock
-                            </span>
+                            <p className="text-[11px] text-zinc-400 dark:text-zinc-500 text-left font-medium">
+                              Supplier: {item.supplier}
+                            </p>
                           )}
                         </div>
 
-                        <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-100 tracking-tight text-left">
-                          {item.name}
-                        </h4>
-
-                        {/* Progress bar and metadata */}
-                        <div className="max-w-md">
+                        {/* Progress bar and metrics */}
+                        <div className="space-y-2.5">
                           <div className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-full h-1.5 overflow-hidden">
                             <div
                               className={`h-full ${isLow ? "bg-rose-500" : "bg-emerald-500"} rounded-full transition-all duration-300`}
                               style={{ width: `${Math.max(5, fillPercent)}%` }}
                             ></div>
                           </div>
-                          <div className="flex justify-between items-center text-[10px] text-zinc-405 dark:text-zinc-550 mt-1">
-                            <span>Min Limit: <strong className="font-semibold text-zinc-650 dark:text-zinc-400">{item.minStockLevel} {item.unit}</strong></span>
-                            <span>Value: <strong className="font-semibold text-zinc-655 dark:text-zinc-400">{formatPrice(item.costPrice * item.quantity)}</strong></span>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-zinc-50/60 dark:bg-zinc-900/25 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800/40 text-left">
+                              <span className="block text-[8px] uppercase tracking-wider font-extrabold text-zinc-400 dark:text-zinc-500">Min Limit</span>
+                              <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                {item.minStockLevel} {item.unit}
+                              </span>
+                            </div>
+                            <div className="bg-zinc-50/60 dark:bg-zinc-900/25 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800/40 text-left">
+                              <span className="block text-[8px] uppercase tracking-wider font-extrabold text-zinc-400 dark:text-zinc-500">Total Value</span>
+                              <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                {formatPrice(item.costPrice * item.quantity)}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Tactile quantity adjustment */}
-                      <div className="flex items-center gap-3 self-end md:self-auto shrink-0">
+                      {/* Card Footer: Quantity controller & Edit details */}
+                      <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
                         <div className="bg-zinc-50 dark:bg-zinc-900/40 rounded-xl p-1 flex items-center gap-1 border border-zinc-100 dark:border-zinc-800 shadow-inner">
                           <button
                             type="button"
@@ -461,11 +488,11 @@ export default function InventoryListView({
                             -
                           </button>
 
-                          <div className="px-3.5 text-center min-w-[72px]">
-                            <span className="block text-sm font-black font-serif text-zinc-800 dark:text-zinc-50 leading-tight">
+                          <div className="px-3.5 text-center min-w-[68px]">
+                            <span className="block text-sm font-bold text-zinc-800 dark:text-zinc-50 leading-tight">
                               {item.quantity}
                             </span>
-                            <span className="block text-[8px] uppercase tracking-wider font-bold text-zinc-500">
+                            <span className="block text-[8px] uppercase tracking-wider font-bold text-zinc-550">
                               {item.unit}
                             </span>
                           </div>

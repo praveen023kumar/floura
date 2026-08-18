@@ -53,9 +53,8 @@ export function useCustomers({
     if (state?.searchCustomerName) {
       async function findAndSelect() {
         try {
-          const match = await localDb.customers
-            .filter(c => c.name.toLowerCase() === state!.searchCustomerName!.toLowerCase() && c.isDeleted !== 1)
-            .first();
+          const allCust = await localDb.customers.toArray();
+          const match = allCust.find(c => c.name.toLowerCase() === state!.searchCustomerName!.toLowerCase() && c.isDeleted !== 1);
           if (match) {
             navigate(`/customers/${match.id}${state!.fromOrderId ? `?fromOrderId=${state!.fromOrderId}` : ""}`, { replace: true });
           } else {
@@ -143,10 +142,12 @@ export function useCustomers({
     async function loadDbCustomers() {
       try {
         const startIndex = (customersCurrentPage - 1) * customersItemsPerPage;
-        let collection = localDb.customers.orderBy("updatedAt").reverse();
         
-        collection = collection.filter(c => {
-          if (c.isDeleted === 1) return false;
+        // Retrieve all active decrypted customer records from database
+        const allCust = await localDb.customers.filter(c => c.isDeleted !== 1).toArray();
+
+        // Filter and sort the decrypted records in memory
+        const matched = allCust.filter(c => {
           if (filterType !== "All" && c.type !== filterType) return false;
           if (searchTerm) {
             const term = searchTerm.toLowerCase();
@@ -159,13 +160,15 @@ export function useCustomers({
           return true;
         });
 
-        const [totalCount, pageSlice] = await Promise.all([
-          collection.count(),
-          collection.offset(startIndex).limit(customersItemsPerPage).toArray()
-        ]);
+        // Sort in memory (newest updated first, to match orderBy("updatedAt").reverse())
+        matched.sort((a, b) => {
+          const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+          const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+          return bTime - aTime;
+        });
 
-        setFilteredCount(totalCount);
-        setPaginatedCustomers(pageSlice);
+        setFilteredCount(matched.length);
+        setPaginatedCustomers(matched.slice(startIndex, startIndex + customersItemsPerPage));
       } catch (err) {
         console.error("Failed to query customers from localDb:", err);
       }

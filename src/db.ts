@@ -14,6 +14,19 @@ export function decryptData(ciphertext: string): any {
   return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
 }
 
+function normalizeOrderStatus(status: string): string {
+  if (!status) return "Pending";
+  const lower = status.trim().toLowerCase();
+  if (lower === "pending") return "Pending";
+  if (lower === "ordered ingredients" || lower === "ingredients ordered") return "Ordered Ingredients";
+  if (lower === "in progress" || lower === "inprogress") return "In Progress";
+  if (lower === "decorating") return "Decorating";
+  if (lower === "ready for pickup" || lower === "ready for pick up" || lower === "readyforpickup") return "Ready for Pickup";
+  if (lower === "completed") return "Completed";
+  if (lower === "cancelled" || lower === "canceled") return "Cancelled";
+  return status;
+}
+
 function setupTableEncryption(table: any) {
   const primKeyName = table.name === "preferences" ? "key" : "id";
 
@@ -36,6 +49,10 @@ function setupTableEncryption(table: any) {
     delete rest.isDeleted;
     delete rest.updatedAt;
     delete rest.createdAt;
+    
+    if (table.name === "orders" && rest.status) {
+      rest.status = normalizeOrderStatus(rest.status);
+    }
     
     const encrypted = encryptData(rest);
     
@@ -75,6 +92,10 @@ function setupTableEncryption(table: any) {
     delete rest.updatedAt;
     delete rest.createdAt;
     
+    if (table.name === "orders" && rest.status) {
+      rest.status = normalizeOrderStatus(rest.status);
+    }
+    
     const encrypted = encryptData(rest);
 
     const updatedMods: any = {
@@ -107,6 +128,11 @@ function setupTableEncryption(table: any) {
         ...decrypted
       };
       result[primKeyName] = obj[primKeyName];
+      
+      if (table.name === "orders" && result.status) {
+        result.status = normalizeOrderStatus(result.status);
+      }
+      
       return result;
     } catch (err) {
       console.error("Transparent decryption failed on database read:", err);

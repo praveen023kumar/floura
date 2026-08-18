@@ -52,10 +52,12 @@ export function useDashboard({ checklist }: UseDashboardProps) {
       try {
         const today = new Date().toISOString().split("T")[0];
 
-        const [allOrders, lowStockRaw] = await Promise.all([
+        const [allOrders, allInventory] = await Promise.all([
           localDb.orders.filter(o => o.isDeleted !== 1).toArray(),
-          localDb.inventory.filter((i: any) => i.isDeleted !== 1 && i.quantity < i.minStockLevel).toArray()
+          localDb.inventory.filter(i => i.isDeleted !== 1).toArray()
         ]);
+
+        const lowStockRaw = allInventory.filter(i => i.quantity < i.minStockLevel);
 
         const completedOrders = allOrders.filter((o) => o.status === "Completed");
         const progressOrders = allOrders.filter((o) => o.status === "Pending");

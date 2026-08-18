@@ -35,3 +35,15 @@ export async function updateUserProfile(email: string, name: string, avatar: str
   await runSql(db, "UPDATE users SET name = ?, avatar = ? WHERE email = ?", [name, avatar || "chef", emailKey]);
   db.close();
 }
+
+export async function hasBakeryProfile(email: string): Promise<boolean> {
+  const db = await getDb();
+  const results = await querySqlAll<any>(
+    db, 
+    "SELECT 1 FROM bakery_profile WHERE user_email = ? AND isDeleted != 1 LIMIT 1", 
+    [email.toLowerCase().trim()]
+  );
+  db.close();
+  return results.length > 0;
+}
+

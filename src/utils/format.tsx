@@ -1,6 +1,7 @@
 // File Path: /src/utils/format.tsx
 // Dynamic currency and date formatting helpers based on user preferences in profile
 import { useState, useEffect } from "react";
+import { type Order } from "../types";
 import { 
   setSharedFormatConfig, 
   getSharedCurrencySymbol, 
@@ -61,4 +62,24 @@ export function FormattedPrice({ amount, className = "" }: { amount: number | nu
 export function FormattedDate({ dateString, className = "" }: { dateString: string; className?: string }) {
   const { formatDate } = useFormat();
   return <span className={className} id={`fmt-date-${Math.random().toString(36).substr(2, 5)}`}>{formatDate(dateString)}</span>;
+}
+
+export function getOrderSeqId(orderId: string, allOrders: Order[]): string {
+  if (!orderId) return "GT000";
+  const sorted = [...allOrders]
+    .filter(o => o.isDeleted !== 1)
+    .sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (aTime !== bTime) {
+        return aTime - bTime;
+      }
+      return a.id.localeCompare(b.id);
+    });
+  const index = sorted.findIndex(o => o.id === orderId);
+  if (index === -1) {
+    const match = orderId.match(/\d+/);
+    return "GT" + (match ? match[0].padStart(3, "0") : "001");
+  }
+  return "GT" + String(index + 1).padStart(3, "0");
 }

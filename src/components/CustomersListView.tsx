@@ -56,9 +56,8 @@ export default function CustomersListView() {
     if (state?.searchCustomerName) {
       async function findAndSelect() {
         try {
-          const match = await localDb.customers
-            .filter(c => c.name.toLowerCase() === state!.searchCustomerName!.toLowerCase() && c.isDeleted !== 1)
-            .first();
+          const allCust = await localDb.customers.toArray();
+          const match = allCust.find(c => c.name.toLowerCase() === state!.searchCustomerName!.toLowerCase() && c.isDeleted !== 1);
           if (match) {
             navigate(`/customers/${match.id}${state!.fromOrderId ? `?fromOrderId=${state!.fromOrderId}` : ""}`, { replace: true });
           } else {
@@ -77,17 +76,12 @@ export default function CustomersListView() {
     async function loadCustomers() {
       try {
         const startIndex = (customersCurrentPage - 1) * customersItemsPerPage;
-        const isDefaultSort = !sortBy || sortBy === "updated-newest";
 
-        let collection;
-        if (isDefaultSort) {
-          collection = localDb.customers.orderBy("updatedAt").reverse();
-        } else {
-          collection = localDb.customers.toCollection();
-        }
+        // Retrieve all active decrypted customer records
+        const allCust = await localDb.customers.filter(c => c.isDeleted !== 1).toArray();
 
-        collection = collection.filter(c => {
-          if (c.isDeleted === 1) return false;
+        // Filter customer records in memory
+        const matched = allCust.filter(c => {
           if (filterType !== "All" && c.type !== filterType) return false;
           if (searchTerm) {
             const term = searchTerm.toLowerCase();
@@ -100,31 +94,27 @@ export default function CustomersListView() {
           return true;
         });
 
-        if (isDefaultSort) {
-          const [totalCount, pageSlice] = await Promise.all([
-            collection.count(),
-            collection.offset(startIndex).limit(customersItemsPerPage).toArray()
-          ]);
-          setFilteredCount(totalCount);
-          setPaginatedCustomers(pageSlice);
-        } else {
-          const matched = await collection.toArray();
-          matched.sort((a, b) => {
-            if (sortBy === "member-newest") {
-              return new Date(b.memberSince || 0).getTime() - new Date(a.memberSince || 0).getTime();
-            } else if (sortBy === "member-oldest") {
-              return new Date(a.memberSince || 0).getTime() - new Date(b.memberSince || 0).getTime();
-            } else if (sortBy === "orders-highest") {
-              return (b.totalOrders || 0) - (a.totalOrders || 0);
-            } else if (sortBy === "orders-lowest") {
-              return (a.totalOrders || 0) - (b.totalOrders || 0);
-            } else { // "name-az"
-              return a.name.localeCompare(b.name);
-            }
-          });
-          setFilteredCount(matched.length);
-          setPaginatedCustomers(matched.slice(startIndex, startIndex + customersItemsPerPage));
-        }
+        // Sort customer records in memory
+        matched.sort((a, b) => {
+          if (sortBy === "member-newest") {
+            return new Date(b.memberSince || 0).getTime() - new Date(a.memberSince || 0).getTime();
+          } else if (sortBy === "member-oldest") {
+            return new Date(a.memberSince || 0).getTime() - new Date(b.memberSince || 0).getTime();
+          } else if (sortBy === "orders-highest") {
+            return (b.totalOrders || 0) - (a.totalOrders || 0);
+          } else if (sortBy === "orders-lowest") {
+            return (a.totalOrders || 0) - (b.totalOrders || 0);
+          } else if (sortBy === "name-az") {
+            return a.name.localeCompare(b.name);
+          } else { // "updated-newest" (default)
+            const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+            const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+            return bTime - aTime;
+          }
+        });
+
+        setFilteredCount(matched.length);
+        setPaginatedCustomers(matched.slice(startIndex, startIndex + customersItemsPerPage));
       } catch (err) {
         console.error("Failed to query customers from localDb:", err);
       }
@@ -143,14 +133,13 @@ export default function CustomersListView() {
       if (paginatedCustomers.length === 0) return;
       try {
         const counts: { [id: string]: number } = {};
-        await Promise.all(
-          paginatedCustomers.map(async (c) => {
-            const count = await localDb.orders
-              .filter(o => o.customerId === c.id && o.isDeleted !== 1)
-              .count();
-            counts[c.id] = count;
-          })
-        );
+        
+        // Load all active decrypted orders
+        const allOrders = await localDb.orders.filter(o => o.isDeleted !== 1).toArray();
+        
+        for (const c of paginatedCustomers) {
+          counts[c.id] = allOrders.filter(o => o.customerId === c.id).length;
+        }
         setCustomerOrderCounts(counts);
       } catch (err) {
         console.error("Failed to fetch customer order counts:", err);

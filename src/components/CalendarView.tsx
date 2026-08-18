@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { type Order, type Customer, type CustomScheduledAlert, type DispatchedNotification } from "../types";
-import { formatPrice, formatDate } from "../utils/format";
+import { formatPrice, formatDate, getOrderSeqId } from "../utils/format";
 import { localDb } from "../db";
 
 import { useCalendar } from "../hooks/useCalendar";
@@ -348,7 +348,7 @@ export default function CalendarView({
                       {ordersOnSelectedDate.map((o) => (
                         <div key={o.id} className="p-3 border border-zinc-150 dark:border-zinc-800 rounded-2xl bg-zinc-50/40 dark:bg-zinc-850/60 shadow-2xs">
                           <div className="flex justify-between items-start gap-1">
-                            <span className="text-[9px] font-mono text-zinc-400">#{o.id}</span>
+                            <span className="text-[9px] font-mono text-zinc-400">#{getOrderSeqId(o.id, orders)}</span>
                             <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
                               o.status === "Pending" ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400" :
                               o.status === "Ready for Pickup" ? "bg-teal-100 text-teal-800 dark:bg-teal-950/40 dark:text-teal-400" :

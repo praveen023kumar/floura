@@ -354,16 +354,17 @@ export default function OrderCreate({
                         placeholder="Search / Select profile..."
                         value={(() => {
                           const allOpts = [
-                            { value: "", label: "-- Choose Existing --" },
-                            ...customerOptions,
-                            { value: "new", label: "Add Custom/New Client" }
+                            { value: "", label: "Add Custom/New Client" },
+                            ...customerOptions
                           ];
-                          return allOpts.find(o => o.value === formData.customerId) || { value: "", label: "-- Choose Existing --" };
+                          if (!formData.customerId || formData.customerId === "new" || formData.customerId === "guest") {
+                            return { value: "", label: "Add Custom/New Client" };
+                          }
+                          return allOpts.find(o => o.value === formData.customerId) || { value: "", label: "Add Custom/New Client" };
                         })()}
                         options={[
-                          { value: "", label: "-- Choose Existing --" },
-                          ...customerOptions,
-                          { value: "new", label: "Add Custom/New Client" }
+                          { value: "", label: "Add Custom/New Client" },
+                          ...customerOptions
                         ]}
                         onInputChange={(inputValue) => setCustomerSearch(inputValue)}
                         onChange={(option) => handleCustomerChange(option?.value || "")}
@@ -377,7 +378,7 @@ export default function OrderCreate({
                         type="text"
                         placeholder="e.g. Eleanor Rigby"
                         value={formData.customerName}
-                        disabled={formData.customerId !== "new" && formData.customerId !== ""}
+                        disabled={formData.customerId !== "new" && formData.customerId !== "" && formData.customerId !== "guest"}
                         onChange={(val) => setFormData({ ...formData, customerName: val })}
                         className="bg-white dark:bg-zinc-800 text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand placeholder:text-zinc-300 disabled:opacity-60 text-zinc-850 dark:text-zinc-150 text-left"
                       />
@@ -390,7 +391,7 @@ export default function OrderCreate({
                         type="tel"
                         placeholder="+1 234 567 890"
                         value={formData.customerMobile}
-                        disabled={formData.customerId !== "new" && formData.customerId !== ""}
+                        disabled={formData.customerId !== "new" && formData.customerId !== "" && formData.customerId !== "guest"}
                         onChange={(val) => setFormData({ ...formData, customerMobile: val })}
                         className="bg-white dark:bg-zinc-800 text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand placeholder:text-zinc-300 disabled:opacity-60 text-zinc-850 dark:text-zinc-150 text-left"
                       />
@@ -521,7 +522,7 @@ export default function OrderCreate({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
                 transition={{ duration: 0.15 }}
-                className="grid grid-cols-1 sm:grid-cols-2 gap-6"
+                className="grid grid-cols-1 gap-6"
               >
                 {/* Cake details and weights */}
                 <section className="bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-2xl space-y-4">

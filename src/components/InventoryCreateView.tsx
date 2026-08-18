@@ -106,7 +106,7 @@ export default function InventoryCreateView({
           updatedAt: new Date().toISOString(),
         };
         await onUpdateInventoryItem(cleanedItem);
-        window.showToast?.("Ingredient updated successfully!", "success");
+        window.showToast?.("Product updated successfully!", "success");
       } else {
         await onAddInventoryItem({
           name: formInputs.name,
@@ -124,7 +124,7 @@ export default function InventoryCreateView({
       setTimeout(() => {
         setSuccess(false);
         navigate("/inventory");
-      }, 1000);
+      }, 1500);
     } catch (err) {
       console.error(err);
       window.showToast?.("Failed to register inventory item.", "error");
@@ -308,16 +308,20 @@ export default function InventoryCreateView({
             <button
               type="submit"
               disabled={saving || success}
-              className="w-full py-3 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white text-xs font-bold rounded-full transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 active:scale-95"
+              className={`w-full py-3 text-xs font-bold rounded-full transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 active:scale-95 ${
+                success
+                  ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                  : "bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white"
+              }`}
             >
               {saving ? (
-                <span>Saving Ingredient...</span>
+                <span>{itemToEdit ? "Saving Changes..." : "Saving Ingredient..."}</span>
               ) : success ? (
                 <span className="flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" /> Registered!
+                  <CheckCircle2 className="w-4 h-4" /> {itemToEdit ? "Changes Saved!" : "Ingredient Registered!"}
                 </span>
               ) : (
-                <span>Register Ingredient</span>
+                <span>{itemToEdit ? "Save Changes" : "Register Ingredient"}</span>
               )}
             </button>
           </div>

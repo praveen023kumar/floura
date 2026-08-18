@@ -65,11 +65,7 @@ export function useCalendar({
         const yearMonthPrefix = `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}`;
 
         const [loadedOrders, loadedCustomers] = await Promise.all([
-          localDb.orders.filter(o => {
-            if (o.isDeleted === 1) return false;
-            const dateStr = o.deliveryDate || o.eventDate;
-            return dateStr && dateStr.startsWith(yearMonthPrefix);
-          }).toArray(),
+          localDb.orders.filter(o => o.isDeleted !== 1).toArray(),
           localDb.customers.filter(c => c.isDeleted !== 1).limit(200).toArray()
         ]);
         setOrders(loadedOrders);

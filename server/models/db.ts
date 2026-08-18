@@ -297,18 +297,9 @@ export async function initDb() {
     await runSql(db, `ALTER TABLE feedbacks ADD COLUMN imageUrl TEXT`);
   } catch {}
 
-  // Seed initial bakery profile if table is empty
-  try {
-    const profileCount = await querySqlAll<any>(db, "SELECT count(*) as count FROM bakery_profile WHERE user_email = 'praveen023kumar@gmail.com'");
-    if (profileCount.length === 0 || profileCount[0].count === 0) {
-      await runSql(db, `
-        INSERT INTO bakery_profile (id, bakeryName, email, phone, address, role, currency, dateFormat, updatedAt, user_email, isDeleted)
-        VALUES ('active-profile', 'Sweet Home Bakery', 'praveen023kumar@gmail.com', '+1 (555) 012-3456', '456 Confectionary Boulevard, Suite A', 'Head Baker & Owner', '$', 'YYYY-MM-DD', ?, 'praveen023kumar@gmail.com', 0)
-      `, [new Date().toISOString()]);
-    }
-  } catch (err) {
-    console.error("Failed to seed initial bakery profile SQLite table:", err);
-  }
+  // We do not seed the initial bakery profile anymore, as doing so automatically
+  // marks the user as "onboarded" and prevents the Getting Started page from showing.
+  // The profile will be created when the user completes onboarding.
 
   // Seed default categories if table is empty
   try {

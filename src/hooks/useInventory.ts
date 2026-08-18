@@ -70,11 +70,12 @@ export function useInventory({
   useEffect(() => {
     async function fetchInventoryMetadata() {
       try {
-        const [dbCats, lowStock, allItems] = await Promise.all([
+        const [dbCats, allItems] = await Promise.all([
           localDb.categories.filter(c => c.type === "inventory" && c.isDeleted !== 1).toArray(),
-          localDb.inventory.filter(i => i.isDeleted !== 1 && i.quantity < i.minStockLevel).toArray(),
           localDb.inventory.filter(i => i.isDeleted !== 1).toArray()
         ]);
+        
+        const lowStock = allItems.filter(i => i.quantity < i.minStockLevel);
         
         const catNames = dbCats.map(c => c.name);
         const combinedCats = Array.from(new Set([...defaultCategories, ...catNames]));
@@ -99,10 +100,12 @@ export function useInventory({
     async function loadDbInventory() {
       try {
         const startIndex = (inventoryCurrentPage - 1) * inventoryItemsPerPage;
-        let collection = localDb.inventory.orderBy("updatedAt").reverse();
+        
+        // Retrieve all active decrypted inventory items
+        const allItems = await localDb.inventory.filter(i => i.isDeleted !== 1).toArray();
 
-        collection = collection.filter(i => {
-          if (i.isDeleted === 1) return false;
+        // Filter items in memory
+        const matched = allItems.filter(i => {
           if (selectedCategory !== "All" && i.category !== selectedCategory) return false;
           if (showOnlyLowStock && !(i.quantity < i.minStockLevel)) return false;
           if (searchTerm) {
@@ -115,13 +118,15 @@ export function useInventory({
           return true;
         });
 
-        const [totalCount, pageSlice] = await Promise.all([
-          collection.count(),
-          collection.offset(startIndex).limit(inventoryItemsPerPage).toArray()
-        ]);
+        // Sort items in memory (newest updated first)
+        matched.sort((a, b) => {
+          const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+          const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+          return bTime - aTime;
+        });
 
-        setFilteredCount(totalCount);
-        setPaginatedInventory(pageSlice);
+        setFilteredCount(matched.length);
+        setPaginatedInventory(matched.slice(startIndex, startIndex + inventoryItemsPerPage));
       } catch (err) {
         console.error("Failed to query inventory from localDb:", err);
       }

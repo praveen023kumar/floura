@@ -252,8 +252,11 @@ export function useOrders({
   useEffect(() => {
     async function loadSelectOptions() {
       try {
-        const query = localDb.customers.filter(c => {
-          if (c.isDeleted === 1) return false;
+        // Retrieve all active decrypted customer records from localDb
+        const allCust = await localDb.customers.filter((c: any) => c.isDeleted !== 1).toArray();
+
+        // Perform filtering in memory using the decrypted objects
+        const matched = allCust.filter(c => {
           if (customerSearch) {
             const lower = customerSearch.toLowerCase();
             return (
@@ -264,10 +267,12 @@ export function useOrders({
           }
           return true;
         });
-        const matched = await query.limit(50).toArray();
-        const opts = matched.map(c => ({ value: c.id, label: `${c.name} (${c.mobile})` }));
 
-        if (formData.customerId && formData.customerId !== "new" && formData.customerId !== "") {
+        // Limit the results in memory
+        const limitedMatched = matched.slice(0, 50);
+        const opts = limitedMatched.map(c => ({ value: c.id, label: `${c.name} (${c.mobile})` }));
+
+        if (formData.customerId && formData.customerId !== "new" && formData.customerId !== "" && formData.customerId !== "guest") {
           const hasSelected = opts.some(o => o.value === formData.customerId);
           if (!hasSelected) {
             const selected = await localDb.customers.get(formData.customerId);
@@ -303,33 +308,26 @@ export function useOrders({
         };
 
         const startIndex = (ordersCurrentPage - 1) * ordersItemsPerPage;
-        const isCreatedSort = sortBy === "created-newest" || sortBy === "created-oldest" || !sortBy;
         const isCalendar = viewTab === "calendar";
 
-        let collection;
-        if (isCreatedSort && !isCalendar) {
-          collection = localDb.orders.orderBy("createdAt");
-          if (sortBy !== "created-oldest") {
-            collection = collection.reverse();
-          }
-        } else {
-          collection = localDb.orders.toCollection();
-        }
+        // Query the database to retrieve all active (non-deleted) decrypted orders
+        const allOrders = await localDb.orders.filter((o: any) => o.isDeleted !== 1).toArray();
 
-        const query = collection.filter(o => {
-          if (o.isDeleted === 1) return false;
-
+        // Perform all filtering in memory using the decrypted objects
+        const matched = allOrders.filter(o => {
           // Apply payment status filter
           if (paymentFilter !== "all" && (o.paymentStatus || "Unpaid") !== paymentFilter) return false;
 
           if (isCalendar) {
             // Apply status filter only
-            if (filter === "active") {
-              if (o.status === "Completed" || o.status === "Cancelled") return false;
-            } else if (filter === "archived") {
-              if (o.status !== "Completed" && o.status !== "Cancelled") return false;
-            } else if (filter !== "all") {
-              if (o.status !== filter) return false;
+            const statusLower = (o.status || "").toLowerCase();
+            const filterLower = (filter || "").toLowerCase();
+            if (filterLower === "active") {
+              if (statusLower === "completed" || statusLower === "cancelled") return false;
+            } else if (filterLower === "archived") {
+              if (statusLower !== "completed" && statusLower !== "cancelled") return false;
+            } else if (filterLower !== "all") {
+              if (statusLower !== filterLower) return false;
             }
 
             // Apply current month date filter only
@@ -351,12 +349,14 @@ export function useOrders({
               if (!matchesSearch) return false;
             }
 
-            if (filter === "active") {
-              if (o.status === "Completed" || o.status === "Cancelled") return false;
-            } else if (filter === "archived") {
-              if (o.status !== "Completed" && o.status !== "Cancelled") return false;
-            } else if (filter !== "all") {
-              if (o.status !== filter) return false;
+            const statusLower = (o.status || "").toLowerCase();
+            const filterLower = (filter || "").toLowerCase();
+            if (filterLower === "active") {
+              if (statusLower === "completed" || statusLower === "cancelled") return false;
+            } else if (filterLower === "archived") {
+              if (statusLower !== "completed" && statusLower !== "cancelled") return false;
+            } else if (filterLower !== "all") {
+              if (statusLower !== filterLower) return false;
             }
 
             // Apply date filters based on deliveryDate (fallback to eventDate)
@@ -378,40 +378,39 @@ export function useOrders({
           return true;
         });
 
+        // Perform sorting in memory
+        matched.sort((a, b) => {
+          if (sortBy === "created-newest") {
+            const dateA = a.createdAt || "";
+            const dateB = b.createdAt || "";
+            return dateB.localeCompare(dateA);
+          } else if (sortBy === "created-oldest") {
+            const dateA = a.createdAt || "";
+            const dateB = b.createdAt || "";
+            return dateA.localeCompare(dateB);
+          } else if (sortBy === "delivery-soonest") {
+            const dateA = a.deliveryDate || a.eventDate || "";
+            const dateB = b.deliveryDate || b.eventDate || "";
+            if (dateA !== dateB) return dateA.localeCompare(dateB);
+            return (a.deliveryTime || "").localeCompare(b.deliveryTime || "");
+          } else if (sortBy === "delivery-latest") {
+            const dateA = a.deliveryDate || a.eventDate || "";
+            const dateB = b.deliveryDate || b.eventDate || "";
+            if (dateA !== dateB) return dateB.localeCompare(dateA);
+            return (b.deliveryTime || "").localeCompare(a.deliveryTime || "");
+          } else if (sortBy === "amount-highest") {
+            return (b.totalAmount || 0) - (a.totalAmount || 0);
+          } else { // "amount-lowest"
+            return (a.totalAmount || 0) - (b.totalAmount || 0);
+          }
+        });
+
+        // Set counts and paginated results
+        setFilteredCount(matched.length);
+        setFilteredOrders(matched);
         if (isCalendar) {
-          const matched = await query.toArray();
-          setFilteredCount(matched.length);
-          setFilteredOrders(matched);
           setPaginatedOrders([]);
-        } else if (isCreatedSort) {
-          const [totalCount, pageSlice] = await Promise.all([
-            query.count(),
-            query.offset(startIndex).limit(ordersItemsPerPage).toArray()
-          ]);
-          setFilteredCount(totalCount);
-          setFilteredOrders(pageSlice);
-          setPaginatedOrders(pageSlice);
         } else {
-          const matched = await query.toArray();
-          matched.sort((a, b) => {
-            if (sortBy === "delivery-soonest") {
-              const dateA = a.deliveryDate || a.eventDate || "";
-              const dateB = b.deliveryDate || b.eventDate || "";
-              if (dateA !== dateB) return dateA.localeCompare(dateB);
-              return (a.deliveryTime || "").localeCompare(b.deliveryTime || "");
-            } else if (sortBy === "delivery-latest") {
-              const dateA = a.deliveryDate || a.eventDate || "";
-              const dateB = b.deliveryDate || b.eventDate || "";
-              if (dateA !== dateB) return dateB.localeCompare(dateA);
-              return (b.deliveryTime || "").localeCompare(a.deliveryTime || "");
-            } else if (sortBy === "amount-highest") {
-              return (b.totalAmount || 0) - (a.totalAmount || 0);
-            } else { // "amount-lowest"
-              return (a.totalAmount || 0) - (b.totalAmount || 0);
-            }
-          });
-          setFilteredCount(matched.length);
-          setFilteredOrders(matched);
           setPaginatedOrders(matched.slice(startIndex, startIndex + ordersItemsPerPage));
         }
       } catch (err) {

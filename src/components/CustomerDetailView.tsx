@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { type Customer, type Order } from "../types";
-import { formatPrice, formatDate } from "../utils/format";
+import { formatPrice, formatDate, getOrderSeqId } from "../utils/format";
 import { localDb } from "../db";
 import {
   ArrowLeft,
@@ -22,6 +22,7 @@ export default function CustomerDetailView() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedCustomerOrders, setSelectedCustomerOrders] = useState<Order[]>([]);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
 
   // Sync refresh trigger on local DB updates
   useEffect(() => {
@@ -35,14 +36,16 @@ export default function CustomerDetailView() {
     async function fetchSelectedDetails() {
       if (!id) return;
       try {
-        const [customer, custOrders] = await Promise.all([
+        const [customer, fullOrders] = await Promise.all([
           localDb.customers.get(id),
-          localDb.orders.filter(o => o.customerId === id && o.isDeleted !== 1).toArray()
+          localDb.orders.filter(o => o.isDeleted !== 1).toArray()
         ]);
         setSelectedCustomer(customer || null);
+        const custOrders = fullOrders.filter(o => o.customerId === id);
 
         custOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         setSelectedCustomerOrders(custOrders);
+        setAllOrders(fullOrders);
       } catch (err) {
         console.error("Failed to fetch customer details:", err);
       }
@@ -267,7 +270,7 @@ export default function CustomerDetailView() {
                         {o.cakeFlavor} Flavor &bull; {o.cakeWeight} &bull; {o.layers}
                       </p>
                       <div className="text-[10px] text-zinc-400 mt-2 font-mono">
-                        Delivery: {formatDate(o.eventDate)} &bull; ID: {o.id}
+                        Delivery: {formatDate(o.eventDate)} &bull; ID: {getOrderSeqId(o.id, allOrders)}
                       </div>
                     </div>
                     <div className="text-right sm:self-center shrink-0">
