@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { RefreshCw, XCircle, X, Lock, KeyRound } from "lucide-react";
 import { motion } from "motion/react";
-import flouraLogo from "../assets/images/floura_logo.jpg";
-import bakeryLoginBanner from "../assets/images/bakery_login_banner_1783080828078.jpg";
+import flouraLogo from "../assets/images/floura_logo.webp";
+import bakeryLoginBanner from "../assets/images/bakery_login_banner_1783080828078.webp";
 import { getApiUrl } from "../utils/api";
 
 interface AdminLoginViewProps {

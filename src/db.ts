@@ -156,30 +156,17 @@ export class PatisserieDatabase extends Dexie {
 
   constructor() {
     super("PatisserieDatabaseV1");
-    this.version(2).stores({
-      customers: "id, name, mobile, type, totalOrders, memberSince, updatedAt, localChange, isDeleted",
-      orders: "id, customerId, customerName, customerMobile, eventType, eventDate, deliveryTime, cakeShape, cakeWeight, cakeFlavor, status, createdAt, updatedAt, localChange, isDeleted",
-      inventory: "id, name, category, quantity, unit, minStockLevel, supplier, costPrice, updatedAt, localChange, isDeleted",
-      recipes: "id, name, category, stdYield, yieldUnit, updatedAt, localChange, isDeleted",
-      checklist: "id, text, checked, date, updatedAt, localChange, isDeleted",
-      customEvents: "id, title, date, type, createdAt, localChange, isDeleted",
-      dispatchedNotifications: "id, customerName, customerMobile, cakeSpec, messageText, dispatchedAt, status, localChange, isDeleted",
-      scheduledAlerts: "id, customerName, customerMobile, alertDate, createdAt, localChange, isDeleted",
-      bakeryProfile: "id, bakeryName, email, phone, address, role, currency, dateFormat, updatedAt, localChange, isDeleted",
-      preferences: "key"
-    });
-
-    this.version(3).stores({
-      customers: "id, name, mobile, type, totalOrders, memberSince, updatedAt, localChange, isDeleted",
-      orders: "id, customerId, customerName, customerMobile, eventType, eventDate, deliveryTime, cakeShape, cakeWeight, cakeFlavor, status, createdAt, updatedAt, localChange, isDeleted",
-      inventory: "id, name, category, quantity, unit, minStockLevel, supplier, costPrice, updatedAt, localChange, isDeleted",
-      recipes: "id, name, category, stdYield, yieldUnit, updatedAt, localChange, isDeleted",
-      checklist: "id, text, checked, date, updatedAt, localChange, isDeleted",
-      customEvents: "id, title, date, type, createdAt, localChange, isDeleted",
-      dispatchedNotifications: "id, customerName, customerMobile, cakeSpec, messageText, dispatchedAt, status, localChange, isDeleted",
-      scheduledAlerts: "id, customerName, customerMobile, alertDate, createdAt, localChange, isDeleted",
-      bakeryProfile: "id, bakeryName, email, phone, address, role, currency, dateFormat, updatedAt, localChange, isDeleted",
-      categories: "id, name, type, updatedAt, localChange, isDeleted",
+    this.version(1).stores({
+      customers: "id, updatedAt, localChange, isDeleted",
+      orders: "id, createdAt, updatedAt, localChange, isDeleted",
+      inventory: "id, updatedAt, localChange, isDeleted",
+      recipes: "id, updatedAt, localChange, isDeleted",
+      checklist: "id, updatedAt, localChange, isDeleted",
+      customEvents: "id, createdAt, localChange, isDeleted",
+      dispatchedNotifications: "id, localChange, isDeleted",
+      scheduledAlerts: "id, createdAt, localChange, isDeleted",
+      bakeryProfile: "id, updatedAt, localChange, isDeleted",
+      categories: "id, updatedAt, localChange, isDeleted",
       preferences: "key"
     });
 

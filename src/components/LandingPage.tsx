@@ -29,9 +29,8 @@ import {
   PieChart,
   Globe,
 } from "lucide-react";
-import appScreenshot from "../assets/images/app_screenshot.jpg";
-import flouraLogo from "../assets/images/floura_logo.jpg";
-import chefHeroPhoto from "../assets/images/chef_hero_photo.jpg";
+import flouraLogo from "../assets/images/floura_logo.webp";
+import chefHeroPhoto from "../assets/images/chef_hero_photo.webp";
 import LegalModal from "./LegalModal";
 import { useLogin } from "../hooks/useLogin";
 
@@ -187,14 +186,14 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
         </div>
 
         <div className="hidden lg:flex items-center gap-8 text-[13px] font-semibold text-zinc-500 dark:text-zinc-400">
-          <button onClick={() => scrollToSection(featuresSectionRef)} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">Features</button>
-          <button onClick={() => scrollToSection(howItWorksSectionRef)} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">How It Works</button>
-          <button onClick={() => scrollToSection(demoSectionRef)} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">Modules</button>
-          <button onClick={() => scrollToSection(loginSectionRef)} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">Sign In</button>
+          <a id="nav-link-features" href="#features" onClick={(e) => { e.preventDefault(); scrollToSection(featuresSectionRef); }} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">Features</a>
+          <a id="nav-link-how-it-works" href="#how-it-works" onClick={(e) => { e.preventDefault(); scrollToSection(howItWorksSectionRef); }} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">How It Works</a>
+          <a id="nav-link-modules" href="#modules" onClick={(e) => { e.preventDefault(); scrollToSection(demoSectionRef); }} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">Modules</a>
+          <a id="nav-link-signin" href="#login-section" onClick={(e) => { e.preventDefault(); scrollToSection(loginSectionRef); }} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">Sign In</a>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all text-zinc-500 dark:text-zinc-400 cursor-pointer mr-1" aria-label="Toggle Dark Mode">
+          <button id="btn-toggle-dark-mode" onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all text-zinc-500 dark:text-zinc-400 cursor-pointer mr-1" aria-label="Toggle Dark Mode">
             {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-zinc-600" />}
           </button>
 
@@ -204,13 +203,13 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
                 <img src={user.avatar} alt={user.name} className="w-6 h-6 rounded-full border border-pink-200 object-cover" referrerPolicy="no-referrer" />
                 <span className="hidden sm:inline text-xs font-bold text-zinc-750 dark:text-zinc-200 truncate max-w-[100px]">{user.name.split(" ")[0]}</span>
               </div>
-              <button onClick={() => navigate("/dashboard")} className="flex items-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-2.5 px-4 rounded-xl shadow-sm transition-all active:scale-[0.97] cursor-pointer">
+              <button id="btn-nav-dashboard" onClick={() => navigate("/dashboard")} className="flex items-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-2.5 px-4 rounded-xl shadow-sm transition-all active:scale-[0.97] cursor-pointer">
                 <span>Dashboard</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
-            <button onClick={() => scrollToSection(loginSectionRef)} className="flex items-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-[0.97] cursor-pointer">
+            <button id="btn-nav-get-started" onClick={() => scrollToSection(loginSectionRef)} className="flex items-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-[0.97] cursor-pointer">
               <span>Get Started</span>
             </button>
           )}
@@ -241,17 +240,17 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
 
             <div className="flex flex-col sm:flex-row gap-3">
               {user ? (
-                <button onClick={() => navigate("/dashboard")} className="group inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-sm py-4 px-8 rounded-2xl shadow-lg shadow-pink-200 dark:shadow-none transition-all active:scale-[0.97] cursor-pointer">
+                <button id="btn-hero-dashboard" onClick={() => navigate("/dashboard")} className="group inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-sm py-4 px-8 rounded-2xl shadow-lg shadow-pink-200 dark:shadow-none transition-all active:scale-[0.97] cursor-pointer">
                   <span>Open Dashboard</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               ) : (
-                <button onClick={() => scrollToSection(loginSectionRef)} className="group inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-sm py-4 px-8 rounded-2xl shadow-lg shadow-pink-200 dark:shadow-none transition-all active:scale-[0.97] cursor-pointer">
+                <button id="btn-hero-start-free" onClick={() => scrollToSection(loginSectionRef)} className="group inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-sm py-4 px-8 rounded-2xl shadow-lg shadow-pink-200 dark:shadow-none transition-all active:scale-[0.97] cursor-pointer">
                   <span>Start for Free</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               )}
-              <button onClick={() => scrollToSection(howItWorksSectionRef)} className="inline-flex items-center justify-center gap-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-755 font-bold text-sm py-4 px-8 rounded-2xl transition-all active:scale-[0.97] cursor-pointer">
+              <button id="btn-hero-how-it-works" onClick={() => scrollToSection(howItWorksSectionRef)} className="inline-flex items-center justify-center gap-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-755 font-bold text-sm py-4 px-8 rounded-2xl transition-all active:scale-[0.97] cursor-pointer">
                 How It Works
               </button>
             </div>
@@ -344,7 +343,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
           </div>
 
           <div>
-            <button onClick={() => scrollToSection(loginSectionRef)} className="inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-3 px-8 rounded-xl shadow-md transition-all active:scale-[0.97] cursor-pointer">
+            <button id="btn-features-get-started" onClick={() => scrollToSection(loginSectionRef)} className="inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-3 px-8 rounded-xl shadow-md transition-all active:scale-[0.97] cursor-pointer">
               Get Started Free
             </button>
           </div>
@@ -381,11 +380,11 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
 
           <div className="pt-4">
             {user ? (
-              <button onClick={() => navigate("/dashboard")} className="inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-3.5 px-8 rounded-xl shadow-md transition-all active:scale-[0.97] cursor-pointer">
+              <button id="btn-howitworks-dashboard" onClick={() => navigate("/dashboard")} className="inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-3.5 px-8 rounded-xl shadow-md transition-all active:scale-[0.97] cursor-pointer">
                 Open My Dashboard
               </button>
             ) : (
-              <button onClick={() => scrollToSection(loginSectionRef)} className="inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-3.5 px-8 rounded-xl shadow-md transition-all active:scale-[0.97] cursor-pointer">
+              <button id="btn-howitworks-start-now" onClick={() => scrollToSection(loginSectionRef)} className="inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-3.5 px-8 rounded-xl shadow-md transition-all active:scale-[0.97] cursor-pointer">
                 Get Started Now
               </button>
             )}
@@ -432,10 +431,10 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
                 Every Part of Your Bakery, Covered
               </h2>
             </div>
-            <button onClick={() => scrollToSection(loginSectionRef)} className="text-xs font-extrabold uppercase text-primary-brand dark:text-pink-400 flex items-center gap-1 hover:underline cursor-pointer">
+            <a id="nav-modules-signin" href="#login-section" onClick={(e) => { e.preventDefault(); scrollToSection(loginSectionRef); }} className="text-xs font-extrabold uppercase text-primary-brand dark:text-pink-400 flex items-center gap-1 hover:underline cursor-pointer">
               <span>Sign In to Explore</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
+            </a>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -484,14 +483,14 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
             </ul>
 
             <div className="flex flex-wrap gap-3 pt-2">
-              <a href="#" className="flex items-center gap-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 py-3 px-5 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm select-none">
+              <a id="link-download-appstore" href="#" className="flex items-center gap-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 py-3 px-5 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm select-none">
                 <Smartphone className="w-5 h-5 shrink-0" />
                 <div className="text-left leading-tight">
                   <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Download on the</p>
                   <p className="text-xs font-black">App Store</p>
                 </div>
               </a>
-              <a href="#" className="flex items-center gap-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 py-3 px-5 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm select-none">
+              <a id="link-download-googleplay" href="#" className="flex items-center gap-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 py-3 px-5 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm select-none">
                 <Play className="w-5 h-5 fill-current shrink-0" />
                 <div className="text-left leading-tight">
                   <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Get it on</p>
@@ -574,6 +573,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
 
                 <div className="space-y-2">
                   <button
+                    id="btn-signin-dashboard"
                     onClick={() => navigate("/dashboard")}
                     className="w-full flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-3.5 px-6 rounded-xl shadow-md transition-all active:scale-[0.98] cursor-pointer"
                   >
@@ -582,6 +582,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
                   </button>
                   {onLogout && (
                     <button
+                      id="btn-signin-logout"
                       onClick={onLogout}
                       className="w-full flex items-center justify-center gap-2 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-850 dark:hover:bg-zinc-800 text-zinc-650 dark:text-zinc-350 font-bold text-xs uppercase tracking-widest py-3 px-6 rounded-xl border border-zinc-200/60 dark:border-zinc-800/80 transition-all active:scale-[0.98] cursor-pointer"
                     >
@@ -602,6 +603,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
                 </div>
 
                 <button
+                  id="btn-signin-google"
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={authenticating}
@@ -624,10 +626,10 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
 
                 <p className="text-[10px] text-zinc-400 dark:text-zinc-500 leading-relaxed text-center font-semibold">
                   By signing in, you agree to our{" "}
-                  <button onClick={(e) => { e.preventDefault(); setActiveModal("terms"); }} className="underline hover:text-zinc-750 dark:hover:text-zinc-350 cursor-pointer">Terms</button>,{" "}
-                  <button onClick={(e) => { e.preventDefault(); setActiveModal("privacy"); }} className="underline hover:text-zinc-750 dark:hover:text-zinc-350 cursor-pointer">Privacy Policy</button>{" "}
+                  <button id="btn-terms-modal-signin" onClick={(e) => { e.preventDefault(); setActiveModal("terms"); }} className="underline hover:text-zinc-750 dark:hover:text-zinc-350 cursor-pointer">Terms</button>,{" "}
+                  <button id="btn-privacy-modal-signin" onClick={(e) => { e.preventDefault(); setActiveModal("privacy"); }} className="underline hover:text-zinc-750 dark:hover:text-zinc-350 cursor-pointer">Privacy Policy</button>{" "}
                   &{" "}
-                  <button onClick={(e) => { e.preventDefault(); setActiveModal("disclaimer"); }} className="underline hover:text-zinc-750 dark:hover:text-zinc-300 cursor-pointer">Disclaimer</button>.
+                  <button id="btn-disclaimer-modal-signin" onClick={(e) => { e.preventDefault(); setActiveModal("disclaimer"); }} className="underline hover:text-zinc-750 dark:hover:text-zinc-300 cursor-pointer">Disclaimer</button>.
                 </p>
               </div>
             )}
@@ -645,9 +647,9 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
           </div>
           <div>© {new Date().getFullYear()} Floura. All Rights Reserved.</div>
           <div className="flex items-center gap-5">
-            <button onClick={() => setActiveModal("terms")} className="hover:text-zinc-750 dark:hover:text-zinc-350 transition-colors cursor-pointer">Terms</button>
-            <button onClick={() => setActiveModal("privacy")} className="hover:text-zinc-750 dark:hover:text-zinc-350 transition-colors cursor-pointer">Privacy</button>
-            <button onClick={() => setActiveModal("disclaimer")} className="hover:text-zinc-750 dark:hover:text-zinc-300 transition-colors cursor-pointer">Disclaimer</button>
+            <button id="btn-terms-modal-footer" onClick={() => setActiveModal("terms")} className="hover:text-zinc-750 dark:hover:text-zinc-350 transition-colors cursor-pointer">Terms</button>
+            <button id="btn-privacy-modal-footer" onClick={() => setActiveModal("privacy")} className="hover:text-zinc-750 dark:hover:text-zinc-350 transition-colors cursor-pointer">Privacy</button>
+            <button id="btn-disclaimer-modal-footer" onClick={() => setActiveModal("disclaimer")} className="hover:text-zinc-750 dark:hover:text-zinc-300 transition-colors cursor-pointer">Disclaimer</button>
           </div>
         </div>
       </footer>

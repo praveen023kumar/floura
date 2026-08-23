@@ -39,14 +39,14 @@ declare global {
 
 // Components
 import Header from "./components/Header";
-import flouraLogo from "./assets/images/floura_logo.jpg";
+import flouraLogo from "./assets/images/floura_logo.webp";
 import Avatar from "./components/Avatar";
 import LandingPage from "./components/LandingPage";
 import InitialSyncLoader from "./components/InitialSyncLoader";
-import AdminDashboardView from "./components/AdminDashboardView";
-import AdminLoginView from "./components/AdminLoginView";
 
 // Lazy loaded page components for optimal app bundles and load performance
+const AdminDashboardView = lazy(() => import("./components/AdminDashboardView"));
+const AdminLoginView = lazy(() => import("./components/AdminLoginView"));
 const DashboardView = lazy(() => import("./components/DashboardView"));
 const OrdersList = lazy(() => import("./components/OrdersList"));
 const OrderCreate = lazy(() => import("./components/OrderCreate"));
@@ -226,17 +226,26 @@ function MainAppContent() {
 
   if (isAdminPath) {
     const isLoggedAdmin = user && ((user as any).role === "admin" || (user as any).role === "superadmin");
-    if (!isLoggedAdmin) {
-      return <AdminLoginView onLogin={handleLogin} />;
-    }
-    
     return (
-      <AdminDashboardView
-        user={user}
-        onLogout={handleLogout}
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-      />
+      <Suspense fallback={
+        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
+          <div className="w-10 h-10 rounded-full border-2 border-pink-750 border-t-transparent animate-spin mb-4" />
+          <p className="text-sm font-serif font-semibold text-zinc-650 dark:text-zinc-350">
+            Loading Admin Workspace...
+          </p>
+        </div>
+      }>
+        {!isLoggedAdmin ? (
+          <AdminLoginView onLogin={handleLogin} />
+        ) : (
+          <AdminDashboardView
+            user={user}
+            onLogout={handleLogout}
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
+          />
+        )}
+      </Suspense>
     );
   }
 

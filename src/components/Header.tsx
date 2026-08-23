@@ -2,7 +2,7 @@
 import { Sun, Moon, Cloud, CloudOff, RefreshCw, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Avatar from "./Avatar";
-import flouraLogo from "../assets/images/floura_logo.jpg";
+import flouraLogo from "../assets/images/floura_logo.webp";
 
 interface HeaderProps {
   darkMode: boolean;

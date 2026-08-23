@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { getApiUrl } from "../utils/api";
-import flouraLogo from "../assets/images/floura_logo.jpg";
+import flouraLogo from "../assets/images/floura_logo.webp";
 import Avatar from "./Avatar";
 
 interface FeedbackItem {

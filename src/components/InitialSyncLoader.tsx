@@ -1,7 +1,7 @@
 // File Path: /src/components/InitialSyncLoader.tsx
 import { motion, AnimatePresence } from "motion/react";
 import { Lock, Database, RefreshCw, CheckCircle2, Sparkles, ChefHat } from "lucide-react";
-import flouraLogo from "../assets/images/floura_logo.jpg";
+import flouraLogo from "../assets/images/floura_logo.webp";
 
 interface InitialSyncLoaderProps {
   step: string;

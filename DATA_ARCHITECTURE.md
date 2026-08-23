@@ -110,19 +110,22 @@ All TypeScript interfaces live in `/shared/types.ts` and are imported by **both*
 **Library:** [Dexie.js](https://dexie.org/) — a typed IndexedDB wrapper
 **Database name:** `PatisserieDatabaseV1`
 
-### Tables
+### Tables (Schema Version 1)
+
+In schema version 1, all sensitive index fields are removed from the Dexie store definitions to prevent schema exposure and to ensure IndexedDB does not build empty indexes on fields deleted during transparent encryption. Only non-sensitive metadata fields are indexed.
 
 | Dexie Table | Indexed Fields |
 |---|---|
-| `customers` | `id, name, mobile, type, totalOrders, memberSince, updatedAt, localChange, isDeleted` |
-| `orders` | `id, customerId, customerName, eventType, eventDate, status, createdAt, updatedAt, localChange, isDeleted` |
-| `inventory` | `id, name, category, quantity, unit, minStockLevel, updatedAt, localChange, isDeleted` |
-| `recipes` | `id, name, category, stdYield, updatedAt, localChange, isDeleted` |
-| `checklist` | `id, text, checked, date, updatedAt, localChange, isDeleted` |
-| `customEvents` | `id, title, date, type, createdAt, localChange, isDeleted` |
-| `dispatchedNotifications` | `id, customerName, dispatchedAt, status, localChange, isDeleted` |
-| `scheduledAlerts` | `id, customerName, alertDate, createdAt, localChange, isDeleted` |
-| `bakeryProfile` | `id, bakeryName, email, updatedAt, localChange, isDeleted` |
+| `customers` | `id, updatedAt, localChange, isDeleted` |
+| `orders` | `id, createdAt, updatedAt, localChange, isDeleted` |
+| `inventory` | `id, updatedAt, localChange, isDeleted` |
+| `recipes` | `id, updatedAt, localChange, isDeleted` |
+| `checklist` | `id, updatedAt, localChange, isDeleted` |
+| `customEvents` | `id, createdAt, localChange, isDeleted` |
+| `dispatchedNotifications` | `id, localChange, isDeleted` |
+| `scheduledAlerts` | `id, createdAt, localChange, isDeleted` |
+| `bakeryProfile` | `id, updatedAt, localChange, isDeleted` |
+| `categories` | `id, updatedAt, localChange, isDeleted` |
 | `preferences` | `key` (unencrypted — stores server URL, last sync time, etc.) |
 
 ### What is stored in `preferences`

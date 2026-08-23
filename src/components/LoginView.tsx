@@ -2,9 +2,9 @@
 import { useState } from "react";
 import { RefreshCw, XCircle, X, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
-import bakeryLoginBanner from "../assets/images/bakery_login_banner_1783080828078.jpg";
+import bakeryLoginBanner from "../assets/images/bakery_login_banner_1783080828078.webp";
 import LegalModal from "./LegalModal";
-import flouraLogo from "../assets/images/floura_logo.jpg";
+import flouraLogo from "../assets/images/floura_logo.webp";
 import { getApiUrl } from "../utils/api";
 import { useLogin } from "../hooks/useLogin";
 
