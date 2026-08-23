@@ -133,10 +133,23 @@ export async function initDb() {
       yieldUnit TEXT NOT NULL,
       ingredients TEXT NOT NULL, -- JSON string array
       imageUrl TEXT,
+      imageBase64 TEXT,
       updatedAt TEXT NOT NULL,
       user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com'
     )
   `);
+
+  // Ensure imageBase64 column exists in recipes table
+  try {
+    const columns = await querySqlAll<any>(db, "PRAGMA table_info(recipes)");
+    const hasImageBase64 = columns.some((col: any) => col.name === "imageBase64");
+    if (!hasImageBase64) {
+      await runSql(db, "ALTER TABLE recipes ADD COLUMN imageBase64 TEXT");
+      console.log("Migrated recipes table: Added imageBase64 column");
+    }
+  } catch (e) {
+    console.error("Migration check for recipes imageBase64 column failed:", e);
+  }
 
   // Create Checklist Table
   await runSql(db, `

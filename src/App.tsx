@@ -142,6 +142,7 @@ function MainAppContent() {
     handleAddInventoryItem,
     handleUpdateInventoryItem,
     handleAddRecipe,
+    handleUpdateRecipe,
     handleToggleChecklistItem,
     handleAddChecklistItem,
     handleResetChecklist,
@@ -592,6 +593,7 @@ function MainAppContent() {
               <Route path="/recipes/new" element={
                 <RecipeCreateView 
                   onAddRecipe={handleAddRecipe}
+                  onUpdateRecipe={handleUpdateRecipe}
                 />
               } />
 

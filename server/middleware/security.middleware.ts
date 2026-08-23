@@ -255,7 +255,7 @@ export function securityHeadersMiddleware(req: express.Request, res: express.Res
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* https://www.gstatic.com https://apis.google.com https://*.firebaseapp.com",
     "style-src 'self' 'unsafe-inline' http://localhost:* https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: http://localhost:* https://images.unsplash.com https://*.googleusercontent.com",
+    "img-src 'self' data: blob: http://localhost:* https: https://images.unsplash.com https://*.googleusercontent.com",
     "connect-src 'self' http://localhost:* ws://localhost:* https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com",
     "frame-src 'self' https://*.firebaseapp.com https://apis.google.com"
   ].join("; ");

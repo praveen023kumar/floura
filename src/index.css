@@ -277,6 +277,12 @@ h1, h2, h3, h4, .font-serif-editor {
   .desktop-sidebar {
     padding-top: 1rem !important; /* py-4 equivalent */
     padding-bottom: 1rem !important;
+    overflow-y: auto !important;
+    -ms-overflow-style: none !important; /* IE and Edge */
+    scrollbar-width: none !important; /* Firefox */
+  }
+  .desktop-sidebar::-webkit-scrollbar {
+    display: none !important; /* Chrome, Safari, Opera */
   }
   .desktop-sidebar .sidebar-logo-container {
     margin-bottom: 1.5rem !important; /* mb-6 equivalent */
@@ -302,6 +308,12 @@ h1, h2, h3, h4, .font-serif-editor {
   .desktop-sidebar {
     padding-top: 0.5rem !important; /* py-2 equivalent */
     padding-bottom: 0.5rem !important;
+    overflow-y: auto !important;
+    -ms-overflow-style: none !important; /* IE and Edge */
+    scrollbar-width: none !important; /* Firefox */
+  }
+  .desktop-sidebar::-webkit-scrollbar {
+    display: none !important; /* Chrome, Safari, Opera */
   }
   .desktop-sidebar .sidebar-logo-container {
     margin-bottom: 0.75rem !important; /* mb-3 equivalent */

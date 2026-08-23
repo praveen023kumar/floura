@@ -536,7 +536,7 @@ export default function OrderDetail({
                   <div className="space-y-2.5 pt-2 text-left">
                     <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider text-left">Installments Breakdown</h4>
                     {selectedOrder.paymentHistory && selectedOrder.paymentHistory.length > 0 ? (
-                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                      <div className="space-y-2">
                         {selectedOrder.paymentHistory.map((pmt: any) => (
                           <div
                             key={pmt.id}

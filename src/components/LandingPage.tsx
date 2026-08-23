@@ -183,7 +183,6 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
           </div>
           <div className="flex items-baseline gap-2">
             <span className="font-serif text-xl font-black tracking-tight text-primary-brand dark:text-pink-400 italic">Floura</span>
-            <span className="hidden sm:block text-[9px] uppercase tracking-widest text-zinc-400 dark:text-zinc-500 font-bold">Bakery Command Center</span>
           </div>
         </div>
 
@@ -643,7 +642,6 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
             <img src={flouraLogo} alt="Floura" className="w-6 h-6 rounded-lg" />
             <span className="font-serif font-black text-zinc-650 dark:text-zinc-400 italic">Floura</span>
             <span className="text-zinc-300 dark:text-zinc-700">·</span>
-            <span>Bakery Command Center</span>
           </div>
           <div>© {new Date().getFullYear()} Floura. All Rights Reserved.</div>
           <div className="flex items-center gap-5">

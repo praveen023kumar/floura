@@ -78,6 +78,7 @@ export interface Recipe {
   yieldUnit: string;
   ingredients: RecipeIngredient[];
   imageUrl?: string;
+  imageBase64?: string;
   updatedAt: string; // ISO string
   isDeleted?: number;
 }

@@ -35,6 +35,7 @@ export default function RecipesView() {
     initialViewMode: "list",
   });
 
+  console.log("paginatedRecipes", paginatedRecipes)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const activeFilterCount = (selectedCategory !== "All" ? 1 : 0) + (searchTerm.trim() ? 1 : 0);
@@ -256,7 +257,7 @@ export default function RecipesView() {
               </div>
             )}
 
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto max-h-[600px] p-1 pb-3 pr-2.5 custom-scrollbar">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-1 pb-3">
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <div
@@ -312,7 +313,7 @@ export default function RecipesView() {
                         {/* Image Box */}
                         <div className="w-22 h-22 rounded-xl overflow-hidden bg-zinc-50 dark:bg-zinc-900 shrink-0 border border-zinc-150 dark:border-zinc-800 shadow-inner relative">
                           <img
-                            src={r.imageUrl || "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=300"}
+                            src={(r.imageBase64?.startsWith("data:image/") ? r.imageBase64 : undefined) || r.imageUrl || "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=300"}
                             alt={r.name}
                             className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
                             onError={(e) => {

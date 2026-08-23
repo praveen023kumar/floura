@@ -7,6 +7,7 @@ export type LogFilterType = "all" | "difficulties" | "costs";
 
 export function useDebriefs() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -28,12 +29,15 @@ export function useDebriefs() {
   useEffect(() => {
     async function loadOrders() {
       try {
-        const loaded = await localDb.orders
-          .filter(o => o.status === "Completed" && o.isDeleted !== 1)
+        const allLoaded = await localDb.orders
+          .filter(o => o.isDeleted !== 1)
           .toArray();
-        setOrders(loaded);
+        setAllOrders(allLoaded);
+        
+        const completedOnly = allLoaded.filter(o => o.status === "Completed");
+        setOrders(completedOnly);
       } catch (err) {
-        console.error("Failed to load completed orders in DebriefsView:", err);
+        console.error("Failed to load orders in DebriefsView:", err);
       }
     }
     loadOrders();
@@ -204,12 +208,11 @@ export function useDebriefs() {
   }, [completedOrders, searchTerm, selectedFlavor, startDate, endDate, filterLogType, sortBy]);
 
   const availableFlavors = useMemo(() => {
-    const list = new Set<string>();
-    completedOrders.forEach(o => {
-      if (o.cakeFlavor) list.add(o.cakeFlavor);
-    });
-    return Array.from(list).sort();
-  }, [completedOrders]);
+    const defaultFlavors = ["Belgian Chocolate", "French Vanilla", "Red Velvet", "Butterscotch", "Biscoff"];
+    const allUsedFlavors = allOrders.map((o) => o.cakeFlavor).filter(Boolean);
+    const combined = Array.from(new Set([...defaultFlavors, ...allUsedFlavors]));
+    return combined.sort();
+  }, [allOrders]);
 
 
 

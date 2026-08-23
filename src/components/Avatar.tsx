@@ -85,10 +85,8 @@ export default function Avatar({ avatarKey, className = "w-10 h-10", name, useIc
   if (useIconFallback) {
     const bgClass = getAvatarBg(name);
     return (
-      <div className={`relative ${roundedClass} shrink-0 flex items-center justify-center border border-zinc-200/80 p-[1.5px] bg-white dark:bg-zinc-800 ${className}`}>
-        <div className={`w-full h-full ${roundedClass} flex items-center justify-center ${bgClass} shadow-xs`}>
-          <User className="w-1/2 h-1/2" />
-        </div>
+      <div className={`relative ${roundedClass} shrink-0 flex items-center justify-center ${bgClass} ${className}`}>
+        <User className="w-1/2 h-1/2" />
       </div>
     );
   }
@@ -98,10 +96,8 @@ export default function Avatar({ avatarKey, className = "w-10 h-10", name, useIc
     : "tn";
 
   return (
-    <div className={`relative ${roundedClass} shrink-0 flex items-center justify-center border border-zinc-200/80 p-[1.5px] bg-white dark:bg-zinc-800 ${className}`}>
-      <div className={`w-full h-full ${roundedClass} flex items-center justify-center text-white bg-gradient-to-tr from-[#E11D48] via-[#C084FC] to-[#0D9488] border-[1.5px] border-white shadow-xs font-bold font-sans`}>
-        <span className={`${textSizeClass} tracking-tight leading-none`}>{initials}</span>
-      </div>
+    <div className={`relative ${roundedClass} shrink-0 flex items-center justify-center text-white bg-gradient-to-tr from-[#E11D48] via-[#C084FC] to-[#0D9488] font-bold font-sans ${className}`}>
+      <span className={`${textSizeClass} tracking-tight leading-none`}>{initials}</span>
     </div>
   );
 }

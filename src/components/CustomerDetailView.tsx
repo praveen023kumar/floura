@@ -232,7 +232,7 @@ export default function CustomerDetailView() {
               </span>
             </div>
 
-            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+            <div className="space-y-3">
               {selectedCustomerOrders.length > 0 ? (
                 selectedCustomerOrders.map((o) => (
                   <div

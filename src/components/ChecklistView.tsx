@@ -364,7 +364,7 @@ export default function ChecklistView({
             </div>
           )}
 
-          <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto max-h-[600px] p-1 pb-3 pr-2.5 custom-scrollbar">
+          <div className="flex flex-col gap-2.5 p-1 pb-3">
             {paginatedChecklist.length > 0 ? (
               <>
                 <AnimatePresence initial={false}>

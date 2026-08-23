@@ -442,7 +442,7 @@ export default function CustomersListView() {
             )}
 
             {/* Profile database matching exact screenshots profiles */}
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto max-h-[600px] p-1 pb-3 pr-2.5 custom-scrollbar">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-1 pb-3">
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <div

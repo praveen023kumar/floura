@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { localDb } from "../db";
 import { type Recipe } from "../types";
-import { ArrowLeft, Calculator, Scale, BookOpen } from "lucide-react";
+import { ArrowLeft, Calculator, Scale, BookOpen, Edit } from "lucide-react";
 import { motion } from "motion/react";
 
 export default function RecipeDetailView() {
@@ -112,13 +112,22 @@ export default function RecipeDetailView() {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate("/recipes")}
-          className="border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 py-1.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm text-zinc-750 dark:text-zinc-300"
-        >
-          Back to Recipe Book
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => navigate("/recipes/new", { state: { recipe } })}
+            className="bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white py-1.5 px-4 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-md font-sans"
+          >
+            <Edit className="w-3.5 h-3.5" /> Edit Recipe
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/recipes")}
+            className="border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 py-1.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm text-zinc-750 dark:text-zinc-300"
+          >
+            Back to Recipe Book
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -162,7 +171,7 @@ export default function RecipeDetailView() {
                 <Scale className="w-4 h-4" /> Scaled Ingredient Matrix
               </h4>
 
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              <div className="space-y-2">
                 {scaledIngredients.length > 0 ? (
                   scaledIngredients.map((ing, idx) => (
                     <div
@@ -221,7 +230,7 @@ export default function RecipeDetailView() {
             <div className="flex items-center gap-2 pt-2">
               <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-900 border border-zinc-150 shrink-0">
                 <img
-                  src={recipe.imageUrl || "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=150"}
+                  src={(recipe.imageBase64?.startsWith("data:image/") ? recipe.imageBase64 : undefined) || recipe.imageUrl || "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=150"}
                   alt={recipe.name}
                   className="w-full h-full object-cover"
                   onError={(e) => {

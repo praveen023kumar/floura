@@ -24,6 +24,7 @@ const KEYS_TO_ENCRYPT = [
   "unit",
   "ingredients",
   "imageUrl",
+  "imageBase64",
   "text",
   "title",
   "notes",
@@ -192,8 +193,8 @@ export async function performBulkSync(userEmail: string, payload: any) {
     for (const rawR of recipes as any[]) {
       const r = encryptRow(rawR);
       await runSql(db, `
-        INSERT INTO recipes (id, name, category, stdYield, yieldUnit, ingredients, imageUrl, updatedAt, user_email, isDeleted)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO recipes (id, name, category, stdYield, yieldUnit, ingredients, imageUrl, imageBase64, updatedAt, user_email, isDeleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           name=excluded.name,
           category=excluded.category,
@@ -201,12 +202,13 @@ export async function performBulkSync(userEmail: string, payload: any) {
           yieldUnit=excluded.yieldUnit,
           ingredients=excluded.ingredients,
           imageUrl=excluded.imageUrl,
+          imageBase64=excluded.imageBase64,
           updatedAt=excluded.updatedAt,
           user_email=excluded.user_email,
           isDeleted=excluded.isDeleted
         WHERE (excluded.updatedAt > recipes.updatedAt OR recipes.updatedAt IS NULL)
           AND recipes.user_email = excluded.user_email
-      `, [r.id, r.name, r.category, r.stdYield, r.yieldUnit, typeof r.ingredients === "string" ? r.ingredients : JSON.stringify(r.ingredients), r.imageUrl ?? "", r.updatedAt, userEmail, r.isDeleted !== undefined ? r.isDeleted : 0]);
+      `, [r.id, r.name, r.category, r.stdYield, r.yieldUnit, typeof r.ingredients === "string" ? r.ingredients : JSON.stringify(r.ingredients), r.imageUrl ?? "", r.imageBase64 ?? "", r.updatedAt, userEmail, r.isDeleted !== undefined ? r.isDeleted : 0]);
     }
 
     // Sync Checklist

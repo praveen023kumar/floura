@@ -944,6 +944,19 @@ export function useAppEngine() {
     return recipeRecord;
   };
 
+  // Update Baking Formulation Mutation
+  const handleUpdateRecipe = async (updatedRecipe: Recipe) => {
+    const recipeRecord: Recipe = {
+      ...updatedRecipe,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await localDb.recipes.put({ ...recipeRecord, localChange: 1 });
+    await refreshReactStates();
+    triggerSync();
+    return recipeRecord;
+  };
+
   // Checklist toggles
   const handleToggleChecklistItem = async (id: string, checked: boolean, date?: string) => {
     const targetDate = date || new Date().toISOString().split("T")[0];
@@ -1106,6 +1119,7 @@ export function useAppEngine() {
     handleAddInventoryItem,
     handleUpdateInventoryItem,
     handleAddRecipe,
+    handleUpdateRecipe,
     handleToggleChecklistItem,
     handleAddChecklistItem,
     handleResetChecklist,

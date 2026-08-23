@@ -324,7 +324,7 @@ export default function OrderCreate({
         </div>
 
         <form onSubmit={handleFormSubmit} className="space-y-6 text-left">
-          <div className="max-h-[60vh] overflow-y-auto p-1 pb-4 pr-3 space-y-6 custom-scrollbar text-left">
+          <div className="p-1 pb-4 space-y-6 text-left">
             <AnimatePresence mode="wait">
             {currentStep === 1 && (
               <motion.div

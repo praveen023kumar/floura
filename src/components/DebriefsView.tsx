@@ -138,7 +138,7 @@ export default function DebriefsView({ }: DebriefsViewProps) {
 
 
       {/* Date Range facet */}
-      <div className="pt-5 border-t border-zinc-100 dark:border-zinc-800">
+      <div>
         <h3 className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider font-sans mb-2">
           Bake Date Range
         </h3>
