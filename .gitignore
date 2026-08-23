@@ -34,3 +34,5 @@ firebase-key.json
 .yarnrc
 *.mobileprovision
 *.provisionprofile
+
+.antigravity.antigravity/
