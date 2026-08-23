@@ -169,6 +169,18 @@ export function useOrders({
       setOverrideDecorationCharge(String(o.decorationCharge));
       setOverrideDeliveryFee(String(o.deliveryFee));
       setOverrideTotalAmount(String(o.totalAmount));
+      
+      // Update refs to prevent initial sync override
+      lastBasePrice.current = String(o.basePrice);
+      lastDecorationCharge.current = String(o.decorationCharge);
+      lastDeliveryFee.current = String(o.deliveryFee);
+      prevCakeAttrs.current = {
+        cakeWeight: o.cakeWeight || "2.0 kg",
+        cakeShape: o.cakeShape || "Round",
+        layers: o.layers || "Double Tier",
+        preference: o.preference || "Egg",
+      };
+
       setViewMode("form");
     } else if (location.state && (location.state as any).selectedOrderId) {
       const targetId = (location.state as any).selectedOrderId;
@@ -476,6 +488,64 @@ export function useOrders({
     };
   }, [formData]);
 
+  // Refs to track previous values of component overrides to detect changes from user inputs
+  const lastBasePrice = useRef("");
+  const lastDecorationCharge = useRef("");
+  const lastDeliveryFee = useRef("");
+
+  // Ref to track cake attributes in order to clear price overrides when they change
+  const prevCakeAttrs = useRef({
+    cakeWeight: formData.cakeWeight || "2.0 kg",
+    cakeShape: formData.cakeShape || "Round",
+    layers: formData.layers || "Double Tier",
+    preference: formData.preference || "Egg",
+  });
+
+  // Automatically recalculate overrideTotalAmount when the component overrides change
+  useEffect(() => {
+    const hasBaseChanged = overrideBasePrice !== lastBasePrice.current;
+    const hasDecorationChanged = overrideDecorationCharge !== lastDecorationCharge.current;
+    const hasDeliveryChanged = overrideDeliveryFee !== lastDeliveryFee.current;
+
+    if (hasBaseChanged || hasDecorationChanged || hasDeliveryChanged) {
+      const base = overrideBasePrice ? parseFloat(overrideBasePrice) || 0 : priceCalculation.basePrice;
+      const dec = overrideDecorationCharge ? parseFloat(overrideDecorationCharge) || 0 : priceCalculation.decorationCharge;
+      const del = overrideDeliveryFee ? parseFloat(overrideDeliveryFee) || 0 : priceCalculation.deliveryFee;
+
+      if (overrideBasePrice === "" && overrideDecorationCharge === "" && overrideDeliveryFee === "") {
+        setOverrideTotalAmount("");
+      } else {
+        const newTotal = (base + dec + del).toFixed(2);
+        setOverrideTotalAmount(newTotal);
+      }
+
+      // Update refs to current values
+      lastBasePrice.current = overrideBasePrice;
+      lastDecorationCharge.current = overrideDecorationCharge;
+      lastDeliveryFee.current = overrideDeliveryFee;
+    }
+  }, [overrideBasePrice, overrideDecorationCharge, overrideDeliveryFee, priceCalculation]);
+
+  // Clear component price overrides and total override when cake composition attributes change
+  useEffect(() => {
+    const hasWeightChanged = formData.cakeWeight !== prevCakeAttrs.current.cakeWeight;
+    const hasShapeChanged = formData.cakeShape !== prevCakeAttrs.current.cakeShape;
+    const hasLayersChanged = formData.layers !== prevCakeAttrs.current.layers;
+    const hasPrefChanged = formData.preference !== prevCakeAttrs.current.preference;
+
+    if (hasWeightChanged || hasShapeChanged || hasLayersChanged || hasPrefChanged) {
+      setOverrideBasePrice("");
+      setOverrideTotalAmount("");
+
+      prevCakeAttrs.current = {
+        cakeWeight: formData.cakeWeight,
+        cakeShape: formData.cakeShape,
+        layers: formData.layers,
+        preference: formData.preference,
+      };
+    }
+  }, [formData.cakeWeight, formData.cakeShape, formData.layers, formData.preference]);
+
   const handleStartEdit = (o: Order) => {
     if (onViewModeChange) {
       navigate("/orders/new", { state: { editOrder: o } });
@@ -509,6 +579,18 @@ export function useOrders({
       setOverrideDecorationCharge(String(o.decorationCharge));
       setOverrideDeliveryFee(String(o.deliveryFee));
       setOverrideTotalAmount(String(o.totalAmount));
+      
+      // Update refs to prevent initial sync override
+      lastBasePrice.current = String(o.basePrice);
+      lastDecorationCharge.current = String(o.decorationCharge);
+      lastDeliveryFee.current = String(o.deliveryFee);
+      prevCakeAttrs.current = {
+        cakeWeight: o.cakeWeight || "2.0 kg",
+        cakeShape: o.cakeShape || "Round",
+        layers: o.layers || "Double Tier",
+        preference: o.preference || "Egg",
+      };
+
       handleSetViewMode("form");
     }
   };
@@ -743,6 +825,18 @@ export function useOrders({
         setOverrideDecorationCharge("");
         setOverrideDeliveryFee("");
         setOverrideTotalAmount("");
+        
+        // Reset refs
+        lastBasePrice.current = "";
+        lastDecorationCharge.current = "";
+        lastDeliveryFee.current = "";
+        prevCakeAttrs.current = {
+          cakeWeight: "2.0 kg",
+          cakeShape: "Round",
+          layers: "Double Tier",
+          preference: "Egg",
+        };
+
         setEditingOrderId(null);
         handleSetViewMode("list");
       }, 1500);

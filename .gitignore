@@ -8,6 +8,8 @@ coverage/
 !.env.example
 
 patisserie.sqlite
+patisserie.sqlite-shm
+patisserie.sqlite-wal
 package-lock.json
 firebase-applet-config.json
 
@@ -34,5 +36,4 @@ firebase-key.json
 .yarnrc
 *.mobileprovision
 *.provisionprofile.antigravity/
-.antigravity/
 .antigravity/
