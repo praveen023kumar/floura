@@ -33,6 +33,10 @@ export const customSelectStyles: StylesConfig<any, false> = {
       zIndex: 50
     };
   },
+  menuPortal: (provided) => ({
+    ...provided,
+    zIndex: 9999
+  }),
   option: (provided, state) => {
     const isDark = document.documentElement.classList.contains("dark");
     let bg = "transparent";

@@ -1,5 +1,4 @@
-// File Path: /src/components/DashboardView.tsx
-import { useState } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "motion/react";
 import {
   Search,
@@ -14,11 +13,73 @@ import {
   FolderPlus,
   BookOpen,
   Calendar,
-  Check
+  Check,
+  Clock
 } from "lucide-react";
 import { formatPrice } from "../utils/format";
 import { useDashboard } from "../hooks/useDashboard";
 import { type Order, type ChecklistItem } from "../types";
+import { getStatusColors } from "../utils/orderStatus";
+
+// Helper to parse "hh:mm am/pm" or "hh:mm" into minutes since start of day
+const parseTimeToMinutes = (timeStr: string): number | null => {
+  if (!timeStr) return null;
+  const clean = timeStr.trim().toLowerCase();
+  
+  // Check for am/pm
+  const ampmMatch = clean.match(/^(\d+):(\d+)\s*(am|pm)$/);
+  if (ampmMatch) {
+    let hour = parseInt(ampmMatch[1], 10);
+    const minute = parseInt(ampmMatch[2], 10);
+    const period = ampmMatch[3];
+    if (period === "pm" && hour < 12) hour += 12;
+    if (period === "am" && hour === 12) hour = 0;
+    return hour * 60 + minute;
+  }
+  
+  // Check for 24h format
+  const standardMatch = clean.match(/^(\d+):(\d+)$/);
+  if (standardMatch) {
+    const hour = parseInt(standardMatch[1], 10);
+    const minute = parseInt(standardMatch[2], 10);
+    return hour * 60 + minute;
+  }
+  
+  return null;
+};
+
+
+
+const cardColorMap = [
+  {
+    bg: "bg-pink-50/50 dark:bg-pink-950/20",
+    border: "border-pink-100 dark:border-pink-900/30",
+    bar: "bg-pink-500",
+    text: "text-pink-700 dark:text-pink-300",
+    time: "text-pink-500/80"
+  },
+  {
+    bg: "bg-indigo-50/50 dark:bg-indigo-950/20",
+    border: "border-indigo-100 dark:border-indigo-900/30",
+    bar: "bg-indigo-500",
+    text: "text-indigo-700 dark:text-indigo-300",
+    time: "text-indigo-500/80"
+  },
+  {
+    bg: "bg-sky-50/50 dark:bg-sky-950/20",
+    border: "border-sky-100 dark:border-sky-900/30",
+    bar: "bg-sky-500",
+    text: "text-sky-700 dark:text-sky-300",
+    time: "text-sky-500/80"
+  },
+  {
+    bg: "bg-emerald-50/50 dark:bg-emerald-950/20",
+    border: "border-emerald-100 dark:border-emerald-900/30",
+    bar: "bg-emerald-500",
+    text: "text-emerald-700 dark:text-emerald-300",
+    time: "text-emerald-500/80"
+  }
+];
 
 interface DashboardViewProps {
   onNavigate: (screen: "dashboard" | "orders" | "customers" | "inventory" | "recipes" | "orders-form" | "customers-form" | "inventory-form" | "recipes-form" | "debriefs" | "checklist" | "profile" | "more") => void;
@@ -50,25 +111,29 @@ export default function DashboardView({
 
   const [scheduleDate, setScheduleDate] = useState(todayStr);
 
+  const prevTodayStrRef = useRef(todayStr);
+  useEffect(() => {
+    const prevToday = prevTodayStrRef.current;
+    if (scheduleDate === prevToday) {
+      setScheduleDate(todayStr);
+    }
+    prevTodayStrRef.current = todayStr;
+  }, [todayStr, scheduleDate]);
+
   // Compute checklist stats
   const completedChecklistCount = todayMappedChecklist.filter((i) => i.checked).length;
   const totalChecklistCount = todayMappedChecklist.length;
   const checklistPercent = totalChecklistCount > 0 ? Math.round((completedChecklistCount / totalChecklistCount) * 100) : 0;
 
-  // Filter orders for selected schedule date
+  // Filter and sort orders for selected schedule date
   const scheduleOrders = activeOrders.filter(o => o.deliveryDate === scheduleDate);
-
-  // Helper to map order delivery time to timeline column indexes
-  const getTimelinePosition = (timeStr: string) => {
-    if (!timeStr) return { start: 5, span: 2 }; // Default/Fallback
-    const hour = parseInt(timeStr.split(":")[0]);
-    if (hour < 11) return { start: 1, span: 2 };      // 09:00 am slot
-    if (hour < 13) return { start: 2, span: 2 };      // 12:00 pm slot
-    if (hour < 15) return { start: 3, span: 2 };      // 02:00 pm slot
-    if (hour < 16) return { start: 4, span: 2 };      // 03:00 pm slot
-    if (hour < 17) return { start: 5, span: 2 };      // 04:00 pm slot
-    return { start: 6, span: 1 };                     // 06:00 pm slot
-  };
+  const sortedScheduleOrders = useMemo(() => {
+    return [...scheduleOrders].sort((a, b) => {
+      const aMins = parseTimeToMinutes(a.deliveryTime) ?? 9999;
+      const bMins = parseTimeToMinutes(b.deliveryTime) ?? 9999;
+      return aMins - bMins;
+    });
+  }, [scheduleOrders]);
 
   return (
     <motion.div
@@ -119,13 +184,13 @@ export default function DashboardView({
                     {formatPrice(todayProfit)}
                   </span>
                   <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500">
-                    Margin {Math.round(averageProfitMarginPercent || 75)}%
+                    Margin {Math.round(averageProfitMarginPercent)}%
                   </span>
                 </div>
                 <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                   <div 
                     className="h-full rounded-full bg-sky-600 transition-all duration-550"
-                    style={{ width: `${Math.round(averageProfitMarginPercent || 75)}%` }}
+                    style={{ width: `${Math.round(averageProfitMarginPercent)}%` }}
                   />
                 </div>
               </div>
@@ -226,67 +291,78 @@ export default function DashboardView({
               </div>
             </div>
 
-            {/* Time labels axis */}
+            {/* Delivery list container */}
             <div className="relative">
-              <div className="grid grid-cols-6 border-b border-zinc-100 dark:border-zinc-800 pb-2 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 select-none">
-                <div>09:00 am</div>
-                <div>12:00 pm</div>
-                <div>02:00 pm</div>
-                <div className="text-zinc-800 dark:text-white font-extrabold bg-zinc-100 dark:bg-zinc-800/80 px-1.5 py-0.5 rounded-md text-center max-w-[65px] mx-auto">03:00 pm</div>
-                <div className="text-center">04:00 pm</div>
-                <div className="text-right">06:00 pm</div>
-              </div>
-
-              {/* Grid timeline visual layout */}
-              <div className="grid grid-cols-6 gap-2 mt-4 min-h-[90px] relative">
-                {/* Vertical dotted grid lines */}
-                <div className="absolute inset-0 flex justify-between pointer-events-none select-none opacity-40">
-                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
-                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
-                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
-                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
-                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
-                  <div className="border-l border-dashed border-zinc-200 dark:border-zinc-800 h-full"></div>
-                </div>
-
-                {scheduleOrders.length > 0 ? (
-                  // Map today's actual pending orders to timeline slots based on deliveryTime
-                  scheduleOrders.slice(0, 4).map((order, idx) => {
-                    const pos = getTimelinePosition(order.deliveryTime);
-                    const colors = [
-                      { col: "pink" },
-                      { col: "indigo" },
-                      { col: "sky" },
-                      { col: "emerald" }
-                    ][idx % 4];
-
+              {sortedScheduleOrders.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {sortedScheduleOrders.map((order, idx) => {
+                    const colors = cardColorMap[idx % cardColorMap.length];
+                    const statusInfo = getStatusColors(order.status);
+                    
                     return (
-                      <div 
+                      <div
                         key={order.id}
                         onClick={() => onNavigate("orders")}
-                        className={`col-start-${pos.start} col-span-${pos.span} bg-${colors.col}-50/50 dark:bg-${colors.col}-950/20 border border-${colors.col}-100 dark:border-${colors.col}-900/30 rounded-2xl p-3 flex flex-col justify-between hover:scale-102 hover:shadow-xs active:scale-98 transition-all cursor-pointer relative z-10`}
+                        className="group bg-zinc-50/50 dark:bg-zinc-900/30 border border-zinc-150 dark:border-zinc-800/80 rounded-2xl p-4 flex flex-col justify-between hover:border-zinc-350 dark:hover:border-zinc-700/80 hover:shadow-xs active:scale-98 transition-all cursor-pointer relative overflow-hidden text-left"
                       >
-                        <div className={`w-1.5 h-6 bg-${colors.col}-500 rounded-full absolute left-2 top-3`}></div>
-                        <div className="pl-3.5">
-                          <p className={`text-xs font-bold text-${colors.col}-700 dark:text-${colors.col}-300 truncate`}>
-                            {order.customerName}
-                          </p>
-                          <p className={`text-[9px] font-semibold text-${colors.col}-500/80 mt-0.5`}>
-                            {order.deliveryTime || "04:00 pm"} ({order.cakeFlavor})
-                          </p>
+                        {/* Status Accent Left Border Line */}
+                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${colors.bar}`} />
+                        
+                        <div className="pl-1.5 space-y-3.5">
+                          {/* Top row: Time and Status */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                              <Clock className="w-3 h-3 text-zinc-400 dark:text-zinc-500" />
+                              {order.deliveryTime || "04:00 pm"}
+                            </span>
+                            <span className={`inline-flex items-center text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${statusInfo.bg}`}>
+                              {order.status}
+                            </span>
+                          </div>
+
+                          {/* Customer & Product details */}
+                          <div className="space-y-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="font-extrabold text-sm text-zinc-850 dark:text-zinc-150 leading-tight group-hover:text-primary-brand dark:group-hover:text-orange-400 transition-colors truncate">
+                                {order.customerName}
+                              </h4>
+                              <span className="text-xs font-extrabold text-zinc-900 dark:text-white shrink-0">
+                                {formatPrice(order.totalAmount)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
+                              <span>{order.customerMobile}</span>
+                              {order.eventType && (
+                                <span className="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-500 dark:text-zinc-400 text-[9px] font-bold">
+                                  {order.eventType}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Specs Section */}
+                          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-[11px] font-semibold text-zinc-650 dark:text-zinc-400">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="text-xs">🍰</span>
+                              <span className="truncate">{order.cakeFlavor}</span>
+                            </div>
+                            <span className="text-[10px] bg-zinc-100/60 dark:bg-zinc-800/40 px-1.5 py-0.5 rounded text-zinc-500 dark:text-zinc-400 font-bold shrink-0">
+                              {order.cakeWeight}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     );
-                  })
-                ) : (
-                  // Empty state visual showing no scheduled dispatches
-                  <div className="col-span-6 flex flex-col items-center justify-center py-6 text-zinc-400 dark:text-zinc-555">
-                    <Calendar className="w-8 h-8 text-zinc-300 dark:text-zinc-800 mb-2" />
-                    <p className="text-xs font-semibold">No deliveries scheduled on this date</p>
-                    <p className="text-[10px] text-zinc-400/80">Click the "+" icon above to schedule a new bake dispatch.</p>
-                  </div>
-                )}
-              </div>
+                  })}
+                </div>
+              ) : (
+                // Empty state visual showing no scheduled dispatches
+                <div className="flex flex-col items-center justify-center py-8 text-zinc-400 dark:text-zinc-500">
+                  <Calendar className="w-9 h-9 text-zinc-300 dark:text-zinc-800 mb-2" />
+                  <p className="text-xs font-semibold">No deliveries scheduled on this date</p>
+                  <p className="text-[10px] text-zinc-400/80 mt-1">Click the "+" icon above to schedule a dispatch.</p>
+                </div>
+              )}
             </div>
           </div>
 

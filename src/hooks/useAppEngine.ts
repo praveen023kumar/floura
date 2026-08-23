@@ -137,6 +137,23 @@ export function useAppEngine() {
     }
   }
 
+  // Automatically refresh IndexedDB states when the window is focused or document visibility changes
+  useEffect(() => {
+    const handleFocusOrVisible = () => {
+      if (document.visibilityState === "visible") {
+        refreshReactStates();
+      }
+    };
+
+    window.addEventListener("focus", handleFocusOrVisible);
+    document.addEventListener("visibilitychange", handleFocusOrVisible);
+
+    return () => {
+      window.removeEventListener("focus", handleFocusOrVisible);
+      document.removeEventListener("visibilitychange", handleFocusOrVisible);
+    };
+  }, []);
+
   // When user logging in or changing accounts, handle partition switching
   useEffect(() => {
     async function handleUserSwitch() {

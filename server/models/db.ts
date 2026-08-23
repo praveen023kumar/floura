@@ -1,6 +1,7 @@
 import sqlite3 from "sqlite3";
 import path from "path";
 import fs from "fs";
+import CryptoJS from "crypto-js";
 import { initSecurityDb } from "./security.model";
 
 const DB_FILE = path.join(process.cwd(), "patisserie.sqlite");
@@ -261,6 +262,29 @@ export async function initDb() {
       createdAt TEXT NOT NULL
     )
   `);
+
+  // Seed default superadmin if table is empty
+  try {
+    const adminCount = await querySqlAll<any>(db, "SELECT count(*) as count FROM admin_users");
+    if (adminCount.length === 0 || adminCount[0].count === 0) {
+      const email = "superadmin@floura.com";
+      const name = "Super Administrator";
+      const password = "FlouraAdmin#SuperSecure!2026";
+      const role = "superadmin";
+      const permissions = ["users", "feedbacks", "setup"];
+      
+      const salt = CryptoJS.lib.WordArray.random(16).toString();
+      const hash = CryptoJS.SHA256(password + salt).toString();
+      
+      await runSql(db, `
+        INSERT INTO admin_users (email, name, password_hash, salt, role, permissions, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [email, name, hash, salt, role, JSON.stringify(permissions), new Date().toISOString()]);
+      console.log("Default superadmin user seeded successfully.");
+    }
+  } catch (err) {
+    console.error("Failed to seed default superadmin user:", err);
+  }
 
   // Safe schema migrations helper (adds user_email & isDeleted if absent in old sqlite tables)
   const tables = ["customers", "orders", "inventory", "recipes", "checklist", "custom_events", "dispatched_notifications", "scheduled_alerts", "bakery_profile", "categories"];

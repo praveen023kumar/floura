@@ -38,10 +38,12 @@ export default function InventoryListView({
   const [lowStockItemsList, setLowStockItemsList] = useState<InventoryItem[]>([]);
 
   const [paginatedInventory, setPaginatedInventory] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [filteredCount, setFilteredCount] = useState<number>(0);
 
   const [inventoryCurrentPage, setInventoryCurrentPage] = useState<number>(1);
   const [inventoryItemsPerPage, setInventoryItemsPerPage] = useState<number>(10);
+  const [editingQuantities, setEditingQuantities] = useState<Record<string, string>>({});
 
   const activeFilterCount = (selectedCategory !== "All" ? 1 : 0) + (searchTerm.trim() ? 1 : 0) + (showOnlyLowStock ? 1 : 0);
 
@@ -116,6 +118,8 @@ export default function InventoryListView({
         setPaginatedInventory(matched.slice(startIndex, startIndex + inventoryItemsPerPage));
       } catch (err) {
         console.error("Failed to query inventory from localDb:", err);
+      } finally {
+        setLoading(false);
       }
     }
     loadDbInventory();
@@ -133,7 +137,50 @@ export default function InventoryListView({
   const handleUpdateQuantity = async (item: InventoryItem, delta: number) => {
     if (!onUpdateInventoryItem) return;
     try {
-      const newQty = Math.max(0, Number((item.quantity + delta).toFixed(2)));
+      const currentValStr = editingQuantities[item.id];
+      const baseQty = currentValStr !== undefined && !isNaN(parseFloat(currentValStr))
+        ? parseFloat(currentValStr)
+        : item.quantity;
+      const newQty = Math.max(0, Number((baseQty + delta).toFixed(2)));
+      
+      if (currentValStr !== undefined) {
+        setEditingQuantities((prev) => {
+          const copy = { ...prev };
+          delete copy[item.id];
+          return copy;
+        });
+      }
+
+      await onUpdateInventoryItem({
+        ...item,
+        quantity: newQty
+      });
+    } catch (e) {
+      console.error("Failed to adjust inventory quantity:", e);
+      window.showToast?.("Failed to adjust quantity.", "error");
+    }
+  };
+
+  const handleCommitQuantity = async (item: InventoryItem) => {
+    const valStr = editingQuantities[item.id];
+    if (valStr === undefined) return;
+
+    setEditingQuantities((prev) => {
+      const copy = { ...prev };
+      delete copy[item.id];
+      return copy;
+    });
+
+    const parsed = parseFloat(valStr);
+    if (isNaN(parsed) || parsed < 0) {
+      return;
+    }
+
+    const newQty = Number(parsed.toFixed(2));
+    if (newQty === item.quantity) return;
+
+    if (!onUpdateInventoryItem) return;
+    try {
       await onUpdateInventoryItem({
         ...item,
         quantity: newQty
@@ -146,23 +193,6 @@ export default function InventoryListView({
 
   const renderFilterGroups = () => (
     <div className="space-y-5">
-      {/* Search Input */}
-      <div className="space-y-1.5">
-        <label className="text-[10px] text-zinc-450 dark:text-zinc-500 font-bold uppercase tracking-wider font-sans">
-          Search Products
-        </label>
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-450 dark:text-zinc-500" />
-          <input
-            type="text"
-            placeholder="Search name, supplier..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-zinc-50 dark:bg-zinc-950 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-500 font-medium"
-          />
-        </div>
-      </div>
-
       {/* Category Choices */}
       <div className="space-y-2">
         <label className="text-[10px] text-zinc-450 dark:text-zinc-500 font-bold uppercase tracking-wider font-sans">
@@ -335,49 +365,6 @@ export default function InventoryListView({
         </section>
       )}
 
-      {/* Active filter chips */}
-      {activeFilterCount > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {selectedCategory !== "All" && (
-            <button
-              type="button"
-              onClick={() => setSelectedCategory("All")}
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              <span>Category: {selectedCategory}</span>
-              <X className="w-3 h-3" aria-hidden="true" />
-            </button>
-          )}
-          {searchTerm.trim() && (
-            <button
-              type="button"
-              onClick={() => setSearchTerm("")}
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              <span>Search: "{searchTerm}"</span>
-              <X className="w-3 h-3" aria-hidden="true" />
-            </button>
-          )}
-          {showOnlyLowStock && (
-            <button
-              type="button"
-              onClick={() => setShowOnlyLowStock(false)}
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              <span>Low Stock Only</span>
-              <X className="w-3 h-3" aria-hidden="true" />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={clearAllFilters}
-            className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-655 hover:underline px-1.5 cursor-pointer"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
-
       {/* Main Stock Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Desktop Side Filters Card */}
@@ -403,13 +390,99 @@ export default function InventoryListView({
         <div className="lg:col-span-9 space-y-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-800 shadow-xs flex flex-col min-h-[350px]">
             <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4 flex justify-between items-center">
-              <span className="text-xs font-bold text-zinc-500 dark:text-zinc-550 uppercase tracking-wider">
+              <span className="text-xs font-bold text-zinc-500 dark:text-zinc-555 uppercase tracking-wider">
                 CURRENT STOCK ITEMS ({filteredCount})
               </span>
             </div>
 
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto max-h-[600px] pr-1.5 custom-scrollbar">
-              {paginatedInventory.length > 0 ? (
+            {/* Search Input */}
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="w-4.5 h-4.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Search name, supplier..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-500 font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Active filter chips */}
+            {activeFilterCount > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 mb-4 animate-fade-in">
+                {selectedCategory !== "All" && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("All")}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <span>Category: {selectedCategory}</span>
+                    <X className="w-3 h-3" aria-hidden="true" />
+                  </button>
+                )}
+                {searchTerm.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <span>Search: "{searchTerm}"</span>
+                    <X className="w-3 h-3" aria-hidden="true" />
+                  </button>
+                )}
+                {showOnlyLowStock && (
+                  <button
+                    type="button"
+                    onClick={() => setShowOnlyLowStock(false)}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <span>Low Stock Only</span>
+                    <X className="w-3 h-3" aria-hidden="true" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-655 hover:underline px-1.5 cursor-pointer"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto max-h-[600px] p-1 pb-3 pr-2.5 custom-scrollbar">
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={`skeleton-${i}`}
+                    className="bg-white dark:bg-zinc-850 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-750/70 hover:border-zinc-250 dark:hover:bg-zinc-800/80 hover:shadow-sm transition-all flex flex-col justify-between h-full relative animate-pulse"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-1/3 animate-pulse" />
+                      <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-1/4 rounded-full animate-pulse" />
+                    </div>
+                    <div className="flex-1 flex flex-col justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
+                        <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2 animate-pulse" />
+                      </div>
+                      <div className="space-y-2.5">
+                        <div className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-full h-1.5 overflow-hidden animate-pulse" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="h-8 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse" />
+                          <div className="h-8 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
+                      <div className="h-10 bg-zinc-200 dark:bg-zinc-700 rounded-xl w-32 animate-pulse" />
+                      <div className="w-10 h-10 rounded-xl bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+                    </div>
+                  </div>
+                ))
+              ) : paginatedInventory.length > 0 ? (
                 paginatedInventory.map((item) => {
                   const isLow = item.quantity < item.minStockLevel;
                   const fillPercent = Math.min((item.quantity / (item.minStockLevel * 2)) * 100, 100);
@@ -488,11 +561,31 @@ export default function InventoryListView({
                             -
                           </button>
 
-                          <div className="px-3.5 text-center min-w-[68px]">
-                            <span className="block text-sm font-bold text-zinc-800 dark:text-zinc-50 leading-tight">
-                              {item.quantity}
-                            </span>
-                            <span className="block text-[8px] uppercase tracking-wider font-bold text-zinc-550">
+                          <div className="px-3.5 text-center min-w-[68px] flex flex-col items-center justify-center">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={editingQuantities[item.id] !== undefined ? editingQuantities[item.id] : String(item.quantity)}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                                  setEditingQuantities(prev => ({ ...prev, [item.id]: val }));
+                                }
+                              }}
+                              onFocus={(e) => {
+                                setEditingQuantities(prev => ({ ...prev, [item.id]: String(item.quantity) }));
+                                setTimeout(() => e.target.select(), 0);
+                              }}
+                              onBlur={() => handleCommitQuantity(item)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleCommitQuantity(item);
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                              }}
+                              className="w-14 text-center text-sm font-bold text-zinc-800 dark:text-zinc-50 bg-transparent border-0 border-b border-transparent focus:border-primary-brand dark:focus:border-orange-500 focus:bg-zinc-100 dark:focus:bg-zinc-850 rounded px-1 py-0.5 leading-tight focus:outline-none transition-all"
+                            />
+                            <span className="block text-[8px] uppercase tracking-wider font-bold text-zinc-550 mt-0.5">
                               {item.unit}
                             </span>
                           </div>

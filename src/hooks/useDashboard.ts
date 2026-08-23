@@ -9,7 +9,20 @@ export interface UseDashboardProps {
 export function useDashboard({ checklist }: UseDashboardProps) {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const [todayStr, setTodayStr] = useState(() => new Date().toISOString().split("T")[0]);
+
+  useEffect(() => {
+    const updateToday = () => {
+      const current = new Date().toISOString().split("T")[0];
+      setTodayStr(current);
+    };
+    window.addEventListener("focus", updateToday);
+    document.addEventListener("visibilitychange", updateToday);
+    return () => {
+      window.removeEventListener("focus", updateToday);
+      document.removeEventListener("visibilitychange", updateToday);
+    };
+  }, []);
 
   const todayMappedChecklist = useMemo(() => {
     if (!checklist) return [];
@@ -113,7 +126,7 @@ export function useDashboard({ checklist }: UseDashboardProps) {
       }
     }
     fetchDashboardStats();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, todayStr]);
 
   return {
     ...stats,

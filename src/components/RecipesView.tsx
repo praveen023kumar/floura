@@ -17,6 +17,7 @@ import { useRecipes } from "../hooks/useRecipes";
 export default function RecipesView() {
   const navigate = useNavigate();
   const {
+    loading,
     searchTerm,
     setSearchTerm,
     selectedCategory,
@@ -255,8 +256,33 @@ export default function RecipesView() {
               </div>
             )}
 
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto max-h-[600px] pr-1.5 custom-scrollbar pb-2">
-              {paginatedRecipes.length > 0 ? (
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto max-h-[600px] p-1 pb-3 pr-2.5 custom-scrollbar">
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={`skeleton-${i}`}
+                    className="bg-white dark:bg-zinc-850 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-750/70 shadow-sm flex flex-col justify-between select-none animate-pulse"
+                  >
+                    <div className="flex gap-4">
+                      {/* Image Box Skeleton */}
+                      <div className="w-22 h-22 rounded-xl bg-zinc-200 dark:bg-zinc-800 shrink-0 animate-pulse" />
+                      {/* Details Skeleton */}
+                      <div className="flex-1 flex flex-col justify-between py-0.5 space-y-2">
+                        <div className="space-y-1.5">
+                          <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/3 animate-pulse" />
+                          <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
+                        </div>
+                        <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/4 animate-pulse" />
+                      </div>
+                    </div>
+                    {/* Footer Info Skeleton */}
+                    <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-700/60 flex justify-between items-center">
+                      <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/4 animate-pulse" />
+                      <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/5 animate-pulse" />
+                    </div>
+                  </div>
+                ))
+              ) : paginatedRecipes.length > 0 ? (
                 paginatedRecipes.map((r) => {
                   // Dynamic category tag styles
                   const getCategoryStyles = (category: string) => {
@@ -289,6 +315,10 @@ export default function RecipesView() {
                             src={r.imageUrl || "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=300"}
                             alt={r.name}
                             className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=300";
+                            }}
                           />
                         </div>
                         {/* Details */}

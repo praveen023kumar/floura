@@ -46,6 +46,7 @@ export default function OrdersList({
   const [calYear, setCalYear] = React.useState(today.getFullYear());
 
   const {
+    loading,
     orders,
     filter,
     setFilter,
@@ -580,8 +581,33 @@ export default function OrdersList({
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.18 }}
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {paginatedOrders.length > 0 ? (
+               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {loading ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={`skeleton-${i}`}
+                      className="bg-white dark:bg-zinc-800 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-700/60 shadow-sm animate-pulse flex flex-col gap-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0 w-full">
+                          <div className="w-9 h-9 rounded-xl bg-zinc-200 dark:bg-zinc-700 shrink-0 animate-pulse" />
+                          <div className="min-w-0 w-full space-y-2">
+                            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
+                            <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2 animate-pulse" />
+                            <div className="h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded w-1/3 animate-pulse" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5 pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/4 animate-pulse" />
+                          <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-1/5 animate-pulse" />
+                        </div>
+                        <div className="h-4 bg-zinc-205 dark:bg-zinc-700 rounded w-1/4 rounded-full animate-pulse" />
+                      </div>
+                    </div>
+                  ))
+                ) : paginatedOrders.length > 0 ? (
                   paginatedOrders.map((o) => {
                     const statusInfo = getStatusColors(o.status);
                     return (

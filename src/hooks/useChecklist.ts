@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { type ChecklistItem } from "../types";
 
 export interface UseChecklistProps {
@@ -18,14 +18,41 @@ export function useChecklist({
   const [filterMode, setFilterMode] = useState<"all" | "pending" | "completed">("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
-  const yesterdayStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split("T")[0];
+  const [todayStr, setTodayStr] = useState(() => new Date().toISOString().split("T")[0]);
+
+  useEffect(() => {
+    const updateToday = () => {
+      const current = new Date().toISOString().split("T")[0];
+      setTodayStr(current);
+    };
+    window.addEventListener("focus", updateToday);
+    document.addEventListener("visibilitychange", updateToday);
+    return () => {
+      window.removeEventListener("focus", updateToday);
+      document.removeEventListener("visibilitychange", updateToday);
+    };
   }, []);
 
+  const yesterdayStr = useMemo(() => {
+    const parts = todayStr.split("-");
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    d.setDate(d.getDate() - 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }, [todayStr]);
+
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+
+  const prevTodayStrRef = useRef(todayStr);
+  useEffect(() => {
+    const prevToday = prevTodayStrRef.current;
+    if (selectedDate === prevToday) {
+      setSelectedDate(todayStr);
+    }
+    prevTodayStrRef.current = todayStr;
+  }, [todayStr, selectedDate]);
 
   const formatChecklistDate = (dateStr: string) => {
     try {

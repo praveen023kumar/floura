@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { type Order, type Customer, type CustomScheduledAlert, type DispatchedNotification } from "../types";
 import { localDb } from "../db";
 
@@ -26,7 +26,32 @@ export function useCalendar({
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDateStr, setSelectedDateStr] = useState<string | null>(new Date().toISOString().slice(0, 10));
+  
+  const [todayStr, setTodayStr] = useState(() => new Date().toISOString().slice(0, 10));
+
+  useEffect(() => {
+    const updateToday = () => {
+      const current = new Date().toISOString().slice(0, 10);
+      setTodayStr(current);
+    };
+    window.addEventListener("focus", updateToday);
+    document.addEventListener("visibilitychange", updateToday);
+    return () => {
+      window.removeEventListener("focus", updateToday);
+      document.removeEventListener("visibilitychange", updateToday);
+    };
+  }, []);
+
+  const [selectedDateStr, setSelectedDateStr] = useState<string | null>(todayStr);
+
+  const prevTodayStrRef = useRef(todayStr);
+  useEffect(() => {
+    const prevToday = prevTodayStrRef.current;
+    if (selectedDateStr === prevToday) {
+      setSelectedDateStr(todayStr);
+    }
+    prevTodayStrRef.current = todayStr;
+  }, [todayStr, selectedDateStr]);
 
   const [scheduledAlerts, setScheduledAlerts] = useState<CustomScheduledAlert[]>([]);
   const [dispatchedLogs, setDispatchedLogs] = useState<DispatchedNotification[]>([]);

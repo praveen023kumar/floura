@@ -179,6 +179,8 @@ export default function InventoryCreateView({
               <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Category</label>
               <CreatableSelect
                 styles={customSelectStyles}
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
                 placeholder="Select or type..."
                 value={formInputs.category ? { value: formInputs.category, label: formInputs.category } : null}
                 options={dynamicCategories.map((c) => ({ value: c, label: c }))}
@@ -219,6 +221,8 @@ export default function InventoryCreateView({
                 <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Unit</label>
                 <CreatableSelect
                   styles={customSelectStyles}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
                   placeholder="Select or type..."
                   value={formInputs.unit ? { value: formInputs.unit, label: formInputs.unit } : null}
                   options={dynamicUnits.map((u) => ({ value: u, label: u }))}
@@ -297,18 +301,18 @@ export default function InventoryCreateView({
             </div>
           </div>
 
-          <div className="flex gap-3 pt-6 border-t border-zinc-100 dark:border-zinc-800">
+          <div className="flex justify-end gap-3 pt-6 border-t border-zinc-100 dark:border-zinc-800">
             <button
               type="button"
               onClick={() => navigate("/inventory")}
-              className="w-full py-3 border border-zinc-250 dark:border-zinc-700 text-zinc-650 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-bold rounded-full transition-colors cursor-pointer"
+              className="px-6 py-2.5 border border-zinc-250 dark:border-zinc-700 text-zinc-655 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-bold rounded-full transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving || success}
-              className={`w-full py-3 text-xs font-bold rounded-full transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 active:scale-95 ${
+              className={`px-8 py-2.5 text-xs font-bold rounded-full transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 active:scale-95 ${
                 success
                   ? "bg-emerald-500 hover:bg-emerald-600 text-white"
                   : "bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white"

@@ -74,23 +74,6 @@ export default function ChecklistView({
 
   const renderFilterGroups = () => (
     <div className="space-y-5">
-      {/* Search Input */}
-      <div className="space-y-1.5">
-        <label className="text-[10px] text-zinc-450 dark:text-zinc-500 font-bold uppercase tracking-wider font-sans">
-          Search Tasks
-        </label>
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-555" />
-          <input
-            type="text"
-            placeholder="Search prep tasks..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-zinc-50 dark:bg-zinc-950 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-500 font-medium"
-          />
-        </div>
-      </div>
-
       {/* Date Filters */}
       <div className="space-y-2">
         <label className="text-[10px] text-zinc-450 dark:text-zinc-500 font-bold uppercase tracking-wider font-sans">
@@ -292,48 +275,7 @@ export default function ChecklistView({
         )}
       </AnimatePresence>
 
-      {/* Active filter chips */}
-      {activeFilterCount > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {filterMode !== "all" && (
-            <button
-              type="button"
-              onClick={() => setFilterMode("all")}
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
-            >
-              <span>Status: {filterMode}</span>
-              <X className="w-3 h-3" aria-hidden="true" />
-            </button>
-          )}
-          {searchTerm.trim() && (
-            <button
-              type="button"
-              onClick={() => setSearchTerm("")}
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
-            >
-              <span>Search: "{searchTerm}"</span>
-              <X className="w-3 h-3" aria-hidden="true" />
-            </button>
-          )}
-          {selectedDate !== todayStr && (
-            <button
-              type="button"
-              onClick={() => setSelectedDate(todayStr)}
-              className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
-            >
-              <span>Date: Custom</span>
-              <X className="w-3 h-3" aria-hidden="true" />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={clearAllFilters}
-            className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-655 hover:underline px-1.5 cursor-pointer"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
+
 
       {/* Filters and Checklist Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -365,7 +307,64 @@ export default function ChecklistView({
             </span>
           </div>
 
-          <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto max-h-[600px] pr-1.5 custom-scrollbar">
+          {/* Search Input */}
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-555" />
+              <input
+                type="text"
+                placeholder="Search prep tasks..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-950 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-500 font-medium"
+              />
+            </div>
+          </div>
+
+          {/* Active filter chips */}
+          {activeFilterCount > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mb-4 animate-fade-in">
+              {filterMode !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setFilterMode("all")}
+                  className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
+                >
+                  <span>Status: {filterMode}</span>
+                  <X className="w-3 h-3" aria-hidden="true" />
+                </button>
+              )}
+              {searchTerm.trim() && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
+                >
+                  <span>Search: "{searchTerm}"</span>
+                  <X className="w-3 h-3" aria-hidden="true" />
+                </button>
+              )}
+              {selectedDate !== todayStr && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate(todayStr)}
+                  className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-85 transition-opacity"
+                >
+                  <span>Date: Custom</span>
+                  <X className="w-3 h-3" aria-hidden="true" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-655 hover:underline px-1.5 cursor-pointer"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+
+          <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto max-h-[600px] p-1 pb-3 pr-2.5 custom-scrollbar">
             {paginatedChecklist.length > 0 ? (
               <>
                 <AnimatePresence initial={false}>

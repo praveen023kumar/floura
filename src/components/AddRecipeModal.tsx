@@ -7,6 +7,43 @@ import { type Recipe } from "../types";
 import { X, Plus, Trash2, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
+const validateImageUrl = (url: string): string | null => {
+  if (!url) return null;
+  
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch (_) {
+    return "Please enter a valid absolute URL starting with http:// or https://";
+  }
+
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    return "URL must use http:// or https:// protocol";
+  }
+
+  const hostname = parsedUrl.hostname;
+  const isAllowedDomain = 
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname === "images.unsplash.com" ||
+    hostname === "googleusercontent.com" ||
+    hostname.endsWith(".googleusercontent.com");
+
+  if (!isAllowedDomain) {
+    return "This domain violates Content Security Policy. Only images from unsplash.com and googleusercontent.com are allowed.";
+  }
+
+  const pathname = parsedUrl.pathname.toLowerCase();
+  const hasImageExtension = /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(pathname);
+  const isUnsplashDirectImage = hostname === "images.unsplash.com" && pathname.startsWith("/photo-");
+
+  if (!hasImageExtension && !isUnsplashDirectImage) {
+    return "URL must link directly to an image file (e.g. ending in .jpg, .png, .webp) rather than a webpage.";
+  }
+
+  return null;
+};
+
 interface AddRecipeModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -83,6 +120,12 @@ export default function AddRecipeModal({
       return;
     }
 
+    const imgError = validateImageUrl(imageUrl);
+    if (imgError) {
+      window.showToast?.(imgError, "error");
+      return;
+    }
+
     setSaving(true);
     try {
       await onAddRecipe({
@@ -94,7 +137,7 @@ export default function AddRecipeModal({
           name: ing.name,
           qty: Number(ing.qty) || 0,
         })),
-        imageUrl: imageUrl || "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=120"
+        imageUrl: imageUrl || ""
       });
 
       setSuccess(true);
@@ -171,6 +214,8 @@ export default function AddRecipeModal({
                   <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Category</label>
                   <CreatableSelect
                     styles={customSelectStyles}
+                    menuPortalTarget={document.body}
+                    menuPosition="fixed"
                     placeholder="Select or type..."
                     value={category ? { value: category, label: category } : null}
                     options={dynamicRecipeCategories.map((c) => ({ value: c, label: c }))}
@@ -206,6 +251,8 @@ export default function AddRecipeModal({
                   <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Unit</label>
                   <CreatableSelect
                     styles={customSelectStyles}
+                    menuPortalTarget={document.body}
+                    menuPosition="fixed"
                     placeholder="Select or type..."
                     value={yieldUnit ? { value: yieldUnit, label: yieldUnit } : null}
                     options={dynamicYieldUnits.map((u) => ({ value: u, label: u }))}

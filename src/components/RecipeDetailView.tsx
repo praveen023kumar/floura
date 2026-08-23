@@ -224,6 +224,10 @@ export default function RecipeDetailView() {
                   src={recipe.imageUrl || "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=150"}
                   alt={recipe.name}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=150";
+                  }}
                 />
               </div>
               <div className="text-left font-sans text-xs text-zinc-500">

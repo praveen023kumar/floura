@@ -155,6 +155,8 @@ export default function CustomerCreateView({
               <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Type Segment</label>
               <Select
                 styles={customSelectStyles}
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
                 isSearchable={false}
                 value={{ value: formData.type, label: formData.type }}
                 options={[
@@ -202,18 +204,18 @@ export default function CustomerCreateView({
             />
           </div>
 
-          <div className="flex gap-3 pt-6 border-t border-zinc-100 dark:border-zinc-800">
+          <div className="flex justify-end gap-3 pt-6 border-t border-zinc-100 dark:border-zinc-800">
             <button
               type="button"
               onClick={() => navigate("/customers")}
-              className="w-full py-3 border border-zinc-250 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-bold rounded-full transition-colors cursor-pointer"
+              className="px-6 py-2.5 border border-zinc-250 dark:border-zinc-700 text-zinc-650 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-bold rounded-full transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving || success}
-              className="w-full py-3 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white text-xs font-bold rounded-full transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 active:scale-95"
+              className="px-8 py-2.5 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white text-xs font-bold rounded-full transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 active:scale-95"
             >
               {saving ? (
                 <span>Saving Record...</span>

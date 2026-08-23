@@ -324,7 +324,7 @@ export default function OrderCreate({
         </div>
 
         <form onSubmit={handleFormSubmit} className="space-y-6 text-left">
-          <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-6 custom-scrollbar text-left">
+          <div className="max-h-[60vh] overflow-y-auto p-1 pb-4 pr-3 space-y-6 custom-scrollbar text-left">
             <AnimatePresence mode="wait">
             {currentStep === 1 && (
               <motion.div
@@ -349,6 +349,8 @@ export default function OrderCreate({
                       <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Select customer profile</label>
                       <Select
                         styles={customSelectStyles}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                         className="react-select-container"
                         classNamePrefix="react-select"
                         placeholder="Search / Select profile..."
@@ -413,6 +415,8 @@ export default function OrderCreate({
                       <label className="text-xs font-bold text-zinc-500">Event Type</label>
                       <CreatableSelect
                         styles={customSelectStyles}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                         placeholder="Select or type custom..."
                         value={formData.eventType ? { value: formData.eventType, label: formData.eventType } : null}
                         options={dynamicEventTypes}
@@ -453,6 +457,8 @@ export default function OrderCreate({
                       <label className="text-xs font-bold text-zinc-500">Delivery/Pickup Time</label>
                       <Select
                         styles={customSelectStyles}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                         isSearchable={true}
                         placeholder="Select 30-min slot"
                         value={
@@ -538,6 +544,8 @@ export default function OrderCreate({
                       <label className="text-xs font-bold text-zinc-550">Shape</label>
                       <Select
                         styles={customSelectStyles}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                         isSearchable={false}
                         value={{ value: formData.cakeShape, label: formData.cakeShape }}
                         options={[
@@ -554,6 +562,8 @@ export default function OrderCreate({
                       <label className="text-xs font-bold text-zinc-555">Weight</label>
                       <Select
                         styles={customSelectStyles}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                         isSearchable={false}
                         value={{ value: formData.cakeWeight, label: formData.cakeWeight }}
                         options={[
@@ -571,6 +581,8 @@ export default function OrderCreate({
                       <label className="text-xs font-bold text-zinc-555">Flavor</label>
                       <CreatableSelect
                         styles={customSelectStyles}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
                         placeholder="Select or type custom..."
                         value={formData.cakeFlavor ? { value: formData.cakeFlavor, label: formData.cakeFlavor } : null}
                         options={dynamicFlavors}
@@ -1028,12 +1040,12 @@ export default function OrderCreate({
           </div>
 
           {/* Stepper Navigation Buttons */}
-          <div className="flex items-center gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-700/60">
+          <div className="flex justify-end items-center gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-700/60">
             {currentStep > 1 && (
               <button
                 type="button"
                 onClick={() => setCurrentStep((prev) => prev - 1)}
-                className="flex-1 py-3 px-6 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+                className="px-6 py-2.5 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
               >
                 <ChevronLeft className="w-4 h-4" /> Back
               </button>
@@ -1049,7 +1061,7 @@ export default function OrderCreate({
                     setCurrentStep(3);
                   }
                 }}
-                className="flex-1 py-3 px-6 rounded-full bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-md"
+                className="px-8 py-2.5 rounded-full bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-md"
               >
                 Next <ChevronRight className="w-4 h-4" />
               </button>
@@ -1060,7 +1072,7 @@ export default function OrderCreate({
                 key="wizard-submit-btn"
                 type="submit"
                 disabled={saving || saveSuccess}
-                className={`flex-1 py-3 px-6 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl cursor-pointer active:scale-95 ${
+                className={`px-8 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl cursor-pointer active:scale-95 ${
                   saveSuccess
                     ? "bg-emerald-500 text-white"
                     : "bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white"

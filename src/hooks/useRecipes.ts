@@ -31,6 +31,7 @@ export function useRecipes({
 
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [paginatedRecipes, setPaginatedRecipes] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [filteredCount, setFilteredCount] = useState<number>(0);
   const [recipeList, setRecipeList] = useState<Recipe[]>([]);
 
@@ -149,6 +150,8 @@ export function useRecipes({
         setPaginatedRecipes(matched.slice(startIndex, startIndex + recipesItemsPerPage));
       } catch (err) {
         console.error("Failed to query recipes from localDb:", err);
+      } finally {
+        setLoading(false);
       }
     }
     loadDbRecipes();
@@ -169,6 +172,7 @@ export function useRecipes({
   };
 
   return {
+    loading,
     refreshTrigger,
     viewMode,
     setViewMode,

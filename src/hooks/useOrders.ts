@@ -31,6 +31,7 @@ export function useOrders({
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<"list" | "form" | "detail">(initialViewMode);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [bakeryProfile, setBakeryProfile] = useState<BakeryProfile | null>(null);
@@ -415,6 +416,8 @@ export function useOrders({
         }
       } catch (err) {
         console.error("Failed to query orders from localDb:", err);
+      } finally {
+        setLoading(false);
       }
     }
     loadDbOrders();
@@ -853,6 +856,7 @@ export function useOrders({
   };
 
   return {
+    loading,
     orders,
     viewMode,
     setViewMode,

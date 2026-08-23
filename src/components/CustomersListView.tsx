@@ -17,6 +17,7 @@ import {
   X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import Avatar from "./Avatar";
 
 export default function CustomersListView() {
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ export default function CustomersListView() {
   };
 
   const [paginatedCustomers, setPaginatedCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [filteredCount, setFilteredCount] = useState<number>(0);
   const [customerOrderCounts, setCustomerOrderCounts] = useState<{ [id: string]: number }>({});
 
@@ -117,6 +119,8 @@ export default function CustomersListView() {
         setPaginatedCustomers(matched.slice(startIndex, startIndex + customersItemsPerPage));
       } catch (err) {
         console.error("Failed to query customers from localDb:", err);
+      } finally {
+        setLoading(false);
       }
     }
     loadCustomers();
@@ -438,8 +442,39 @@ export default function CustomersListView() {
             )}
 
             {/* Profile database matching exact screenshots profiles */}
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto max-h-[600px] pr-1.5 custom-scrollbar">
-              {paginatedCustomers.length > 0 ? (
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto max-h-[600px] p-1 pb-3 pr-2.5 custom-scrollbar">
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={`skeleton-${i}`}
+                    className="bg-white dark:bg-zinc-800 rounded-2xl p-5 border border-zinc-100 dark:border-zinc-700/60 shadow-sm flex flex-col gap-4 text-left animate-pulse"
+                  >
+                    <div className="flex gap-3">
+                      <div className="w-14 h-14 rounded-xl bg-zinc-200 dark:bg-zinc-700 shrink-0 animate-pulse" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
+                        <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2 animate-pulse" />
+                        <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/4 animate-pulse" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 py-3 border-y border-zinc-100 dark:border-zinc-700/60">
+                      <div className="space-y-1.5">
+                        <div className="h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
+                        <div className="h-3.5 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2 animate-pulse" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
+                        <div className="h-3.5 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2 animate-pulse" />
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <div className="flex-1 h-8 bg-zinc-200 dark:bg-zinc-700 rounded-full animate-pulse" />
+                      <div className="flex-1 h-8 bg-zinc-200 dark:bg-zinc-700 rounded-full animate-pulse" />
+                      <div className="flex-1 h-8 bg-zinc-200 dark:bg-zinc-700 rounded-full animate-pulse" />
+                    </div>
+                  </div>
+                ))
+              ) : paginatedCustomers.length > 0 ? (
                 paginatedCustomers.map((c) => (
                   <div
                     key={c.id}
@@ -447,23 +482,12 @@ export default function CustomersListView() {
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex gap-3">
-                        <div className="w-14 h-14 rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-700 shrink-0 border border-zinc-150 shadow-sm">
-                          <img
-                            src={
-                              c.name === "Amara Bennett"
-                                ? "https://lh3.googleusercontent.com/aida-public/AB6AXuDvK-VSYM6ttAvU1bQXLmi73g7r7BjZdgoXpdKSkHYZ1g0ZY5xMX01iazAnRo1Kt0S_bdJGFeyASi3Ip1BaewMWXmh87UaPieW0r94Hl270EPIl-_n_72yuZDAlMRFUOWQ2O6oRfwxv-JkYkPmzCSqvX47Q3LqjKPsO4pcg8z6NTfVdFjz2FBTewxhPGyWQNvo-cF0OJMRFo7AFkkxSNWjuQq6yiKBlHkczPxB2E-n18AJjwZS6P9y981d0x2BBPFXalmJTEfm526ZJ"
-                                : c.name === "Julian Thorne"
-                                ? "https://lh3.googleusercontent.com/aida-public/AB6AXuCj9ksb_nWgm3VZm5cs68O1bNLb-icNtltnNe0PIaaYOp0JAmkjXPgGE8g552PW8ontBTlK2do5G9RoaToHYlZXVW3_y_uZLie933eIu58Ol3jUhMmNUNhd66vGbBw759LTR1aDaCekC21tGqvHuoFQ2fC0x9MrJWvAjrPpYbv8IplhvUeXK3G48KLeQQ25ZG1AOm9zzo2Rq83KSHxHEUXXxCJ0zF5OIYDjdM4V4VK5LJHwE-Dtem1Dq0d3wYka22WQ5IlR9ZBkC91e"
-                                : c.name === "Sophie Laurent"
-                                ? "https://lh3.googleusercontent.com/aida-public/AB6AXuD3fRKXMsxoORcPTki9B8GeFlRQabcWEMOZSTuU8GSE4KEZ92fB5c8s2pUYN_sbmxszTYaXy4T3M182Q1MQAFc6oUkQIKd4xYR412OscimC8Rkvs2XE_-D03BBSzV1x_U4kjJz47U5LeGSlFe9yWJu4759Mq5GUcjX-F3E1YRgbbu2KG1iQQ4QnpsmDVTPXziJNFjl4mT-IY5tQsFC0g1b5xcEZqQAn7wI67RXuWkd4Bb6FXeIfUWl2lX5zDQmVYttd2K4s93UhHamb"
-                                : c.name === "David Chen"
-                                ? "https://lh3.googleusercontent.com/aida-public/AB6AXuAO_WNwNsr-58WQE8m0OkygFVqzFl7hSipi2DaAgdnGRIOwo_ZFMsw4E2NgMTTvwP2QMuXyShhgR3ve9WsRsmh6hoAct1lGLFK3aEnso3rEzGif5wu9CUQbTba9x7Ey6fs6j6zKEOM_ITNIXJO7FgOycG1ilDbGDLaMpWBRneDpo9xxUveTlssiTjvcaREvxvpc3ca_4Xg8GyBiNFS5vhV8_rXNyGpxRs6mZEFnLGeUFHdGr3v1TDU6_WwQtWcnC1ZUUozss_NrwGpw"
-                                : `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(c.name)}`
-                            }
-                            alt={c.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+                        <Avatar
+                          avatarKey=""
+                          name={c.name}
+                          useIconFallback={true}
+                          className="w-14 h-14 rounded-xl border border-zinc-150 shadow-sm"
+                        />
                         <div>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <h3 className="font-serif font-bold text-sm text-zinc-800 dark:text-zinc-200">{c.name}</h3>

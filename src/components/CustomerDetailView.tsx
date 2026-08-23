@@ -13,6 +13,7 @@ import {
   Edit
 } from "lucide-react";
 import { motion } from "motion/react";
+import Avatar from "./Avatar";
 
 export default function CustomerDetailView() {
   const navigate = useNavigate();
@@ -144,23 +145,12 @@ export default function CustomerDetailView() {
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-white dark:bg-zinc-800 rounded-3xl p-6 border border-zinc-100 dark:border-zinc-700/60 shadow-sm space-y-4">
             <div className="flex flex-col items-center text-center pb-4 border-b border-zinc-100 dark:border-zinc-700/60">
-              <div className="w-24 h-24 rounded-full overflow-hidden bg-zinc-100 dark:bg-zinc-700 border-2 border-primary-brand/20 shadow-md mb-3">
-                <img
-                  src={
-                    selectedCustomer.name === "Amara Bennett"
-                      ? "https://lh3.googleusercontent.com/aida-public/AB6AXuDvK-VSYM6ttAvU1bQXLmi73g7r7BjZdgoXpdKSkHYZ1g0ZY5xMX01iazAnRo1Kt0S_bdJGFeyASi3Ip1BaewMWXmh87UaPieW0r94Hl270EPIl-_n_72yuZDAlMRFUOWQ2O6oRfwxv-JkYkPmzCSqvX47Q3LqjKPsO4pcg8z6NTfVdFjz2FBTewxhPGyWQNvo-cF0OJMRFo7AFkkxSNWjuQq6yiKBlHkczPxB2E-n18AJjwZS6P9y981d0x2BBPFXalmJTEfm526ZJ"
-                      : selectedCustomer.name === "Julian Thorne"
-                      ? "https://lh3.googleusercontent.com/aida-public/AB6AXuCj9ksb_nWgm3VZm5cs68O1bNLb-icNtltnNe0PIaaYOp0JAmkjXPgGE8g552PW8ontBTlK2do5G9RoaToHYlZXVW3_y_uZLie933eIu58Ol3jUhMmNUNhd66vGbBw759LTR1aDaCekC21tGqvHuoFQ2fC0x9MrJWvAjrPpYbv8IplhvUeXK3G48KLeQQ25ZG1AOm9zzo2Rq83KSHxHEUXXxCJ0zF5OIYDjdM4V4VK5LJHwE-Dtem1Dq0d3wYka22WQ5IlR9ZBkC91e"
-                      : selectedCustomer.name === "Sophie Laurent"
-                      ? "https://lh3.googleusercontent.com/aida-public/AB6AXuD3fRKXMsxoORcPTki9B8GeFlRQabcWEMOZSTuU8GSE4KEZ92fB5c8s2pUYN_sbmxszTYaXy4T3M182Q1MQAFc6oUkQIKd4xYR412OscimC8Rkvs2XE_-D03BBSzV1x_U4kjJz47U5LeGSlFe9yWJu4759Mq5GUcjX-F3E1YRgbbu2KG1iQQ4QnpsmDVTPXziJNFjl4mT-IY5tQsFC0g1b5xcEZqQAn7wI67RXuWkd4Bb6FXeIfUWl2lX5zDQmVYttd2K4s93UhHamb"
-                      : selectedCustomer.name === "David Chen"
-                      ? "https://lh3.googleusercontent.com/aida-public/AB6AXuAO_WNwNsr-58WQE8m0OkygFVqzFl7hSipi2DaAgdnGRIOwo_ZFMsw4E2NgMTTvwP2QMuXyShhgR3ve9WsRsmh6hoAct1lGLFK3aEnso3rEzGif5wu9CUQbTba9x7Ey6fs6j6zKEOM_ITNIXJO7FgOycG1ilDbGDLaMpWBRneDpo9xxUveTlssiTjvcaREvxvpc3ca_4Xg8GyBiNFS5vhV8_rXNyGpxRs6mZEFnLGeUFHdGr3v1TDU6_WwQtWcnC1ZUUozss_NrwGpw"
-                      : `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(selectedCustomer.name)}`
-                  }
-                  alt={selectedCustomer.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+              <Avatar
+                avatarKey=""
+                name={selectedCustomer.name}
+                useIconFallback={true}
+                className="w-24 h-24 border-2 border-primary-brand/20 shadow-md mb-3"
+              />
               <h3 className="font-serif font-bold text-lg text-zinc-800 dark:text-zinc-100 font-sans">
                 {selectedCustomer.name}
               </h3>
