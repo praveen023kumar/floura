@@ -4,7 +4,8 @@ import CryptoJS from "crypto-js";
 
 let sqlite3: any = null;
 let db: any = null;
-let userDbKey: string | null = null;
+let userDbKey: any = null;
+let legacyUserDbKey: string | null = null;
 let dbReady = false;
 
 const SENSITIVE_COLUMNS: Record<string, string[]> = {
@@ -46,35 +47,132 @@ const TABLE_COLUMNS: Record<string, string[]> = {
   preferences: ["key", "value"]
 };
 
-// Key derivation from logged-in user credentials
-function deriveKey(email: string, token: string): string {
+const ALLOWED_TABLES = new Set(Object.keys(TABLE_COLUMNS));
+
+function isValidTable(table: string): boolean {
+  return ALLOWED_TABLES.has(table);
+}
+
+// Key derivation from logged-in user credentials using Web Crypto API PBKDF2
+async function deriveKey(email: string, token: string): Promise<any> {
+  const emailClean = email.toLowerCase().trim();
+  const tokenClean = token.trim();
+  
+  const encoder = new TextEncoder();
+  const passwordBytes = encoder.encode(tokenClean);
+  // Salt is the SHA-256 hash of the cleaned email for determinism
+  const saltBytes = await self.crypto.subtle.digest("SHA-256", encoder.encode(emailClean));
+  
+  const baseKey = await self.crypto.subtle.importKey(
+    "raw",
+    passwordBytes,
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+  
+  return self.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: saltBytes,
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    baseKey,
+    {
+      name: "AES-GCM",
+      length: 256
+    },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+// Legacy key derivation using SHA256 of email + "|" + token for migration only
+function deriveLegacyKey(email: string, token: string): string {
   const emailClean = email.toLowerCase().trim();
   const tokenClean = token.trim();
   return CryptoJS.SHA256(emailClean + "|" + tokenClean).toString();
 }
 
-function encryptValue(val: any, key: string): string {
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return self.btoa(binary);
+}
+
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = self.atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+async function encryptValue(val: any, key: any): Promise<string> {
   if (val === undefined || val === null) return "";
   const strVal = typeof val === "object" ? JSON.stringify(val) : String(val).trim();
   if (strVal === "") return "";
-  return "__ENC__" + CryptoJS.AES.encrypt(strVal, key).toString();
+  
+  if (!key) {
+    throw new Error("Encryption key not available");
+  }
+
+  const encoder = new TextEncoder();
+  const plaintextBytes = encoder.encode(strVal);
+  
+  const iv = self.crypto.getRandomValues(new Uint8Array(12));
+  const encryptedBuffer = await self.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    plaintextBytes
+  );
+  
+  // Combine IV and encrypted buffer [iv (12) + ciphertext + tag (16)]
+  const combined = new Uint8Array(iv.length + encryptedBuffer.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encryptedBuffer), iv.length);
+  
+  return "__GCM__" + arrayBufferToBase64(combined.buffer);
 }
 
-function decryptValue(val: any, key: string): any {
+async function decryptValue(val: any, key: any, legacyKey: string | null): Promise<any> {
   if (!val) return val;
-  if (typeof val === "string" && val.startsWith("__ENC__")) {
-    const cipher = val.substring(7);
+  
+  if (typeof val === "string" && val.startsWith("__GCM__")) {
+    if (!key) {
+      throw new Error("Decryption key not available");
+    }
+    const rawBase64 = val.substring(7);
+    let combinedBytes: Uint8Array;
+    try {
+      combinedBytes = new Uint8Array(base64ToArrayBuffer(rawBase64));
+    } catch (e) {
+      console.warn("Failed to decode base64 for encrypted value");
+      return val;
+    }
     
-    // Check if the decrypted string is valid printable ASCII/UTF-8
-    const isValidPlaintext = (str: string) => {
-      if (str === "") return true;
-      if (str.includes("\uFFFD")) return false;
-      // Printable characters and standard whitespaces check
-      const printable = /^[\x20-\x7E\s\u00A0-\uFFFD]*$/;
-      return printable.test(str);
-    };
-
-    const parseDecrypted = (str: string) => {
+    if (combinedBytes.length < 12) {
+      console.warn("Ciphertext too short to be valid AES-GCM");
+      return val;
+    }
+    
+    const iv = combinedBytes.slice(0, 12);
+    const ciphertextBytes = combinedBytes.slice(12);
+    
+    try {
+      const decryptedBuffer = await self.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        key,
+        ciphertextBytes
+      );
+      const str = new TextDecoder().decode(decryptedBuffer);
+      
       if (
         (str.startsWith("[") && str.endsWith("]")) ||
         (str.startsWith("{") && str.endsWith("}"))
@@ -86,33 +184,66 @@ function decryptValue(val: any, key: string): any {
         }
       }
       return str;
-    };
+    } catch (err) {
+      console.error("AES-GCM Decryption failed (integrity/authentication failure)");
+      throw new Error("Decryption failed: Integrity check failed");
+    }
+  }
+  
+  if (typeof val === "string" && val.startsWith("__ENC__")) {
+    return decryptLegacyValue(val, legacyKey);
+  }
+  
+  return val;
+}
 
-    // 1. Try decrypting with user primary key
+function decryptLegacyValue(val: string, legacyKey: string | null): any {
+  const cipher = val.substring(7);
+  
+  const isValidPlaintext = (str: string) => {
+    if (str === "") return true;
+    if (str.includes("\uFFFD")) return false;
+    const printable = /^[\x20-\x7E\s\u00A0-\uFFFD]*$/;
+    return printable.test(str);
+  };
+
+  const parseDecrypted = (str: string) => {
+    if (
+      (str.startsWith("[") && str.endsWith("]")) ||
+      (str.startsWith("{") && str.endsWith("}"))
+    ) {
+      try {
+        return JSON.parse(str);
+      } catch {
+        return str;
+      }
+    }
+    return str;
+  };
+
+  // 1. Try decrypting with user legacy primary key derived from credentials
+  if (legacyKey) {
     try {
-      const decrypted = CryptoJS.AES.decrypt(cipher, key).toString(CryptoJS.enc.Utf8);
+      const decrypted = CryptoJS.AES.decrypt(cipher, legacyKey).toString(CryptoJS.enc.Utf8);
       if (decrypted !== "" && isValidPlaintext(decrypted)) {
         return parseDecrypted(decrypted);
       }
     } catch (e) {}
-
-    // 2. Try legacy key fallback
-    try {
-      const legacyKey = "floura_kitchen_super_secret_db_key_2026";
-      const decryptedLegacy = CryptoJS.AES.decrypt(cipher, legacyKey).toString(CryptoJS.enc.Utf8);
-      if (isValidPlaintext(decryptedLegacy)) {
-        return parseDecrypted(decryptedLegacy);
-      }
-    } catch (e) {}
-
-    // If both failed, return empty string if the raw value represents an empty string cipher block
-    // E.g., sample empty blocks we tested like "U2FsdGVkX19M5..." decrypt to ""
-    return val;
   }
+
+  // 2. Try legacy fallback key
+  try {
+    const fallbackLegacyKey = "floura_kitchen_super_secret_db_key_2026";
+    const decryptedLegacy = CryptoJS.AES.decrypt(cipher, fallbackLegacyKey).toString(CryptoJS.enc.Utf8);
+    if (decryptedLegacy !== "" && isValidPlaintext(decryptedLegacy)) {
+      return parseDecrypted(decryptedLegacy);
+    }
+  } catch (e) {}
+
   return val;
 }
 
-function encryptRow(tableName: string, row: any): any {
+async function encryptRow(tableName: string, row: any): Promise<any> {
   if (!userDbKey) return row;
   const sensitive = SENSITIVE_COLUMNS[tableName];
   if (!sensitive) return row;
@@ -120,16 +251,16 @@ function encryptRow(tableName: string, row: any): any {
   const newRow = { ...row };
   for (const col of sensitive) {
     if (newRow[col] !== undefined && newRow[col] !== null) {
-      if (typeof newRow[col] === "string" && newRow[col].startsWith("__ENC__")) {
+      if (typeof newRow[col] === "string" && (newRow[col].startsWith("__GCM__") || newRow[col].startsWith("__ENC__"))) {
         continue;
       }
-      newRow[col] = encryptValue(newRow[col], userDbKey);
+      newRow[col] = await encryptValue(newRow[col], userDbKey);
     }
   }
   return newRow;
 }
 
-function decryptRow(tableName: string, row: any): any {
+async function decryptRow(tableName: string, row: any): Promise<any> {
   if (!userDbKey) return row;
   const sensitive = SENSITIVE_COLUMNS[tableName];
   if (!sensitive) return row;
@@ -137,7 +268,7 @@ function decryptRow(tableName: string, row: any): any {
   const newRow = { ...row };
   for (const col of sensitive) {
     if (newRow[col] !== undefined && newRow[col] !== null) {
-      newRow[col] = decryptValue(newRow[col], userDbKey);
+      newRow[col] = await decryptValue(newRow[col], userDbKey, legacyUserDbKey);
     }
   }
   return newRow;
@@ -450,25 +581,6 @@ async function bootDb() {
     }
 
     createTables();
-    
-    // Auto-load active key if user is already saved in preferences
-    try {
-      const userRow: any[] = [];
-      db.exec({
-        sql: "SELECT value FROM preferences WHERE key = 'patisserie_user' LIMIT 1",
-        rowMode: "object",
-        callback: (row: any) => userRow.push(row)
-      });
-      if (userRow.length > 0) {
-        const userData = JSON.parse(userRow[0].value);
-        if (userData && userData.email && userData.token) {
-          userDbKey = deriveKey(userData.email, userData.token);
-          console.log("Worker automatically derived database key from saved preference");
-        }
-      }
-    } catch (e) {
-      console.warn("Could not auto-derive key on startup:", e);
-    }
 
     dbReady = true;
     self.postMessage({ type: "DB_READY" });
@@ -481,6 +593,97 @@ async function bootDb() {
 // Start booting immediately
 bootDb();
 
+function validateSqlQuery(sql: string, table: string): boolean {
+  const trimmed = sql.trim().toUpperCase();
+  if (!trimmed.startsWith("SELECT")) {
+    return false;
+  }
+  
+  if (trimmed.includes(";")) {
+    return false;
+  }
+  
+  // Ensure the query references the specified table name
+  const fromPattern = new RegExp(`\\bFROM\\s+\`?${table}\`?\\b`, "i");
+  if (!fromPattern.test(sql)) {
+    return false;
+  }
+  
+  // Ban write or administrative SQL commands
+  const bannedKeywords = [
+    "INSERT", "UPDATE", "DELETE", "REPLACE", "DROP", "CREATE", 
+    "ALTER", "TRUNCATE", "PRAGMA", "ATTACH", "DETACH", "UNION",
+    "JOIN"
+  ];
+  for (const keyword of bannedKeywords) {
+    const keywordPattern = new RegExp(`\\b${keyword}\\b`, "i");
+    if (keywordPattern.test(sql)) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+async function migrateLegacyEncryptedData() {
+  if (!db || !userDbKey) return;
+  
+  try {
+    for (const [tableName, cols] of Object.entries(SENSITIVE_COLUMNS)) {
+      if (!isValidTable(tableName)) continue;
+      
+      const rows: any[] = [];
+      db.exec({
+        sql: `SELECT * FROM ${tableName}`,
+        rowMode: "object",
+        callback: (row: any) => rows.push(row)
+      });
+      
+      const rowsToUpdate: any[] = [];
+      for (const row of rows) {
+        let needsUpdate = false;
+        const updatedRow = { ...row };
+        
+        for (const col of cols) {
+          const val = row[col];
+          if (typeof val === "string" && val.startsWith("__ENC__")) {
+            const decrypted = decryptLegacyValue(val, legacyUserDbKey);
+            if (decrypted !== val) {
+              updatedRow[col] = await encryptValue(decrypted, userDbKey);
+              needsUpdate = true;
+            }
+          }
+        }
+        
+        if (needsUpdate) {
+          rowsToUpdate.push(updatedRow);
+        }
+      }
+      
+      if (rowsToUpdate.length > 0) {
+        db.transaction(() => {
+          const pkName = tableName === "preferences" ? "key" : "id";
+          for (const updatedRow of rowsToUpdate) {
+            const keys = Object.keys(updatedRow);
+            const setClause = keys.map(k => `${k} = ?`).join(", ");
+            const sql = `UPDATE ${tableName} SET ${setClause} WHERE ${pkName} = ?`;
+            const params = keys.map(k => updatedRow[k]);
+            params.push(updatedRow[pkName]);
+            
+            db.exec({
+              sql,
+              bind: params
+            });
+          }
+        });
+        console.log(`Migrated ${rowsToUpdate.length} legacy encrypted records in table: ${tableName}`);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to run background legacy encryption migration:", err);
+  }
+}
+
 self.onmessage = async (e: MessageEvent) => {
   const { id, type, payload } = e.data;
   
@@ -488,10 +691,17 @@ self.onmessage = async (e: MessageEvent) => {
     try {
       const { email, token } = payload;
       if (email && token) {
-        userDbKey = deriveKey(email, token);
+        userDbKey = await deriveKey(email, token);
+        legacyUserDbKey = deriveLegacyKey(email, token);
         self.postMessage({ id, type, result: { success: true } });
+        
+        // Execute background migration of old data to new AES-GCM format
+        migrateLegacyEncryptedData().catch(err => {
+          console.error("Background migration of legacy encrypted records failed:", err);
+        });
       } else {
         userDbKey = null;
+        legacyUserDbKey = null;
         self.postMessage({ id, type, result: { success: true, message: "Key cleared" } });
       }
     } catch (err: any) {
@@ -509,6 +719,11 @@ self.onmessage = async (e: MessageEvent) => {
     switch (type) {
       case "GET": {
         const { table, key } = payload;
+        if (!isValidTable(table)) {
+          self.postMessage({ id, type, error: `Unauthorized table name: ${table}` });
+          break;
+        }
+        
         const result: any[] = [];
         const pkName = table === "preferences" ? "key" : "id";
         
@@ -520,7 +735,7 @@ self.onmessage = async (e: MessageEvent) => {
         });
 
         if (result.length > 0) {
-          const decrypted = decryptRow(table, result[0]);
+          const decrypted = await decryptRow(table, result[0]);
           const cleaned = cleanReadRow(table, decrypted);
           self.postMessage({ id, type, result: cleaned });
         } else {
@@ -531,8 +746,13 @@ self.onmessage = async (e: MessageEvent) => {
 
       case "PUT": {
         const { table, row } = payload;
+        if (!isValidTable(table)) {
+          self.postMessage({ id, type, error: `Unauthorized table name: ${table}` });
+          break;
+        }
+        
         const cleaned = cleanRow(table, row);
-        const encrypted = encryptRow(table, cleaned);
+        const encrypted = await encryptRow(table, cleaned);
         
         const keys = Object.keys(encrypted);
         const placeholders = keys.map(() => "?").join(", ");
@@ -551,6 +771,11 @@ self.onmessage = async (e: MessageEvent) => {
 
       case "DELETE": {
         const { table, key } = payload;
+        if (!isValidTable(table)) {
+          self.postMessage({ id, type, error: `Unauthorized table name: ${table}` });
+          break;
+        }
+        
         const pkName = table === "preferences" ? "key" : "id";
         db.exec({
           sql: `DELETE FROM ${table} WHERE ${pkName} = ?`,
@@ -562,6 +787,11 @@ self.onmessage = async (e: MessageEvent) => {
 
       case "CLEAR": {
         const { table } = payload;
+        if (!isValidTable(table)) {
+          self.postMessage({ id, type, error: `Unauthorized table name: ${table}` });
+          break;
+        }
+        
         db.exec({
           sql: `DELETE FROM ${table}`
         });
@@ -571,6 +801,11 @@ self.onmessage = async (e: MessageEvent) => {
 
       case "COUNT": {
         const { table } = payload;
+        if (!isValidTable(table)) {
+          self.postMessage({ id, type, error: `Unauthorized table name: ${table}` });
+          break;
+        }
+        
         const result: any[] = [];
         db.exec({
           sql: `SELECT COUNT(*) as count FROM ${table}`,
@@ -583,6 +818,16 @@ self.onmessage = async (e: MessageEvent) => {
 
       case "QUERY": {
         const { sql, params, table } = payload;
+        if (!isValidTable(table)) {
+          self.postMessage({ id, type, error: `Unauthorized table name: ${table}` });
+          break;
+        }
+        
+        if (!validateSqlQuery(sql, table)) {
+          self.postMessage({ id, type, error: `SQL query validation failed for table ${table}` });
+          break;
+        }
+        
         const result: any[] = [];
         db.exec({
           sql,
@@ -591,10 +836,11 @@ self.onmessage = async (e: MessageEvent) => {
           callback: (row: any) => result.push(row)
         });
 
-        const decryptedList = result.map(row => {
-          const decrypted = decryptRow(table, row);
-          return cleanReadRow(table, decrypted);
-        });
+        const decryptedList = [];
+        for (const row of result) {
+          const decrypted = await decryptRow(table, row);
+          decryptedList.push(cleanReadRow(table, decrypted));
+        }
 
         self.postMessage({ id, type, result: decryptedList });
         break;

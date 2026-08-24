@@ -112,6 +112,23 @@ worker.onmessage = (e) => {
     console.log("SQLite WASM + OPFS Worker is ready. Running migration check...");
     dbReady = true;
     
+    // Auto-load user key on startup from localStorage
+    if (typeof window !== "undefined") {
+      try {
+        const savedUserStr = localStorage.getItem("patisserie_user");
+        if (savedUserStr) {
+          const userData = JSON.parse(savedUserStr);
+          if (userData && userData.email && userData.token) {
+            setDatabaseEncryptionKey(userData.email, userData.token).catch((err) => {
+              console.error("Failed to automatically set database encryption key:", err);
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore DB key from localStorage on startup:", e);
+      }
+    }
+
     while (requestQueue.length > 0) {
       const { fn, resolve, reject } = requestQueue.shift()!;
       fn().then(resolve).catch(reject);
@@ -337,6 +354,13 @@ export const localDb = {
 
 export async function getPreference(key: string, defaultValue: any = null): Promise<any> {
   try {
+    if (key === "patisserie_user" || key === "patisserie_last_synced_email") {
+      if (typeof window !== "undefined") {
+        const val = localStorage.getItem(key);
+        return val !== null ? JSON.parse(val) : defaultValue;
+      }
+      return defaultValue;
+    }
     const pref = await localDb.preferences.get(key);
     return pref ? pref.value : defaultValue;
   } catch (e) {
@@ -347,10 +371,16 @@ export async function getPreference(key: string, defaultValue: any = null): Prom
 
 export async function setPreference(key: string, value: any): Promise<void> {
   try {
-    await localDb.preferences.put({ key, value });
-    if (key === "patisserie_user" && value && value.email && value.token) {
-      await setDatabaseEncryptionKey(value.email, value.token);
+    if (key === "patisserie_user" || key === "patisserie_last_synced_email") {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
+      if (key === "patisserie_user" && value && value.email && value.token) {
+        await setDatabaseEncryptionKey(value.email, value.token);
+      }
+      return;
     }
+    await localDb.preferences.put({ key, value });
   } catch (e) {
     console.error("Failed to set preference for key:", key, e);
   }
@@ -358,10 +388,16 @@ export async function setPreference(key: string, value: any): Promise<void> {
 
 export async function removePreference(key: string): Promise<void> {
   try {
-    await localDb.preferences.delete(key);
-    if (key === "patisserie_user") {
-      await sendToWorker("SET_KEY", { email: "", token: "" });
+    if (key === "patisserie_user" || key === "patisserie_last_synced_email") {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(key);
+      }
+      if (key === "patisserie_user") {
+        await sendToWorker("SET_KEY", { email: "", token: "" });
+      }
+      return;
     }
+    await localDb.preferences.delete(key);
   } catch (e) {
     console.error("Failed to remove preference for key:", key, e);
   }
@@ -488,16 +524,22 @@ async function triggerMigration() {
           console.error("Failed to decrypt preference row:", row.key, e);
         }
       }
-      await localDb.preferences.put({ key: row.key, value: decryptedVal });
-      if (row.key === "patisserie_user") {
-        patisserieUser = decryptedVal;
+      if (row.key === "patisserie_user" || row.key === "patisserie_last_synced_email") {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(row.key, JSON.stringify(decryptedVal));
+        }
+        if (row.key === "patisserie_user") {
+          patisserieUser = decryptedVal;
+        }
+      } else {
+        await localDb.preferences.put({ key: row.key, value: decryptedVal });
       }
     }
 
     // Initialize worker key if user exists
     if (patisserieUser && patisserieUser.email && patisserieUser.token) {
       await setDatabaseEncryptionKey(patisserieUser.email, patisserieUser.token);
-      console.log("Migration initialized worker encryption key:", patisserieUser.email);
+      console.log("Migration initialized worker encryption key");
     }
 
     // 2. Migrate standard tables
