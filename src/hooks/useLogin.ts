@@ -291,10 +291,15 @@ export function useLogin({ onLogin }: UseLoginProps) {
         }, 800);
       } catch (err: any) {
         console.error("[Auth Debug] Google Login flow failed with exception:", err);
-        setErrorToast(
-          "Access Denied: " + err.message + 
-          "\n\nPlease ensure your network is connected and try logging in again."
-        );
+        let userMessage = err.message || String(err);
+        if (err.code === "auth/popup-closed-by-user" || (err.message && err.message.includes("popup-closed-by-user"))) {
+          userMessage = "Sign-in cancelled. The login popup was closed before completion.";
+        } else if (err.code === "auth/network-request-failed" || (err.message && err.message.includes("network-request-failed"))) {
+          userMessage = "Network error. Please check your internet connection and try again.";
+        } else {
+          userMessage = "Access Denied: " + userMessage + "\n\nPlease check your connection and try logging in again.";
+        }
+        setErrorToast(userMessage);
         setAuthenticating(false);
         setToastMessage("");
       }

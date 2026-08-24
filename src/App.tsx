@@ -696,15 +696,15 @@ function MainAppContent() {
         </button>
 
         <button
-          onClick={() => navigate("/customers")}
+          onClick={() => navigate("/recipes")}
           className={`flex flex-col items-center justify-center p-2 text-xs font-semibold cursor-pointer rounded-xl transition-all ${
-            currentScreen === "customers" || currentScreen === "customers-form"
+            currentScreen === "recipes" || currentScreen === "recipes-form"
               ? "text-primary-brand dark:text-pink-400 scale-102"
               : "text-zinc-400 hover:text-zinc-650"
           }`}
         >
-          <Users className="w-5 h-5 mb-0.5" />
-          <span>Customers</span>
+          <BookOpen className="w-5 h-5 mb-0.5" />
+          <span>Recipes</span>
         </button>
 
         <button

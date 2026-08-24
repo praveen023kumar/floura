@@ -1,15 +1,70 @@
-// File Path: /src/db.ts
-import Dexie, { type Table } from "dexie";
 import { Customer, Order, InventoryItem, Recipe, ChecklistItem, CustomEvent, DispatchedNotification, CustomScheduledAlert, BakeryProfile, Category } from "./types";
 import CryptoJS from "crypto-js";
 
-const SECRET_KEY = "floura_kitchen_super_secret_db_key_2026";
-
-export function encryptData(data: any): string {
-  return CryptoJS.AES.encrypt(JSON.stringify(data), SECRET_KEY).toString();
+function checkDatabaseExists(dbName: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === "undefined") {
+      resolve(false);
+      return;
+    }
+    if (indexedDB.databases) {
+      indexedDB.databases().then((dbs) => {
+        resolve(dbs.some((db) => db.name === dbName));
+      }).catch(() => {
+        resolve(true); // Fallback to try opening
+      });
+    } else {
+      resolve(true); // Fallback
+    }
+  });
 }
 
-export function decryptData(ciphertext: string): any {
+function getIndexedDBData(dbName: string, storeNames: string[]): Promise<Record<string, any[]>> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      resolve({});
+      return;
+    }
+    const request = indexedDB.open(dbName);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const result: Record<string, any[]> = {};
+      const storeList = Array.from(db.objectStoreNames).filter((name) => storeNames.includes(name));
+
+      if (storeList.length === 0) {
+        db.close();
+        resolve(result);
+        return;
+      }
+
+      const tx = db.transaction(storeList, "readonly");
+      let completedStores = 0;
+
+      for (const storeName of storeList) {
+        const store = tx.objectStore(storeName);
+        const req = store.getAll();
+        req.onsuccess = () => {
+          result[storeName] = req.result;
+          completedStores++;
+          if (completedStores === storeList.length) {
+            db.close();
+            resolve(result);
+          }
+        };
+        req.onerror = () => {
+          db.close();
+          reject(req.error);
+        };
+      }
+    };
+  });
+}
+
+const SECRET_KEY = "floura_kitchen_super_secret_db_key_2026";
+
+// Decrypt Dexie records encrypted with old hardcoded key during migration
+export function decryptOldData(ciphertext: string): any {
   const bytes = CryptoJS.AES.decrypt(ciphertext, SECRET_KEY);
   return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
 }
@@ -27,158 +82,258 @@ function normalizeOrderStatus(status: string): string {
   return status;
 }
 
-function setupTableEncryption(table: any) {
-  const primKeyName = table.name === "preferences" ? "key" : "id";
+let messageId = 0;
+const pendingRequests = new Map<number, { resolve: (val: any) => void; reject: (err: any) => void }>();
+let dbReady = false;
+const requestQueue: Array<{ fn: () => Promise<any>; resolve: (val: any) => void; reject: (err: any) => void }> = [];
 
-  table.hook("creating", (primKey: any, obj: any) => {
-    if (!obj) return;
-    
-    // Check if it's already encrypted
-    if (obj.encryptedData && Object.keys(obj).length <= 4) {
-      return;
-    }
-    
-    const localChange = obj.localChange !== undefined ? obj.localChange : 0;
-    const isDeleted = obj.isDeleted !== undefined ? obj.isDeleted : 0;
-    const updatedAt = obj.updatedAt;
-    const createdAt = obj.createdAt;
-    
-    const rest = { ...obj };
-    delete rest[primKeyName];
-    delete rest.localChange;
-    delete rest.isDeleted;
-    delete rest.updatedAt;
-    delete rest.createdAt;
-    
-    if (table.name === "orders" && rest.status) {
-      rest.status = normalizeOrderStatus(rest.status);
-    }
-    
-    const encrypted = encryptData(rest);
-    
-    // Mutate the original object in-place for Dexie/IndexedDB to store
-    for (const key of Object.keys(obj)) {
-      if (key !== primKeyName && key !== "localChange" && key !== "isDeleted" && key !== "updatedAt" && key !== "createdAt") {
-        delete obj[key];
-      }
-    }
-    obj.encryptedData = encrypted;
-    obj.localChange = localChange;
-    obj.isDeleted = isDeleted;
-    if (updatedAt !== undefined) obj.updatedAt = updatedAt;
-    if (createdAt !== undefined) obj.createdAt = createdAt;
-  });
+// Web Worker instance
+const worker = new Worker(new URL("./db-worker.ts", import.meta.url), { type: "module" });
 
-  table.hook("updating", (mods: any, primKey: any, obj: any) => {
-    if (!obj) return mods;
-    // If mods has encryptedData already, we don't need to do anything
-    if (mods.encryptedData && Object.keys(mods).length <= 3) {
-      return mods;
+worker.onmessage = (e) => {
+  const { id, type, result, error } = e.data;
+  
+  if (type === "DB_LOCKED" || type === "DB_ERROR") {
+    const errMsg = error || (type === "DB_LOCKED" ? "Database is locked by another tab" : "Failed to initialize database");
+    console.error(`SQLite database error: ${type} - ${errMsg}`);
+    
+    while (requestQueue.length > 0) {
+      const { reject } = requestQueue.shift()!;
+      reject(new Error(errMsg));
     }
     
-    const decryptedObj = obj.encryptedData ? decryptData(obj.encryptedData) : {};
-    const mergedFull = { ...obj, ...decryptedObj, ...mods };
+    if (type === "DB_LOCKED" && typeof window !== "undefined") {
+      alert("Floura database is locked because it is open in another tab. Please close other tabs of Floura to continue.");
+    }
+    return;
+  }
+  
+  if (type === "DB_READY") {
+    console.log("SQLite WASM + OPFS Worker is ready. Running migration check...");
+    dbReady = true;
     
-    const localChange = mergedFull.localChange !== undefined ? mergedFull.localChange : 0;
-    const isDeleted = mergedFull.isDeleted !== undefined ? mergedFull.isDeleted : 0;
-    const updatedAt = mergedFull.updatedAt;
-    const createdAt = mergedFull.createdAt;
-    
-    const rest = { ...mergedFull };
-    delete rest[primKeyName];
-    delete rest.localChange;
-    delete rest.isDeleted;
-    delete rest.encryptedData;
-    delete rest.updatedAt;
-    delete rest.createdAt;
-    
-    if (table.name === "orders" && rest.status) {
-      rest.status = normalizeOrderStatus(rest.status);
+    while (requestQueue.length > 0) {
+      const { fn, resolve, reject } = requestQueue.shift()!;
+      fn().then(resolve).catch(reject);
     }
     
-    const encrypted = encryptData(rest);
+    triggerMigration();
+    return;
+  }
+  
+  if (pendingRequests.has(id)) {
+    const { resolve, reject } = pendingRequests.get(id)!;
+    pendingRequests.delete(id);
+    if (error) reject(new Error(error));
+    else resolve(result);
+  }
+};
 
-    const updatedMods: any = {
-      encryptedData: encrypted,
-      localChange,
-      isDeleted
-    };
-    if (updatedAt !== undefined) updatedMods.updatedAt = updatedAt;
-    if (createdAt !== undefined) updatedMods.createdAt = createdAt;
+export function sendToWorker(type: string, payload: any): Promise<any> {
+  const execute = () => {
+    return new Promise((resolve, reject) => {
+      const id = messageId++;
+      pendingRequests.set(id, { resolve, reject });
+      worker.postMessage({ id, type, payload });
+    });
+  };
 
-    // Set other properties to undefined so they are deleted from IndexedDB
-    for (const key of Object.keys(mods)) {
-      if (key !== primKeyName && key !== "localChange" && key !== "isDeleted" && key !== "encryptedData" && key !== "updatedAt" && key !== "createdAt") {
-        updatedMods[key] = undefined;
-      }
-    }
-    
-    return updatedMods;
-  });
+  if (!dbReady) {
+    return new Promise((resolve, reject) => {
+      requestQueue.push({ fn: execute, resolve, reject });
+    });
+  }
 
-  table.hook("reading", (obj: any) => {
-    if (!obj || !obj.encryptedData) return obj;
-    try {
-      const decrypted = decryptData(obj.encryptedData);
-      const result: any = {
-        localChange: obj.localChange !== undefined ? obj.localChange : 0,
-        isDeleted: obj.isDeleted !== undefined ? obj.isDeleted : 0,
-        updatedAt: obj.updatedAt,
-        createdAt: obj.createdAt,
-        ...decrypted
-      };
-      result[primKeyName] = obj[primKeyName];
-      
-      if (table.name === "orders" && result.status) {
-        result.status = normalizeOrderStatus(result.status);
-      }
-      
-      return result;
-    } catch (err) {
-      console.error("Transparent decryption failed on database read:", err);
-      return obj;
-    }
-  });
+  return execute();
 }
 
-export class PatisserieDatabase extends Dexie {
-  customers!: Table<Customer & { localChange?: number }>;
-  orders!: Table<Order & { localChange?: number }>;
-  inventory!: Table<InventoryItem & { localChange?: number }>;
-  recipes!: Table<Recipe & { localChange?: number }>;
-  checklist!: Table<ChecklistItem & { localChange?: number }>;
-  customEvents!: Table<CustomEvent & { localChange?: number }>;
-  dispatchedNotifications!: Table<DispatchedNotification & { localChange?: number }>;
-  scheduledAlerts!: Table<CustomScheduledAlert & { localChange?: number }>;
-  bakeryProfile!: Table<BakeryProfile & { localChange?: number }>;
-  categories!: Table<Category & { localChange?: number }>;
-  preferences!: Table<{ key: string; value: any }>;
+export async function setDatabaseEncryptionKey(email: string, token: string) {
+  await sendToWorker("SET_KEY", { email, token });
+}
 
-  constructor() {
-    super("PatisserieDatabaseV1");
-    this.version(1).stores({
-      customers: "id, updatedAt, localChange, isDeleted",
-      orders: "id, createdAt, updatedAt, localChange, isDeleted",
-      inventory: "id, updatedAt, localChange, isDeleted",
-      recipes: "id, updatedAt, localChange, isDeleted",
-      checklist: "id, updatedAt, localChange, isDeleted",
-      customEvents: "id, createdAt, localChange, isDeleted",
-      dispatchedNotifications: "id, localChange, isDeleted",
-      scheduledAlerts: "id, createdAt, localChange, isDeleted",
-      bakeryProfile: "id, updatedAt, localChange, isDeleted",
-      categories: "id, updatedAt, localChange, isDeleted",
-      preferences: "key"
-    });
+class SQLiteTable<T> {
+  tableName: string;
 
-    const tablesToEncrypt = ["customers", "orders", "inventory", "recipes", "checklist", "customEvents", "dispatchedNotifications", "scheduledAlerts", "bakeryProfile", "categories", "preferences"];
-    for (const tableName of tablesToEncrypt) {
-      const table = this.table(tableName);
-      setupTableEncryption(table);
+  constructor(tableName: string) {
+    this.tableName = tableName;
+  }
+
+  async get(key: string): Promise<T | undefined> {
+    return sendToWorker("GET", { table: this.tableName, key });
+  }
+
+  async put(row: any): Promise<void> {
+    if (this.tableName === "orders" && row.status) {
+      row.status = normalizeOrderStatus(row.status);
     }
+    return sendToWorker("PUT", { table: this.tableName, row });
+  }
+
+  async update(key: string, modifications: any): Promise<void> {
+    const existing = await this.get(key);
+    if (!existing) {
+      throw new Error(`Record not found: ${key}`);
+    }
+    const updated = { ...existing, ...modifications };
+    return this.put(updated);
+  }
+
+  async bulkPut(rows: any[]): Promise<void> {
+    for (const row of rows) {
+      await this.put(row);
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    return sendToWorker("DELETE", { table: this.tableName, key });
+  }
+
+  async clear(): Promise<void> {
+    return sendToWorker("CLEAR", { table: this.tableName });
+  }
+
+  async count(): Promise<number> {
+    return sendToWorker("COUNT", { table: this.tableName });
+  }
+
+  async toArray(): Promise<T[]> {
+    return sendToWorker("QUERY", {
+      sql: `SELECT * FROM ${this.tableName}`,
+      params: [],
+      table: this.tableName
+    });
+  }
+
+  toCollection() {
+    return {
+      first: async (): Promise<T | undefined> => {
+        const rows = await sendToWorker("QUERY", {
+          sql: `SELECT * FROM ${this.tableName} LIMIT 1`,
+          params: [],
+          table: this.tableName
+        });
+        return rows[0];
+      }
+    };
+  }
+
+  where(field: string) {
+    return {
+      equals: (val: any) => {
+        return {
+          toArray: () => {
+            return sendToWorker("QUERY", {
+              sql: `SELECT * FROM ${this.tableName} WHERE ${field} = ?`,
+              params: [val],
+              table: this.tableName
+            });
+          }
+        };
+      }
+    };
+  }
+
+  filter(predicate: (item: T) => boolean) {
+    let limitCount: number | null = null;
+
+    const builder = {
+      limit: (n: number) => {
+        limitCount = n;
+        return builder;
+      },
+      toArray: async (): Promise<T[]> => {
+        const predStr = predicate.toString();
+        let sql = `SELECT * FROM ${this.tableName}`;
+        const params: any[] = [];
+        const conditions: string[] = [];
+
+        // Map standard isDeleted checks
+        if (predStr.includes("isDeleted !== 1") || predStr.includes("isDeleted != 1") || predStr.includes("isDeleted === 0")) {
+          conditions.push("isDeleted = 0");
+        }
+
+        // Map standard Category type checks
+        if (predStr.includes('type === "inventory"') || predStr.includes("type === 'inventory'")) {
+          conditions.push("type = ?");
+          params.push("inventory");
+        } else if (predStr.includes('type === "recipe"') || predStr.includes("type === 'recipe'")) {
+          conditions.push("type = ?");
+          params.push("recipe");
+        }
+
+        // Map any direct status checks
+        const statusMatch = predStr.match(/status\s*===\s*["']([^"']+)["']/);
+        if (statusMatch) {
+          conditions.push("status = ?");
+          params.push(statusMatch[1]);
+        }
+
+        if (conditions.length > 0) {
+          sql += " WHERE " + conditions.join(" AND ");
+        }
+
+        if (limitCount !== null) {
+          sql += ` LIMIT ${limitCount}`;
+        }
+
+        return sendToWorker("QUERY", {
+          sql,
+          params,
+          table: this.tableName
+        });
+      },
+      count: async (): Promise<number> => {
+        const rows = await builder.toArray();
+        return rows.filter(predicate).length;
+      }
+    };
+
+    return builder;
   }
 }
 
-export const localDb = new PatisserieDatabase();
+class SQLitePreferencesTable {
+  async get(key: string): Promise<any> {
+    return sendToWorker("GET", { table: "preferences", key });
+  }
+
+  async put(row: { key: string; value: any }): Promise<void> {
+    return sendToWorker("PUT", { table: "preferences", row });
+  }
+
+  async delete(key: string): Promise<void> {
+    return sendToWorker("DELETE", { table: "preferences", key });
+  }
+}
+
+export const localDb = {
+  customers: new SQLiteTable<Customer>("customers"),
+  orders: new SQLiteTable<Order>("orders"),
+  inventory: new SQLiteTable<InventoryItem>("inventory"),
+  recipes: new SQLiteTable<Recipe>("recipes"),
+  checklist: new SQLiteTable<ChecklistItem>("checklist"),
+  customEvents: new SQLiteTable<CustomEvent>("customEvents"),
+  dispatchedNotifications: new SQLiteTable<DispatchedNotification>("dispatchedNotifications"),
+  scheduledAlerts: new SQLiteTable<CustomScheduledAlert>("scheduledAlerts"),
+  bakeryProfile: new SQLiteTable<BakeryProfile>("bakeryProfile"),
+  categories: new SQLiteTable<Category>("categories"),
+  preferences: new SQLitePreferencesTable(),
+
+  async transaction(type: string, tables: any[], callback: () => Promise<void>) {
+    await callback();
+  },
+
+  async delete(): Promise<void> {
+    const tables = ["customers", "orders", "inventory", "recipes", "checklist", "customEvents", "dispatchedNotifications", "scheduledAlerts", "bakeryProfile", "categories", "preferences"];
+    for (const table of tables) {
+      await sendToWorker("CLEAR", { table });
+    }
+  },
+
+  async open(): Promise<void> {
+    // SQLite worker database is opened automatically on startup
+  }
+};
 
 export async function getPreference(key: string, defaultValue: any = null): Promise<any> {
   try {
@@ -193,6 +348,9 @@ export async function getPreference(key: string, defaultValue: any = null): Prom
 export async function setPreference(key: string, value: any): Promise<void> {
   try {
     await localDb.preferences.put({ key, value });
+    if (key === "patisserie_user" && value && value.email && value.token) {
+      await setDatabaseEncryptionKey(value.email, value.token);
+    }
   } catch (e) {
     console.error("Failed to set preference for key:", key, e);
   }
@@ -201,12 +359,14 @@ export async function setPreference(key: string, value: any): Promise<void> {
 export async function removePreference(key: string): Promise<void> {
   try {
     await localDb.preferences.delete(key);
+    if (key === "patisserie_user") {
+      await sendToWorker("SET_KEY", { email: "", token: "" });
+    }
   } catch (e) {
     console.error("Failed to remove preference for key:", key, e);
   }
 }
 
-// Utility helper to seed local indexedDB from server payload
 export async function seedLocalDbFromPayload(payload: {
   customers: Customer[];
   orders: Order[];
@@ -219,93 +379,181 @@ export async function seedLocalDbFromPayload(payload: {
   bakeryProfile?: BakeryProfile[];
   categories?: Category[];
 }) {
-  await localDb.transaction("rw", [
-    localDb.customers,
-    localDb.orders,
-    localDb.inventory,
-    localDb.recipes,
-    localDb.checklist,
-    localDb.customEvents,
-    localDb.dispatchedNotifications,
-    localDb.scheduledAlerts,
-    localDb.bakeryProfile,
-    localDb.categories
-  ], async () => {
+  const tables = [
+    { name: "customers", list: payload.customers, dateField: "updatedAt" },
+    { name: "orders", list: payload.orders, dateField: "updatedAt" },
+    { name: "inventory", list: payload.inventory, dateField: "updatedAt" },
+    { name: "recipes", list: payload.recipes, dateField: "updatedAt" },
+    { name: "checklist", list: payload.checklist, dateField: "updatedAt" },
+    { name: "customEvents", list: payload.customEvents, dateField: "createdAt" },
+    { name: "dispatchedNotifications", list: payload.dispatchedNotifications, dateField: "dispatchedAt" },
+    { name: "scheduledAlerts", list: payload.scheduledAlerts, dateField: "createdAt" },
+    { name: "bakeryProfile", list: payload.bakeryProfile || [], dateField: "updatedAt" },
+    { name: "categories", list: payload.categories || [], dateField: "updatedAt" }
+  ];
 
+  for (const table of tables) {
+    const sqliteTable = (localDb as any)[table.name];
+    if (!sqliteTable) continue;
+    
+    for (const item of table.list) {
+      const existing = await sqliteTable.get(item.id);
+      const itemDate = new Date(item[table.dateField] || 0);
+      const existingDate = existing ? new Date(existing[table.dateField] || 0) : new Date(0);
 
-    // We only update if there are no localChanges pending, or we resolve server wins
-    for (const c of payload.customers) {
-      const existing = await localDb.customers.get(c.id);
-      if (!existing || !existing.localChange || new Date(c.updatedAt) > new Date(existing.updatedAt)) {
-        await localDb.customers.put({ ...c, localChange: 0 });
+      if (!existing || !existing.localChange || itemDate > existingDate) {
+        await sqliteTable.put({ ...item, localChange: 0 });
       }
     }
+  }
+}
 
-    for (const o of payload.orders) {
-      const existing = await localDb.orders.get(o.id);
-      if (!existing || !existing.localChange || new Date(o.updatedAt) > new Date(existing.updatedAt)) {
-        await localDb.orders.put({ ...o, localChange: 0 });
+function decryptAllEncryptedFieldsInObject(obj: any): any {
+  if (!obj || typeof obj !== "object") return obj;
+  
+  const result = Array.isArray(obj) ? [...obj] : { ...obj };
+  for (const key of Object.keys(result)) {
+    const val = result[key];
+    if (typeof val === "string" && val.startsWith("__ENC__")) {
+      const cipher = val.substring(7);
+      try {
+        const decrypted = CryptoJS.AES.decrypt(cipher, SECRET_KEY).toString(CryptoJS.enc.Utf8);
+        if (
+          (decrypted.startsWith("[") && decrypted.endsWith("]")) ||
+          (decrypted.startsWith("{") && decrypted.endsWith("}"))
+        ) {
+          try {
+            result[key] = JSON.parse(decrypted);
+          } catch {
+            result[key] = decrypted;
+          }
+        } else {
+          result[key] = decrypted;
+        }
+      } catch (e) {
+        console.error("Failed to decrypt legacy column field during migration:", key, e);
       }
+    } else if (typeof val === "object" && val !== null) {
+      result[key] = decryptAllEncryptedFieldsInObject(val);
+    }
+  }
+  return result;
+}
+
+// One-time IndexedDB to SQLite WASM migration trigger using native IndexedDB API
+async function triggerMigration() {
+  try {
+    const isMigrated = await getPreference("sqlite_migrated");
+    if (isMigrated === true) {
+      console.log("Migration to SQLite was already completed.");
+      return;
     }
 
-    for (const item of payload.inventory) {
-      const existing = await localDb.inventory.get(item.id);
-      if (!existing || !existing.localChange || new Date(item.updatedAt) > new Date(existing.updatedAt)) {
-        await localDb.inventory.put({ ...item, localChange: 0 });
-      }
+    const dexieDbName = "PatisserieDatabaseV1";
+    const exists = await checkDatabaseExists(dexieDbName);
+    if (!exists) {
+      console.log("No Dexie database found to migrate. Marking migration as complete.");
+      await setPreference("sqlite_migrated", true);
+      return;
     }
 
-    for (const r of payload.recipes) {
-      const existing = await localDb.recipes.get(r.id);
-      if (!existing || !existing.localChange || new Date(r.updatedAt) > new Date(existing.updatedAt)) {
-        await localDb.recipes.put({ ...r, localChange: 0 });
-      }
+    console.log("Dexie database found. Starting data migration to SQLite...");
+    
+    const tablesToMigrate = [
+      "customers", "orders", "inventory", "recipes", "checklist",
+      "customEvents", "dispatchedNotifications", "scheduledAlerts",
+      "bakeryProfile", "categories", "preferences"
+    ];
+
+    let allData: Record<string, any[]> = {};
+    try {
+      allData = await getIndexedDBData(dexieDbName, tablesToMigrate);
+    } catch (e) {
+      console.error("Failed to read IndexedDB database:", e);
+      await setPreference("sqlite_migrated", true);
+      return;
     }
 
-    for (const chk of payload.checklist) {
-      const existing = await localDb.checklist.get(chk.id);
-      if (!existing || !existing.localChange || new Date(chk.updatedAt) > new Date(existing.updatedAt)) {
-        await localDb.checklist.put({ ...chk, localChange: 0 });
-      }
-    }
-
-    for (const ev of payload.customEvents) {
-      const existing = await localDb.customEvents.get(ev.id);
-      if (!existing || !existing.localChange || new Date(ev.createdAt) > new Date(existing.createdAt || 0)) {
-        await localDb.customEvents.put({ ...ev, localChange: 0 });
-      }
-    }
-
-    for (const dn of payload.dispatchedNotifications) {
-      const existing = await localDb.dispatchedNotifications.get(dn.id);
-      if (!existing || !existing.localChange || new Date(dn.dispatchedAt) > new Date(existing.dispatchedAt || 0)) {
-        await localDb.dispatchedNotifications.put({ ...dn, localChange: 0 });
-      }
-    }
-
-    for (const sa of payload.scheduledAlerts) {
-      const existing = await localDb.scheduledAlerts.get(sa.id);
-      if (!existing || !existing.localChange || new Date(sa.createdAt) > new Date(existing.createdAt || 0)) {
-        await localDb.scheduledAlerts.put({ ...sa, localChange: 0 });
-      }
-    }
-
-    if (payload.bakeryProfile) {
-      for (const bp of payload.bakeryProfile) {
-        const existing = await localDb.bakeryProfile.get(bp.id);
-        if (!existing || !existing.localChange || new Date(bp.updatedAt) > new Date(existing.updatedAt || 0)) {
-          await localDb.bakeryProfile.put({ ...bp, localChange: 0 });
+    // 1. Migrate preferences first to get user session data
+    const prefRows = allData["preferences"] || [];
+    let patisserieUser: any = null;
+    
+    for (const row of prefRows) {
+      let decryptedVal = row.value;
+      if (row.encryptedData) {
+        try {
+          const dec = decryptOldData(row.encryptedData);
+          decryptedVal = dec.value;
+        } catch (e) {
+          console.error("Failed to decrypt preference row:", row.key, e);
         }
       }
-    }
-
-    if (payload.categories) {
-      for (const cat of payload.categories) {
-        const existing = await localDb.categories.get(cat.id);
-        if (!existing || !existing.localChange || new Date(cat.updatedAt) > new Date(existing.updatedAt || 0)) {
-          await localDb.categories.put({ ...cat, localChange: 0 });
-        }
+      await localDb.preferences.put({ key: row.key, value: decryptedVal });
+      if (row.key === "patisserie_user") {
+        patisserieUser = decryptedVal;
       }
     }
-  });
+
+    // Initialize worker key if user exists
+    if (patisserieUser && patisserieUser.email && patisserieUser.token) {
+      await setDatabaseEncryptionKey(patisserieUser.email, patisserieUser.token);
+      console.log("Migration initialized worker encryption key:", patisserieUser.email);
+    }
+
+    // 2. Migrate standard tables
+    for (const tableName of tablesToMigrate) {
+      if (tableName === "preferences") continue;
+      const rows = allData[tableName] || [];
+      const destTable = (localDb as any)[tableName];
+      if (!destTable) continue;
+
+      for (const row of rows) {
+        let decryptedRow = { ...row };
+        if (row.encryptedData) {
+          try {
+            const decrypted = decryptOldData(row.encryptedData);
+            decryptedRow = {
+              ...row,
+              ...decrypted
+            };
+            delete decryptedRow.encryptedData;
+          } catch (e) {
+            console.error(`Failed to decrypt record ${row.id} in ${tableName} during migration:`, e);
+          }
+        }
+        
+        // Decrypt individual legacy encrypted columns recursively
+        decryptedRow = decryptAllEncryptedFieldsInObject(decryptedRow);
+        
+        await destTable.put(decryptedRow);
+      }
+    }
+
+    console.log("Data migration successfully completed. Deleting Dexie database...");
+    
+    await new Promise<void>((resolve, reject) => {
+      if (typeof indexedDB === "undefined") {
+        resolve();
+        return;
+      }
+      const req = indexedDB.deleteDatabase(dexieDbName);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+
+    await setPreference("sqlite_migrated", true);
+    console.log("Dexie database deleted successfully. SQLite is now fully active.");
+    
+    // Notify application views to reload
+    window.dispatchEvent(new Event("db-update"));
+  } catch (err) {
+    console.error("Critical error during database migration to SQLite:", err);
+  }
+}
+
+// Global debug bridge to query SQLite directly from the browser dev console
+if (typeof window !== "undefined") {
+  (window as any).localDbQuery = (sql: string, params: any[] = [], table: string = "") => {
+    return sendToWorker("QUERY", { sql, params, table });
+  };
 }

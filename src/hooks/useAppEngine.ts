@@ -193,13 +193,14 @@ export function useAppEngine() {
         await refreshReactStates();
         setProfileChecked(true);
 
-        const [custCount, ordCount] = await Promise.all([
+        const [custCount, ordCount, bakeryProfileCount] = await Promise.all([
           localDb.customers.count(),
-          localDb.orders.count()
+          localDb.orders.count(),
+          localDb.bakeryProfile.count()
         ]);
 
         if (typeof navigator !== "undefined" && navigator.onLine) {
-          if (custCount === 0 && ordCount === 0) {
+          if (custCount === 0 && ordCount === 0 && bakeryProfileCount === 0) {
             setIsSyncingInitialData(true);
             try {
               await fetchMasterData(user, (step, percent) => {

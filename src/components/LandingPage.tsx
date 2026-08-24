@@ -34,6 +34,7 @@ import chefHeroPhoto from "../assets/images/chef_hero_photo.webp";
 import LegalModal from "./LegalModal";
 import { useLogin } from "../hooks/useLogin";
 
+
 interface LandingPageProps {
   user?: { name: string; email: string; avatar: string; token?: string } | null;
   onLogin: (user: { name: string; email: string; avatar: string; token: string; isNew?: boolean }) => void;
@@ -311,7 +312,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
             </div>
           </div>
         </div>
-      </section>
+      </section> 
 
       {/* FEATURES */}
       <section id="features" ref={featuresSectionRef} className="py-20 md:py-28 bg-pink-50/30 dark:bg-zinc-900/40 border-t border-b border-pink-50/50 dark:border-zinc-900/60">

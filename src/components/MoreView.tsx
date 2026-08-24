@@ -18,7 +18,8 @@ import {
   Sun,
   Moon,
   RefreshCw,
-  UserCog
+  UserCog,
+  Users
 } from "lucide-react";
 import LegalModal from "./LegalModal";
 import { useMore } from "../hooks/useMore";
@@ -304,6 +305,14 @@ export default function MoreView({
                       title="Kitchen Debriefs"
                       description="Review completed orders and kitchen performance"
                       onClick={() => navigate("/debriefs")}
+                    />
+                  </div>
+                  <div className="bg-white dark:bg-zinc-900">
+                    <MenuItem
+                      icon={Users}
+                      title="Customers"
+                      description="View and manage your customer profiles"
+                      onClick={() => navigate("/customers")}
                     />
                   </div>
                 </div>
