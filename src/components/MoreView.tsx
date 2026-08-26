@@ -1,6 +1,7 @@
 // /src/components/MoreView.tsx
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { memo } from "react";
+import { memoWithData } from "../utils/memo";
+
 import {
   User,
   Building2,
@@ -38,6 +39,7 @@ interface MoreViewProps {
   setDarkMode?: (dark: boolean) => void;
   syncStatus?: "synced" | "offline" | "syncing" | "error";
   onSync?: () => void;
+  onNavigate?: (path: string | number) => void;
 }
 
 interface MenuItemProps {
@@ -53,15 +55,15 @@ interface MenuSectionProps {
   children: React.ReactNode;
 }
 
-export default function MoreView({
+function MoreView({
   onLogout,
   user,
   darkMode,
   setDarkMode,
   syncStatus,
   onSync,
+  onNavigate,
 }: MoreViewProps) {
-  const navigate = useNavigate();
   const { activeModal, setActiveModal } = useMore({ onLogout });
 
   const handleLogout = () => {
@@ -254,7 +256,7 @@ export default function MoreView({
 
                 <button
                   type="button"
-                  onClick={() => navigate("/profile")}
+                  onClick={() => onNavigate?.("/profile")}
                   className="px-4 py-2 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-xs whitespace-nowrap self-start sm:self-center"
                 >
                   Edit Profile
@@ -269,7 +271,7 @@ export default function MoreView({
                   icon={Building2}
                   title="Bakery Profile"
                   description="Business details, payment methods and delivery settings"
-                  onClick={() => navigate("/profile")}
+                  onClick={() => onNavigate?.("/profile")}
                 />
               </MenuSection>
 
@@ -280,7 +282,7 @@ export default function MoreView({
                       icon={CheckCircle}
                       title="Daily Prep Checklist"
                       description="Manage today's kitchen preparation tasks"
-                      onClick={() => navigate("/checklist")}
+                      onClick={() => onNavigate?.("/checklist")}
                     />
                   </div>
                   <div className="bg-white dark:bg-zinc-900">
@@ -288,7 +290,7 @@ export default function MoreView({
                       icon={Boxes}
                       title="Inventory & Raw Materials"
                       description="Ingredients, stock levels and alerts"
-                      onClick={() => navigate("/inventory")}
+                      onClick={() => onNavigate?.("/inventory")}
                     />
                   </div>
                   <div className="bg-white dark:bg-zinc-900">
@@ -296,7 +298,7 @@ export default function MoreView({
                       icon={BookOpen}
                       title="Formulations & Recipes"
                       description="Recipes, measurements and baking formulations"
-                      onClick={() => navigate("/recipes")}
+                      onClick={() => onNavigate?.("/recipes")}
                     />
                   </div>
                   <div className="bg-white dark:bg-zinc-900">
@@ -304,7 +306,7 @@ export default function MoreView({
                       icon={Activity}
                       title="Kitchen Debriefs"
                       description="Review completed orders and kitchen performance"
-                      onClick={() => navigate("/debriefs")}
+                      onClick={() => onNavigate?.("/debriefs")}
                     />
                   </div>
                   <div className="bg-white dark:bg-zinc-900">
@@ -312,7 +314,7 @@ export default function MoreView({
                       icon={Users}
                       title="Customers"
                       description="View and manage your customer profiles"
-                      onClick={() => navigate("/customers")}
+                      onClick={() => onNavigate?.("/customers")}
                     />
                   </div>
                 </div>
@@ -374,7 +376,7 @@ export default function MoreView({
                 icon={MessageSquare}
                 title="Share Feedback"
                 description="Send bugs, requests or suggestions"
-                onClick={() => navigate("/feedback")}
+                onClick={() => onNavigate?.("/feedback")}
               />
               <MenuItem
                 icon={ShieldCheck}
@@ -432,3 +434,5 @@ export default function MoreView({
     </>
   );
 }
+
+export default memoWithData(MoreView);

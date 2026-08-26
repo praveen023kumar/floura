@@ -9,11 +9,10 @@ import {
   InventoryItem,
   Recipe,
   ChecklistItem,
-  CustomEvent,
-  DispatchedNotification,
-  CustomScheduledAlert,
   BakeryProfile,
 } from "../types";
+import { scaleRecipeIngredients, parseWeightToGrams } from "../../shared/calculations";
+
 
 export function useAppEngine() {
   const navigate = useNavigate();
@@ -42,9 +41,6 @@ export function useAppEngine() {
 
   // Local state replicas of IndexedDB tables (Empty references used purely as lightweight reactive triggers)
   const [checkerList, setCheckerList] = useState<ChecklistItem[]>([]);
-  const [customEvents, setCustomEvents] = useState<CustomEvent[]>([]);
-  const [dispatchedNotifications, setDispatchedNotifications] = useState<DispatchedNotification[]>([]);
-  const [scheduledAlerts, setScheduledAlerts] = useState<CustomScheduledAlert[]>([]);
   const [bakeryProfile, setBakeryProfile] = useState<BakeryProfile | null>(null);
 
   // High-performance dashboard statistics states (replaces in-memory computations)
@@ -96,61 +92,129 @@ export function useAppEngine() {
   }, [darkMode]);
 
   // Load data slice for react states (counts and active small tables) to prevent memory leak
-  async function refreshReactStates() {
+  async function refreshReactStates(skipNotify = false, table?: string | string[], isRouteTransition = false, isFromBroadcast = false) {
     try {
+      let p = window.location.hash ? window.location.hash.substring(1) : window.location.pathname;
+      if (p.startsWith("/")) p = p.substring(1);
+      const activeTab = p.split("?")[0].split("/")[0].toLowerCase();
+
+      const loadChecklist = activeTab === "checklist" || activeTab === "dashboard";
+      const loadStats = activeTab === "dashboard" || activeTab === "";
+
+      const shouldLoadProfile = !isRouteTransition || !bakeryProfile || (table === "bakeryProfile" || (Array.isArray(table) && table.includes("bakeryProfile")));
+
       const [
-        localChecklist,
-        localCustomEvents,
-        localDispatchedNotifications,
-        localScheduledAlerts,
         localBakeryProfile,
-        allOrders,
-        allInventory
+        completedCountResult,
+        pendingCountResult,
+        lowStockCountResult
       ] = await Promise.all([
-        localDb.checklist.toArray(),
-        localDb.customEvents.toArray(),
-        localDb.dispatchedNotifications.toArray(),
-        localDb.scheduledAlerts.toArray(),
-        localDb.bakeryProfile.toArray(),
-        localDb.orders.filter((o: any) => o.isDeleted !== 1).toArray(),
-        localDb.inventory.filter((i: any) => i.isDeleted !== 1).toArray()
+        shouldLoadProfile ? localDb.bakeryProfile.query("SELECT * FROM bakeryProfile WHERE isDeleted = 0 LIMIT 1") : Promise.resolve([]),
+        loadStats ? localDb.orders.query("SELECT COUNT(*) as count FROM orders WHERE isDeleted = 0 AND status = 'Completed'") : Promise.resolve([]),
+        loadStats ? localDb.orders.query("SELECT COUNT(*) as count FROM orders WHERE isDeleted = 0 AND status = 'Pending'") : Promise.resolve([]),
+        loadStats ? localDb.inventory.query("SELECT COUNT(*) as count FROM inventory WHERE isDeleted = 0 AND quantity < minStockLevel") : Promise.resolve([])
       ]);
 
-      const completedCount = allOrders.filter((o: any) => o.status === "Completed").length;
-      const pendingCount = allOrders.filter((o: any) => o.status === "Pending").length;
-      const lowCount = allInventory.filter((i: any) => i.quantity < i.minStockLevel).length;
+      if (loadStats) {
+        const completedCount = completedCountResult[0]?.count || 0;
+        const pendingCount = pendingCountResult[0]?.count || 0;
+        const lowCount = lowStockCountResult[0]?.count || 0;
 
-      setCompletedOrdersCount(completedCount);
-      setActiveOrdersCount(pendingCount);
-      setLowStockCount(lowCount);
+        setCompletedOrdersCount(completedCount);
+        setActiveOrdersCount(pendingCount);
+        setLowStockCount(lowCount);
+      }
 
-      setCheckerList(localChecklist.filter((chk: any) => chk.isDeleted !== 1));
-      setCustomEvents(localCustomEvents.filter((ev: any) => ev.isDeleted !== 1));
-      setDispatchedNotifications(localDispatchedNotifications.filter((dn: any) => dn.isDeleted !== 1));
-      setScheduledAlerts(localScheduledAlerts.filter((sa: any) => sa.isDeleted !== 1));
-      setBakeryProfile(localBakeryProfile.filter((bp: any) => bp.isDeleted !== 1)[0] || null);
+      if (shouldLoadProfile) {
+        setBakeryProfile(localBakeryProfile[0] || null);
+      }
 
-      // Dispatch event to notify child views (such as OrdersView, DashboardView, etc.) to reload their IndexedDB queries
-      window.dispatchEvent(new Event("db-update"));
+      // Dispatch event to notify child views (such as OrdersView, DashboardView, etc.) to reload their SQLite queries
+      if (!skipNotify) {
+        window.dispatchEvent(new CustomEvent("db-update", { detail: { table } }));
+      }
+
+      // Broadcast update to other tabs of the same app to keep them in sync
+      if (!skipNotify && !isFromBroadcast && typeof window !== "undefined" && "BroadcastChannel" in window) {
+        try {
+          const channel = new BroadcastChannel("floura_db_sync");
+          channel.postMessage({ table });
+          channel.close();
+        } catch (e) {
+          console.error("Failed to broadcast database update:", e);
+        }
+      }
     } catch (err) {
-      console.error("Failed to load IndexedDB data slice:", err);
+      console.error("Failed to load SQLite data slice:", err);
     }
   }
 
-  // Automatically refresh IndexedDB states when the window is focused or document visibility changes
+  // Keep a reference to the latest refreshReactStates to prevent stale closures in event listeners
+  const refreshReactStatesRef = useRef(refreshReactStates);
   useEffect(() => {
-    const handleFocusOrVisible = () => {
+    refreshReactStatesRef.current = refreshReactStates;
+  });
+
+  // Automatically refresh states when document visibility changes
+  useEffect(() => {
+    const handleVisible = () => {
       if (document.visibilityState === "visible") {
-        refreshReactStates();
+        refreshReactStatesRef.current();
       }
     };
 
-    window.addEventListener("focus", handleFocusOrVisible);
-    document.addEventListener("visibilitychange", handleFocusOrVisible);
+    document.addEventListener("visibilitychange", handleVisible);
 
     return () => {
-      window.removeEventListener("focus", handleFocusOrVisible);
-      document.removeEventListener("visibilitychange", handleFocusOrVisible);
+      document.removeEventListener("visibilitychange", handleVisible);
+    };
+  }, []);
+
+  // Listen for db updates broadcast from other tabs
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+
+    const channel = new BroadcastChannel("floura_db_sync");
+    const handleMessage = (event: MessageEvent) => {
+      const { table } = event.data;
+      refreshReactStatesRef.current(false, table, false, true);
+    };
+
+    channel.addEventListener("message", handleMessage);
+
+    return () => {
+      channel.removeEventListener("message", handleMessage);
+      channel.close();
+    };
+  }, []);
+
+  // Silently refresh route-specific states when url / tab changes
+  useEffect(() => {
+    const handleUrlChange = () => {
+      refreshReactStatesRef.current(true, undefined, true);
+    };
+
+    window.addEventListener("popstate", handleUrlChange);
+    window.addEventListener("hashchange", handleUrlChange);
+
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function(...args) {
+      originalPushState.apply(this, args);
+      handleUrlChange();
+    };
+
+    window.history.replaceState = function(...args) {
+      originalReplaceState.apply(this, args);
+      handleUrlChange();
+    };
+
+    return () => {
+      window.removeEventListener("popstate", handleUrlChange);
+      window.removeEventListener("hashchange", handleUrlChange);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
     };
   }, []);
 
@@ -190,7 +254,7 @@ export function useAppEngine() {
 
       // Load data in parallel for optimal startup performance
       try {
-        await refreshReactStates();
+        await refreshReactStates(true);
         setProfileChecked(true);
 
         const [custCount, ordCount, bakeryProfileCount] = await Promise.all([
@@ -353,7 +417,13 @@ export function useAppEngine() {
     setSyncStatus("syncing");
 
     try {
-      // 1. Gather all local changes (unsynced) in parallel using IndexedDB indexes
+      // 1. Gather all local changes (unsynced) in parallel using SQLite
+      // Query metadata table to find which tables have pending local changes
+      const changedRows = await localDb.updated_tables.query(
+        "SELECT tableName FROM updated_tables WHERE hasChanges = 1"
+      );
+      const changedTables = new Set(changedRows.map(r => r.tableName));
+
       const [
         dirtyCustomers,
         dirtyOrders,
@@ -366,29 +436,17 @@ export function useAppEngine() {
         dirtyBakeryProfile,
         dirtyCategories
       ] = await Promise.all([
-        localDb.customers.where("localChange").equals(1).toArray(),
-        localDb.orders.where("localChange").equals(1).toArray(),
-        localDb.inventory.where("localChange").equals(1).toArray(),
-        localDb.recipes.where("localChange").equals(1).toArray(),
-        localDb.checklist.where("localChange").equals(1).toArray(),
-        localDb.customEvents.where("localChange").equals(1).toArray(),
-        localDb.dispatchedNotifications.where("localChange").equals(1).toArray(),
-        localDb.scheduledAlerts.where("localChange").equals(1).toArray(),
-        localDb.bakeryProfile.where("localChange").equals(1).toArray(),
-        localDb.categories.where("localChange").equals(1).toArray()
+        changedTables.has("customers") ? localDb.customers.where("localChange").equals(1).toArray() : Promise.resolve([]),
+        changedTables.has("orders") ? localDb.orders.where("localChange").equals(1).toArray() : Promise.resolve([]),
+        changedTables.has("inventory") ? localDb.inventory.where("localChange").equals(1).toArray() : Promise.resolve([]),
+        changedTables.has("recipes") ? localDb.recipes.where("localChange").equals(1).toArray() : Promise.resolve([]),
+        changedTables.has("checklist") ? localDb.checklist.where("localChange").equals(1).toArray() : Promise.resolve([]),
+        changedTables.has("customEvents") ? localDb.customEvents.where("localChange").equals(1).toArray() : Promise.resolve([]),
+        changedTables.has("dispatchedNotifications") ? localDb.dispatchedNotifications.where("localChange").equals(1).toArray() : Promise.resolve([]),
+        changedTables.has("scheduledAlerts") ? localDb.scheduledAlerts.where("localChange").equals(1).toArray() : Promise.resolve([]),
+        changedTables.has("bakeryProfile") ? localDb.bakeryProfile.where("localChange").equals(1).toArray() : Promise.resolve([]),
+        changedTables.has("categories") ? localDb.categories.where("localChange").equals(1).toArray() : Promise.resolve([])
       ]);
-
-      const hasDirtyChanges =
-        dirtyCustomers.length > 0 ||
-        dirtyOrders.length > 0 ||
-        dirtyInventory.length > 0 ||
-        dirtyRecipes.length > 0 ||
-        dirtyChecklist.length > 0 ||
-        dirtyCustomEvents.length > 0 ||
-        dirtyDispatchedNotifications.length > 0 ||
-        dirtyScheduledAlerts.length > 0 ||
-        dirtyBakeryProfile.length > 0 ||
-        dirtyCategories.length > 0;
 
       // If no dirty changes are present, we fast-path exit!
       if (!hasDirtyChanges) {
@@ -583,9 +641,6 @@ export function useAppEngine() {
 
     // Reset local memory states to prevent UI remnants
     setCheckerList([]);
-    setCustomEvents([]);
-    setDispatchedNotifications([]);
-    setScheduledAlerts([]);
     setBakeryProfile(null);
 
     setUser(null);
@@ -670,7 +725,14 @@ export function useAppEngine() {
       id,
       createdAt: timeStr,
       updatedAt: timeStr,
+      inventoryReduced: 0,
     };
+
+    const isOtherStatus = newOrder.status !== "Pending" && newOrder.status !== "Ordered Ingredients" && newOrder.status !== "Cancelled";
+    if (isOtherStatus) {
+      await reduceInventoryForOrder(orderRecord);
+      orderRecord.inventoryReduced = 1;
+    }
 
     // Save locally to IndexedDB with dirty flag set to 1
     await localDb.orders.put({ ...orderRecord, localChange: 1 });
@@ -692,11 +754,66 @@ export function useAppEngine() {
     }
 
     // Refresh count states and triggers empty trigger state update
-    await refreshReactStates();
+    const statesToRefresh = ["orders", "customers"];
+    if (orderRecord.inventoryReduced) {
+      statesToRefresh.push("inventory");
+    }
+    await refreshReactStates(false, statesToRefresh);
 
     // Triggers silent backend cloud sync
     triggerSync();
     return orderRecord;
+  };
+
+  // Helper to get inventory conversion factor
+  const getInventoryConversionFactor = (inventoryUnit: string): number => {
+    const unit = (inventoryUnit || "").toLowerCase().trim();
+    if (unit === "kg" || unit === "kilogram" || unit === "kilograms" || unit === "l" || unit === "liter" || unit === "liters" || unit === "litre" || unit === "litres") {
+      return 1000;
+    }
+    return 1;
+  };
+
+  // Reduce inventory quantities based on order flavor recipe and weight
+  const reduceInventoryForOrder = async (order: Order) => {
+    try {
+      const recipes = await localDb.recipes.toArray();
+      const matchingRecipe = recipes.find(
+        (r: any) => r.isDeleted !== 1 && r.name.trim().toLowerCase() === order.cakeFlavor.trim().toLowerCase()
+      );
+      
+      if (!matchingRecipe) {
+        console.log(`[Inventory Sync] No matching recipe found for flavor: ${order.cakeFlavor}`);
+        return;
+      }
+      
+      const targetWeight = parseWeightToGrams(order.cakeWeight);
+      const scaledIngredients = scaleRecipeIngredients(matchingRecipe, targetWeight);
+      
+      const inventoryItems = await localDb.inventory.toArray();
+      for (const ing of scaledIngredients) {
+        const invItem = inventoryItems.find(
+          (item: any) => item.isDeleted !== 1 && item.name.trim().toLowerCase() === ing.name.trim().toLowerCase()
+        );
+        if (invItem) {
+          const conversion = getInventoryConversionFactor(invItem.unit);
+          const qtyToReduce = ing.scaledQty / conversion;
+          const newQty = Math.max(0, invItem.quantity - qtyToReduce);
+          
+          await localDb.inventory.put({
+            ...invItem,
+            quantity: parseFloat(newQty.toFixed(3)),
+            updatedAt: new Date().toISOString(),
+            localChange: 1
+          });
+          console.log(`[Inventory Sync] Reduced ${ing.name} by ${qtyToReduce} ${invItem.unit} (new qty: ${newQty})`);
+        } else {
+          console.warn(`[Inventory Sync] Ingredient ${ing.name} in recipe not found in inventory.`);
+        }
+      }
+    } catch (err) {
+      console.error("[Inventory Sync] Failed to reduce inventory for order:", err);
+    }
   };
 
   // Update order status trigger with extended stages
@@ -704,19 +821,30 @@ export function useAppEngine() {
     const timeStr = new Date().toISOString();
     const record = await localDb.orders.get(id);
     if (record) {
+      let inventoryReducedVal = record.inventoryReduced || 0;
+      const isOtherStatus = status !== "Pending" && status !== "Ordered Ingredients" && status !== "Cancelled";
+      const shouldReduce = isOtherStatus && !inventoryReducedVal;
+
+      if (shouldReduce) {
+        await reduceInventoryForOrder(record);
+        inventoryReducedVal = 1;
+      }
+
       const updated = {
         ...record,
         status,
+        inventoryReduced: inventoryReducedVal,
         updatedAt: timeStr,
         localChange: 1,
       };
       await localDb.orders.put(updated);
-      await refreshReactStates();
+      await refreshReactStates(false, ["orders", "inventory"]);
       
       // Sync with cloud SQLite
       triggerSync();
     }
   };
+
 
   // Update complete order details
   const handleUpdateOrder = async (updatedOrder: Order) => {
@@ -755,13 +883,24 @@ export function useAppEngine() {
     }
 
     const originalOrder = await localDb.orders.get(updatedOrder.id);
+    let inventoryReducedVal = originalOrder?.inventoryReduced || 0;
+    const newStatus = updatedOrder.status;
+    const isOtherStatus = newStatus !== "Pending" && newStatus !== "Ordered Ingredients" && newStatus !== "Cancelled";
+    const shouldReduce = isOtherStatus && !inventoryReducedVal;
+
     const updated = {
       ...originalOrder,
       ...updatedOrder,
+      inventoryReduced: inventoryReducedVal,
       customerId: finalCustomerId || "guest",
       updatedAt: timeStr,
       localChange: 1,
     };
+
+    if (shouldReduce && originalOrder) {
+      await reduceInventoryForOrder(updated);
+      updated.inventoryReduced = 1;
+    }
 
     // Correctly update customer stats if customer assignment changes
     if (updated.customerId && updated.customerId !== "guest" && updated.customerId !== "new") {
@@ -800,67 +939,12 @@ export function useAppEngine() {
     }
 
     await localDb.orders.put(updated);
-    await refreshReactStates();
+    await refreshReactStates(false, ["orders", "customers", "inventory"]);
     triggerSync();
+
   };
 
-  // Calendar event and notifications DB handlers
-  const handleAddCustomEvent = async (event: CustomEvent) => {
-    const record = { ...event, localChange: 1, isDeleted: 0 };
-    await localDb.customEvents.put(record);
-    setCustomEvents((prev) => [record, ...prev]);
-    triggerSync();
-  };
 
-  const handleDeleteCustomEvent = async (id: string) => {
-    const record = await localDb.customEvents.get(id);
-    if (record) {
-      const updated = { ...record, isDeleted: 1, localChange: 1 };
-      await localDb.customEvents.put(updated);
-      setCustomEvents((prev) => prev.filter((ev) => ev.id !== id));
-      triggerSync();
-    }
-  };
-
-  const handleAddScheduledAlert = async (alert: CustomScheduledAlert) => {
-    const record = { ...alert, localChange: 1, isDeleted: 0 };
-    await localDb.scheduledAlerts.put(record);
-    setScheduledAlerts((prev) => [record, ...prev]);
-    triggerSync();
-  };
-
-  const handleDeleteScheduledAlert = async (id: string) => {
-    const record = await localDb.scheduledAlerts.get(id);
-    if (record) {
-      const updated = { ...record, isDeleted: 1, localChange: 1 };
-      await localDb.scheduledAlerts.put(updated);
-      setScheduledAlerts((prev) => prev.filter((sa) => sa.id !== id));
-      triggerSync();
-    }
-  };
-
-  const handleAddDispatchedNotification = async (notif: DispatchedNotification) => {
-    const record = { ...notif, localChange: 1, isDeleted: 0 };
-    await localDb.dispatchedNotifications.put(record);
-    setDispatchedNotifications((prev) => [record, ...prev]);
-    triggerSync();
-  };
-
-  const handleClearDispatchedNotifications = async () => {
-    const active = await localDb.dispatchedNotifications.toArray();
-    const updated = active.map(item => ({
-      ...item,
-      isDeleted: 1,
-      localChange: 1
-    }));
-    if (updated.length > 0) {
-      await localDb.dispatchedNotifications.bulkPut(updated);
-    }
-    setDispatchedNotifications([]);
-    triggerSync();
-  };
-
-  // Create Customer Spec Mutation
   const handleAddCustomer = async (newCustomer: Omit<Customer, "id" | "updatedAt">) => {
     const id = "cust-" + Math.random().toString(36).substring(2, 9);
     const customerRecord: Customer = {
@@ -870,7 +954,7 @@ export function useAppEngine() {
     };
 
     await localDb.customers.put({ ...customerRecord, localChange: 1 });
-    await refreshReactStates();
+    await refreshReactStates(false, "customers");
     triggerSync();
     return customerRecord;
   };
@@ -883,7 +967,7 @@ export function useAppEngine() {
       localChange: 1,
     };
     await localDb.customers.put(updated);
-    await refreshReactStates();
+    await refreshReactStates(false, "customers");
     triggerSync();
   };
 
@@ -899,7 +983,7 @@ export function useAppEngine() {
       };
       await localDb.customers.put(softDeleted);
     }
-    await refreshReactStates();
+    await refreshReactStates(false, "customers");
     triggerSync();
   };
 
@@ -913,7 +997,7 @@ export function useAppEngine() {
     };
 
     await localDb.inventory.put({ ...itemRecord, localChange: 1 });
-    await refreshReactStates();
+    await refreshReactStates(false, "inventory");
     triggerSync();
     return itemRecord;
   };
@@ -925,7 +1009,7 @@ export function useAppEngine() {
       updatedAt: new Date().toISOString(),
     };
     await localDb.inventory.put({ ...itemRecord, localChange: 1 });
-    await refreshReactStates();
+    await refreshReactStates(false, "inventory");
     triggerSync();
     return itemRecord;
   };
@@ -940,7 +1024,7 @@ export function useAppEngine() {
     };
 
     await localDb.recipes.put({ ...recipeRecord, localChange: 1 });
-    await refreshReactStates();
+    await refreshReactStates(false, "recipes");
     triggerSync();
     return recipeRecord;
   };
@@ -953,7 +1037,7 @@ export function useAppEngine() {
     };
 
     await localDb.recipes.put({ ...recipeRecord, localChange: 1 });
-    await refreshReactStates();
+    await refreshReactStates(false, "recipes");
     triggerSync();
     return recipeRecord;
   };
@@ -1005,6 +1089,7 @@ export function useAppEngine() {
           localChange: 1,
         };
         await localDb.checklist.put(updated);
+        await refreshReactStates(false, "checklist");
         triggerSync();
       }
     } catch (err) {
@@ -1026,6 +1111,7 @@ export function useAppEngine() {
     };
     await localDb.checklist.put({ ...itemRecord, localChange: 1 });
     setCheckerList((prev) => [...prev, itemRecord]);
+    await refreshReactStates(false, "checklist");
     triggerSync();
     return itemRecord;
   };
@@ -1050,6 +1136,7 @@ export function useAppEngine() {
     }
     const fresh = await localDb.checklist.toArray();
     setCheckerList(fresh.filter((chk: any) => chk.isDeleted !== 1));
+    await refreshReactStates(false, "checklist");
     triggerSync();
   };
 
@@ -1073,6 +1160,7 @@ export function useAppEngine() {
       updatedAt: new Date().toISOString()
     });
     setBakeryProfile(updatedProfile);
+    await refreshReactStates(false, "bakeryProfile");
     if (typeof navigator !== "undefined" && navigator.onLine) {
       triggerSync();
     }
@@ -1091,9 +1179,6 @@ export function useAppEngine() {
     pullingProgress,
     syncStatus,
     checkerList,
-    customEvents,
-    dispatchedNotifications,
-    scheduledAlerts,
     bakeryProfile,
     setBakeryProfile,
     completedOrdersCount,
@@ -1108,12 +1193,6 @@ export function useAppEngine() {
     handleAddOrder,
     handleUpdateOrderStatus,
     handleUpdateOrder,
-    handleAddCustomEvent,
-    handleDeleteCustomEvent,
-    handleAddScheduledAlert,
-    handleDeleteScheduledAlert,
-    handleAddDispatchedNotification,
-    handleClearDispatchedNotifications,
     handleAddCustomer,
     handleUpdateCustomer,
     handleDeleteCustomer,

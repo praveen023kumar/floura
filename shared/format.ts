@@ -8,6 +8,9 @@ export function setSharedFormatConfig(currency: string, dateFormat: string) {
 }
 
 export function getSharedCurrencySymbol(): string {
+  if (!activeCurrency || activeCurrency.startsWith("__GCM__") || activeCurrency.startsWith("__ENC__")) {
+    return "$";
+  }
   return activeCurrency;
 }
 
@@ -18,6 +21,9 @@ export function formatPriceShared(amount: number | null | undefined): string {
 }
 
 export function getSharedDateFormat(): string {
+  if (!activeDateFormat || activeDateFormat.startsWith("__GCM__") || activeDateFormat.startsWith("__ENC__")) {
+    return "YYYY-MM-DD";
+  }
   return activeDateFormat;
 }
 

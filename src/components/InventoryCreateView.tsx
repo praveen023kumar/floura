@@ -1,9 +1,10 @@
 // File Path: /src/components/InventoryCreateView.tsx
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, memo } from "react";
+import { memoWithData } from "../utils/memo";
 import CreatableSelect from "react-select/creatable";
 import { customSelectStyles } from "./customSelectStyles";
-import { type InventoryItem } from "../types";
-import { useNavigate, useLocation } from "react-router-dom";
+import { type InventoryItem, type Category } from "../types";
+
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { motion } from "motion/react";
 import { localDb } from "../db";
@@ -12,16 +13,16 @@ import { getCurrencySymbol } from "../utils/format";
 interface InventoryCreateViewProps {
   onAddInventoryItem: (item: Omit<InventoryItem, "id" | "updatedAt">) => Promise<any>;
   onUpdateInventoryItem?: (item: InventoryItem) => Promise<any>;
+  onNavigate?: (path: string | number) => void;
+  itemToEdit?: InventoryItem | null;
 }
 
-export default function InventoryCreateView({
+function InventoryCreateView({
   onAddInventoryItem,
   onUpdateInventoryItem,
+  onNavigate,
+  itemToEdit,
 }: InventoryCreateViewProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const itemToEdit = location.state?.item as InventoryItem | null;
 
   const [formInputs, setFormInputs] = useState<any>({
     name: "",
@@ -71,11 +72,15 @@ export default function InventoryCreateView({
   useEffect(() => {
     async function loadOptions() {
       try {
-        const allItems = await localDb.inventory.filter((i: any) => i.isDeleted !== 1).toArray();
+        const [dbCats, allItems] = await Promise.all([
+          localDb.categories.filter((c: Category) => c.type === "inventory" && c.isDeleted !== 1).toArray(),
+          localDb.inventory.filter((i: any) => i.isDeleted !== 1).toArray(),
+        ]);
+        const catNames = dbCats.map((c) => c.name);
         const allCategories = allItems.map(item => item.category).filter(Boolean);
         const allUnits = allItems.map(item => item.unit).filter(Boolean);
 
-        setDynamicCategories(Array.from(new Set([...defaultCategories, ...allCategories])));
+        setDynamicCategories(Array.from(new Set([...defaultCategories, ...catNames, ...allCategories])));
         setDynamicUnits(Array.from(new Set([...defaultUnits, ...allUnits])));
       } catch (err) {
         console.error("Failed to load inventory categories & units for autocomplete:", err);
@@ -123,7 +128,7 @@ export default function InventoryCreateView({
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
-        navigate("/inventory");
+        onNavigate?.("/inventory");
       }, 1500);
     } catch (err) {
       console.error(err);
@@ -139,7 +144,7 @@ export default function InventoryCreateView({
       <div className="flex items-center gap-4 bg-white dark:bg-zinc-800 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-700/60 shadow-sm">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => onNavigate?.(-1)}
           className="p-2 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors"
           title="Go back"
         >
@@ -304,7 +309,7 @@ export default function InventoryCreateView({
           <div className="flex justify-end gap-3 pt-6 border-t border-zinc-100 dark:border-zinc-800">
             <button
               type="button"
-              onClick={() => navigate("/inventory")}
+              onClick={() => onNavigate?.("/inventory")}
               className="px-6 py-2.5 border border-zinc-250 dark:border-zinc-700 text-zinc-655 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-bold rounded-full transition-colors cursor-pointer"
             >
               Cancel
@@ -334,3 +339,5 @@ export default function InventoryCreateView({
     </div>
   );
 }
+
+export default memoWithData(InventoryCreateView);

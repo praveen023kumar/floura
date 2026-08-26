@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { type Recipe } from "../types";
 import { localDb } from "../db";
+import { useQuery } from "@tanstack/react-query";
 
 export interface UseRecipesProps {
   onAddRecipe: (recipe: Omit<Recipe, "id" | "updatedAt">) => Promise<any>;
@@ -13,13 +14,7 @@ export function useRecipes({
   initialViewMode = "list",
   onViewModeChange,
 }: UseRecipesProps) {
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  useEffect(() => {
-    const handler = () => setRefreshTrigger((prev) => prev + 1);
-    window.addEventListener("db-update", handler);
-    return () => window.removeEventListener("db-update", handler);
-  }, []);
 
   const [viewMode, setViewMode] = useState<"list" | "form" | "detail">(initialViewMode);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -28,12 +23,6 @@ export function useRecipes({
 
   const [selectedRecipeId, setSelectedRecipeId] = useState("");
   const [desiredUnits, setDesiredUnits] = useState<number | string>("");
-
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-  const [paginatedRecipes, setPaginatedRecipes] = useState<Recipe[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [filteredCount, setFilteredCount] = useState<number>(0);
-  const [recipeList, setRecipeList] = useState<Recipe[]>([]);
 
   const [recipesCurrentPage, setRecipesCurrentPage] = useState<number>(1);
   const [recipesItemsPerPage, setRecipesItemsPerPage] = useState<number>(10);
@@ -58,25 +47,18 @@ export function useRecipes({
     }
   };
 
-  // Load selected recipe dynamically
-  useEffect(() => {
-    async function loadSelectedRecipe() {
-      try {
-        if (selectedRecipeId) {
-          const found = await localDb.recipes.get(selectedRecipeId);
-          if (found) {
-            setSelectedRecipe(found);
-            return;
-          }
-        }
-        const first = await localDb.recipes.toCollection().first();
-        setSelectedRecipe(first || null);
-      } catch (err) {
-        console.error("Failed to load selected recipe:", err);
+  // Load selected recipe dynamically using TanStack useQuery
+  const { data: selectedRecipe = null } = useQuery<Recipe | null>({
+    queryKey: ["recipes", "detail", selectedRecipeId],
+    queryFn: async () => {
+      if (selectedRecipeId) {
+        const found = await localDb.recipes.get(selectedRecipeId);
+        if (found) return found;
       }
+      const first = await localDb.recipes.toCollection().first();
+      return first || null;
     }
-    loadSelectedRecipe();
-  }, [selectedRecipeId, refreshTrigger]);
+  });
 
   // Set default desiredUnits when recipe is loaded
   useEffect(() => {
@@ -100,36 +82,58 @@ export function useRecipes({
     }));
   }, [selectedRecipe, desiredUnits]);
 
-  const [dynamicCategories, setDynamicCategories] = useState<string[]>(["Cakes", "Viennoiserie", "Tarts", "Confectionary", "Classic", "Pastry"]);
-
-  // Load categories from categories table
-  useEffect(() => {
-    async function loadCategories() {
-      try {
-        const dbCats = await localDb.categories
-          .filter(c => c.type === "recipe" && c.isDeleted !== 1)
-          .toArray();
-        const catNames = dbCats.map(c => c.name);
-        const defaultCats = ["Cakes", "Viennoiserie", "Tarts", "Confectionary", "Classic", "Pastry"];
-        setDynamicCategories(Array.from(new Set([...defaultCats, ...catNames])));
-      } catch (err) {
-        console.error("Failed to load recipe categories:", err);
-      }
+  // Load categories using TanStack useQuery
+  const { data: dynamicCategories = ["Cakes", "Viennoiserie", "Tarts", "Confectionary", "Classic", "Pastry"] } = useQuery<string[]>({
+    queryKey: ["recipes", "categories"],
+    queryFn: async () => {
+      const dbCats = await localDb.categories
+        .filter(c => c.type === "recipe" && c.isDeleted !== 1)
+        .toArray();
+      const catNames = dbCats.map(c => c.name);
+      const defaultCats = ["Cakes", "Viennoiserie", "Tarts", "Confectionary", "Classic", "Pastry"];
+      return Array.from(new Set([...defaultCats, ...catNames]));
     }
-    loadCategories();
-  }, [refreshTrigger]);
+  });
 
-  // Load paginated recipes dynamically
-  useEffect(() => {
-    async function loadDbRecipes() {
-      try {
-        const startIndex = (recipesCurrentPage - 1) * recipesItemsPerPage;
-        
-        // Query the database to retrieve all active (non-deleted) decrypted recipes
-        const allRecipes = await localDb.recipes.filter((r: any) => r.isDeleted !== 1).toArray();
+  // Load paginated list of recipes using TanStack useQuery
+  const { data: listResult = { filteredCount: 0, paginatedRecipes: [] }, isLoading: loading } = useQuery({
+    queryKey: [
+      "recipes",
+      "list",
+      searchTerm,
+      selectedCategory,
+      recipesCurrentPage,
+      recipesItemsPerPage
+    ],
+    queryFn: async () => {
+      const startIndex = (recipesCurrentPage - 1) * recipesItemsPerPage;
+      const hasFilters = selectedCategory !== "All" || searchTerm.trim() !== "";
 
-        // Perform all filtering in memory using the decrypted objects
-        const matched = allRecipes.filter(r => {
+      let filteredCount = 0;
+      let paginatedRecipes: Recipe[] = [];
+
+      if (!hasFilters) {
+        // No filters: Paginate directly in SQLite using lightweight queries
+        const countResult = await localDb.recipes.query(
+          "SELECT COUNT(*) as count FROM recipes WHERE isDeleted = 0"
+        );
+        const totalCount = countResult[0]?.count || 0;
+
+        const pageRecipes = await localDb.recipes.query(
+          "SELECT * FROM recipes WHERE isDeleted = 0 ORDER BY COALESCE(updatedAt, '') DESC LIMIT ? OFFSET ?",
+          [recipesItemsPerPage, startIndex]
+        );
+
+        filteredCount = totalCount;
+        paginatedRecipes = pageRecipes;
+      } else {
+        // Has encrypted/decrypted filters: Fetch only lightweight columns for memory filter/sort
+        const allRecipesLight = await localDb.recipes.query(
+          "SELECT id, name, category, updatedAt FROM recipes WHERE isDeleted = 0"
+        );
+
+        // Perform filtering on lightweight decrypted fields
+        const matched = allRecipesLight.filter(r => {
           if (selectedCategory !== "All" && r.category !== selectedCategory) return false;
           if (searchTerm) {
             const s = searchTerm.toLowerCase();
@@ -145,17 +149,35 @@ export function useRecipes({
           return bTime - aTime;
         });
 
-        // Set counts and paginated results
-        setFilteredCount(matched.length);
-        setPaginatedRecipes(matched.slice(startIndex, startIndex + recipesItemsPerPage));
-      } catch (err) {
-        console.error("Failed to query recipes from localDb:", err);
-      } finally {
-        setLoading(false);
+        filteredCount = matched.length;
+
+        const pageIds = matched
+          .slice(startIndex, startIndex + recipesItemsPerPage)
+          .map(r => r.id);
+
+        if (pageIds.length > 0) {
+          const placeholders = pageIds.map(() => "?").join(",");
+          const pageRecipes = await localDb.recipes.query(
+            `SELECT * FROM recipes WHERE id IN (${placeholders})`,
+            pageIds
+          );
+
+          // Re-sort to match the in-memory filtered & sorted pageIds order
+          const recipeMap = new Map(pageRecipes.map(r => [r.id, r]));
+          paginatedRecipes = pageIds
+            .map(id => recipeMap.get(id))
+            .filter((r): r is Recipe => !!r);
+        }
       }
+
+      return { filteredCount, paginatedRecipes };
     }
-    loadDbRecipes();
-  }, [refreshTrigger, searchTerm, selectedCategory, recipesCurrentPage, recipesItemsPerPage]);
+  });
+
+  const filteredCount = listResult.filteredCount;
+  const paginatedRecipes = listResult.paginatedRecipes;
+  const recipeList: Recipe[] = [];
+  const setSelectedRecipe = (recipe: Recipe | null) => {};
 
   useEffect(() => {
     setRecipesCurrentPage(1);
@@ -173,7 +195,6 @@ export function useRecipes({
 
   return {
     loading,
-    refreshTrigger,
     viewMode,
     setViewMode,
     isCreateModalOpen,

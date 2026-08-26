@@ -1,14 +1,18 @@
 // File Path: /src/components/RecipeDetailView.tsx
 import React, { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { memoWithData } from "../utils/memo";
 import { localDb } from "../db";
 import { type Recipe } from "../types";
 import { ArrowLeft, Calculator, Scale, BookOpen, Edit } from "lucide-react";
 import { motion } from "motion/react";
 
-export default function RecipeDetailView() {
+interface RecipeDetailViewProps {
+  onNavigate?: (path: string | number, state?: any) => void;
+}
+
+function RecipeDetailView({ onNavigate }: RecipeDetailViewProps) {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [desiredUnits, setDesiredUnits] = useState<number | string>("");
@@ -62,7 +66,7 @@ export default function RecipeDetailView() {
         <div className="flex items-center gap-4 bg-white dark:bg-zinc-800 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-700/60 shadow-sm">
           <button
             type="button"
-            onClick={() => navigate("/recipes")}
+            onClick={() => onNavigate?.("/recipes")}
             className="p-2 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-755 text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -92,7 +96,7 @@ export default function RecipeDetailView() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate("/recipes")}
+            onClick={() => onNavigate?.("/recipes")}
             className="p-2 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors"
             title="Back to recipes list"
           >
@@ -115,14 +119,14 @@ export default function RecipeDetailView() {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => navigate("/recipes/new", { state: { recipe } })}
+            onClick={() => onNavigate?.("/recipes/new", { state: { recipe } })}
             className="bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white py-1.5 px-4 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-md font-sans"
           >
             <Edit className="w-3.5 h-3.5" /> Edit Recipe
           </button>
           <button
             type="button"
-            onClick={() => navigate("/recipes")}
+            onClick={() => onNavigate?.("/recipes")}
             className="border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 py-1.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm text-zinc-750 dark:text-zinc-300"
           >
             Back to Recipe Book
@@ -250,3 +254,5 @@ export default function RecipeDetailView() {
     </motion.div>
   );
 }
+
+export default memoWithData(RecipeDetailView);

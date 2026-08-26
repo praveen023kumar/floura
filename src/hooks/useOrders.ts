@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { type Order, type Customer, type BakeryProfile } from "../types";
+import { type Order, type Customer, type BakeryProfile, type Recipe } from "../types";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { localDb } from "../db";
 import { formatPrice } from "../utils/format";
+import { useQuery } from "@tanstack/react-query";
 
 export interface UseOrdersProps {
   onAddOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<any>;
@@ -29,12 +30,9 @@ export function useOrders({
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
 
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+
   const [viewMode, setViewMode] = useState<"list" | "form" | "detail">(initialViewMode);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [bakeryProfile, setBakeryProfile] = useState<BakeryProfile | null>(null);
   const [filter, setFilter] = useState<string>("active");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<string>("delivery-soonest");
@@ -66,8 +64,8 @@ export function useOrders({
     deliveryTime: "09:00",
     venueAddress: "",
     cakeShape: "Round",
-    cakeWeight: "2.0 kg",
-    cakeFlavor: "Belgian Chocolate",
+    cakeWeight: "1.0 kg",
+    cakeFlavor: "",
     preference: "Egg" as "Egg" | "Eggless",
     layers: "Double Tier" as "Single" | "Double Tier" | "Triple Tier",
     cakeInscription: "",
@@ -80,8 +78,7 @@ export function useOrders({
     paymentNotes: "Initial Deposit",
   });
 
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [customerOptions, setCustomerOptions] = useState<{ value: string; label: string }[]>([]);
+  const [selectedCustomerOption, setSelectedCustomerOption] = useState<{ value: string; label: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -100,33 +97,239 @@ export function useOrders({
   const [ordersCurrentPage, setOrdersCurrentPage] = useState<number>(1);
   const [ordersItemsPerPage, setOrdersItemsPerPage] = useState<number>(10);
 
-  // Pagination count
-  const [paginatedOrders, setPaginatedOrders] = useState<Order[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
-  const [filteredCount, setFilteredCount] = useState<number>(0);
 
-  // Selected order
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  // Set refresh trigger listener
-  useEffect(() => {
-    const handler = () => setRefreshTrigger((prev) => prev + 1);
-    window.addEventListener("db-update", handler);
-    return () => window.removeEventListener("db-update", handler);
-  }, []);
-
-  // Load orders
-  useEffect(() => {
-    async function loadAllOrders() {
-      try {
-        const loaded = await localDb.orders.filter((o: any) => o.isDeleted !== 1).toArray();
-        setOrders(loaded);
-      } catch (err) {
-        console.error("Failed to load orders in OrdersView:", err);
-      }
+  // Load orders using TanStack useQuery
+  const { data: orders = [] } = useQuery<Order[]>({
+    queryKey: ["orders", "all"],
+    queryFn: async () => {
+      const loaded = await localDb.orders.query("SELECT id, createdAt, isDeleted, eventType, cakeFlavor FROM orders WHERE isDeleted = 0");
+      return loaded as any;
     }
-    loadAllOrders();
-  }, [refreshTrigger]);
+  });
+
+  // Load bakery profile using useQuery
+  const { data: bakeryProfile = null } = useQuery<BakeryProfile | null>({
+    queryKey: ["bakeryProfile"],
+    queryFn: async () => {
+      const bp = await localDb.bakeryProfile.toArray();
+      return bp.filter((item: any) => item.isDeleted !== 1)[0] || null;
+    }
+  });
+
+  // Load recipes using useQuery
+  const { data: recipes = [] } = useQuery<Recipe[]>({
+    queryKey: ["recipes", "all"],
+    queryFn: async () => {
+      const loaded = await localDb.recipes.query("SELECT * FROM recipes WHERE isDeleted = 0");
+      return loaded as any;
+    }
+  });
+
+  // Load paginated list of orders using useQuery
+  const { data: queryResult = { filteredCount: 0, filteredOrders: [], paginatedOrders: [] }, isLoading: loading } = useQuery({
+    queryKey: [
+      "orders",
+      "list",
+      searchTerm,
+      filter,
+      ordersCurrentPage,
+      ordersItemsPerPage,
+      sortBy,
+      dateFilter,
+      customStartDate,
+      customEndDate,
+      calMonth,
+      calYear,
+      viewTab,
+      paymentFilter
+    ],
+    queryFn: async () => {
+      const getLocalDateString = (offsetDays = 0) => {
+        const d = new Date();
+        if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      const startIndex = (ordersCurrentPage - 1) * ordersItemsPerPage;
+      const isCalendar = viewTab === "calendar";
+
+      // Build base conditions for SQLite query
+      const conditions = ["isDeleted = 0"];
+      const params: any[] = [];
+
+      // 1. Status Filter
+      if (filter) {
+        const filterLower = filter.toLowerCase();
+        if (filterLower === "active") {
+          conditions.push("status != 'Completed' AND status != 'Cancelled'");
+        } else if (filterLower === "archived") {
+          conditions.push("(status = 'Completed' OR status = 'Cancelled')");
+        } else if (filterLower !== "all") {
+          conditions.push("status = ?");
+          params.push(filter);
+        }
+      }
+
+      // 2. Date Filter
+      if (isCalendar) {
+        const targetYear = calYear !== undefined ? calYear : new Date().getFullYear();
+        const targetMonth = calMonth !== undefined ? calMonth : new Date().getMonth();
+        const yearMonthPrefix = `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}`;
+        conditions.push("COALESCE(NULLIF(deliveryDate, ''), eventDate) LIKE ?");
+        params.push(`${yearMonthPrefix}%`);
+      } else {
+        if (dateFilter === "future") {
+          conditions.push("COALESCE(NULLIF(deliveryDate, ''), eventDate) > ?");
+          params.push(getLocalDateString(0));
+        } else if (dateFilter === "today") {
+          conditions.push("COALESCE(NULLIF(deliveryDate, ''), eventDate) = ?");
+          params.push(getLocalDateString(0));
+        } else if (dateFilter === "tomorrow") {
+          conditions.push("COALESCE(NULLIF(deliveryDate, ''), eventDate) = ?");
+          params.push(getLocalDateString(1));
+        } else if (dateFilter === "custom") {
+          if (customStartDate) {
+            conditions.push("COALESCE(NULLIF(deliveryDate, ''), eventDate) >= ?");
+            params.push(customStartDate);
+          }
+          if (customEndDate) {
+            conditions.push("COALESCE(NULLIF(deliveryDate, ''), eventDate) <= ?");
+            params.push(customEndDate);
+          }
+        }
+      }
+
+      // 3. Sorting Clause for SQLite
+      let orderBy = "";
+      if (sortBy === "created-newest") {
+        orderBy = "ORDER BY COALESCE(createdAt, '') DESC";
+      } else if (sortBy === "created-oldest") {
+        orderBy = "ORDER BY COALESCE(createdAt, '') ASC";
+      } else if (sortBy === "delivery-soonest") {
+        orderBy = "ORDER BY COALESCE(NULLIF(deliveryDate, ''), eventDate, '') ASC, COALESCE(deliveryTime, '') ASC";
+      } else if (sortBy === "delivery-latest") {
+        orderBy = "ORDER BY COALESCE(NULLIF(deliveryDate, ''), eventDate, '') DESC, COALESCE(deliveryTime, '') DESC";
+      } else if (sortBy === "amount-highest") {
+        orderBy = "ORDER BY totalAmount DESC";
+      } else { // "amount-lowest"
+        orderBy = "ORDER BY totalAmount ASC";
+      }
+
+      const whereClause = conditions.join(" AND ");
+      const hasEncryptedFilters = searchTerm || (paymentFilter && paymentFilter !== "all");
+
+      let filteredCount = 0;
+      let filteredOrders: Order[] = [];
+      let paginatedOrders: Order[] = [];
+
+      if (!hasEncryptedFilters) {
+        if (isCalendar) {
+          const matchedOrders = await localDb.orders.query(
+            `SELECT * FROM orders WHERE ${whereClause} ${orderBy}`,
+            params
+          );
+          filteredCount = matchedOrders.length;
+          filteredOrders = matchedOrders;
+          paginatedOrders = [];
+        } else {
+          const countResult = await localDb.orders.query(
+            `SELECT COUNT(*) as count FROM orders WHERE ${whereClause}`,
+            params
+          );
+          filteredCount = countResult[0]?.count || 0;
+
+          const pageOrders = await localDb.orders.query(
+            `SELECT * FROM orders WHERE ${whereClause} ${orderBy} LIMIT ? OFFSET ?`,
+            [...params, ordersItemsPerPage, startIndex]
+          );
+
+          filteredOrders = pageOrders;
+          paginatedOrders = pageOrders;
+        }
+      } else {
+        const baseOrders = await localDb.orders.query(
+          `SELECT id, customerName, eventType, cakeFlavor, layers, paymentStatus, createdAt, eventDate, deliveryDate, deliveryTime, totalAmount, status FROM orders WHERE ${whereClause} ${orderBy}`,
+          params
+        );
+
+        const matched = baseOrders.filter(o => {
+          if (paymentFilter && paymentFilter !== "all" && (o.paymentStatus || "Unpaid") !== paymentFilter) return false;
+
+          if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            const matchesSearch = 
+              (o.customerName || "").toLowerCase().includes(term) ||
+              (o.id || "").toLowerCase().includes(term) ||
+              (o.eventType || "").toLowerCase().includes(term) ||
+              (o.cakeFlavor || "").toLowerCase().includes(term) ||
+              (o.paymentStatus || "unpaid").toLowerCase().includes(term);
+            if (!matchesSearch) return false;
+          }
+          return true;
+        });
+
+        filteredCount = matched.length;
+
+        if (isCalendar) {
+          const pageIds = matched.map(o => o.id);
+          if (pageIds.length > 0) {
+            const placeholders = pageIds.map(() => "?").join(",");
+            const fullOrders = await localDb.orders.query(
+              `SELECT * FROM orders WHERE id IN (${placeholders})`,
+              pageIds
+            );
+            const orderMap = new Map(fullOrders.map(o => [o.id, o]));
+            const sortedFullOrders = pageIds
+              .map(id => orderMap.get(id))
+              .filter((o): o is Order => !!o);
+            filteredOrders = sortedFullOrders;
+          }
+          paginatedOrders = [];
+        } else {
+          const pageIds = matched
+            .slice(startIndex, startIndex + ordersItemsPerPage)
+            .map(o => o.id);
+
+          if (pageIds.length > 0) {
+            const placeholders = pageIds.map(() => "?").join(",");
+            const pageOrders = await localDb.orders.query(
+              `SELECT * FROM orders WHERE id IN (${placeholders})`,
+              pageIds
+            );
+            const orderMap = new Map(pageOrders.map(o => [o.id, o]));
+            const sortedPageOrders = pageIds
+              .map(id => orderMap.get(id))
+              .filter((o): o is Order => !!o);
+            filteredOrders = sortedPageOrders;
+            paginatedOrders = sortedPageOrders;
+          }
+        }
+      }
+
+      return { filteredCount, filteredOrders, paginatedOrders };
+    }
+  });
+
+  const filteredCount = queryResult.filteredCount;
+  const filteredOrders = queryResult.filteredOrders;
+  const paginatedOrders = queryResult.paginatedOrders;
+
+  const ordersTotalPages = useMemo(() => {
+    return Math.ceil(filteredCount / ordersItemsPerPage);
+  }, [filteredCount, ordersItemsPerPage]);
+
+  // Selected order details query using useQuery
+  const { data: selectedOrder = null } = useQuery<Order | null>({
+    queryKey: ["orders", "detail", selectedOrderId],
+    enabled: !!selectedOrderId,
+    queryFn: async () => {
+      return (await localDb.orders.get(selectedOrderId!)) || null;
+    }
+  });
 
   // Handle setting view mode
   const handleSetViewMode = (mode: "list" | "form" | "detail") => {
@@ -138,95 +341,91 @@ export function useOrders({
 
   // Prepopulate form on routing state change
   useEffect(() => {
-    if (location.state && (location.state as any).editOrder) {
-      const o = (location.state as any).editOrder as Order;
-      setEditingOrderId(o.id);
-      const firstPayment = o.paymentHistory && o.paymentHistory.length > 0 ? o.paymentHistory[0] : null;
-      setFormData({
-        customerId: o.customerId,
-        customerName: o.customerName,
-        customerMobile: o.customerMobile || "",
-        eventType: o.eventType,
-        eventDate: o.eventDate,
-        deliveryDate: o.deliveryDate || "",
-        deliveryTime: o.deliveryTime,
-        venueAddress: o.venueAddress || "",
-        cakeShape: o.cakeShape || "Round",
-        cakeWeight: o.cakeWeight || "2.0 kg",
-        cakeFlavor: o.cakeFlavor || "Belgian Chocolate",
-        preference: o.preference || "Egg",
-        layers: o.layers || "Double Tier",
-        cakeInscription: o.cakeInscription || "",
-        referenceImage: o.referenceImage || "",
-        specialInstructions: o.specialInstructions || "",
-        expressDelivery: o.deliveryFee > 0,
-        paymentStatus: o.paymentStatus || "Unpaid",
-        initialPaidAmount: o.paidAmount && o.paymentHistory && o.paymentHistory.length > 0 ? String(o.paidAmount) : "",
-        paymentMethod: firstPayment?.method || "UPI",
-        paymentNotes: firstPayment?.notes || "Initial Deposit",
-      });
-      setOverrideBasePrice(String(o.basePrice));
-      setOverrideDecorationCharge(String(o.decorationCharge));
-      setOverrideDeliveryFee(String(o.deliveryFee));
-      setOverrideTotalAmount(String(o.totalAmount));
+    async function handleRoutingState() {
+      if (location.state && (location.state as any).editOrder) {
+        const o = (location.state as any).editOrder as Order;
+        setEditingOrderId(o.id);
+        const firstPayment = o.paymentHistory && o.paymentHistory.length > 0 ? o.paymentHistory[0] : null;
+        setFormData({
+          customerId: o.customerId,
+          customerName: o.customerName,
+          customerMobile: o.customerMobile || "",
+          eventType: o.eventType,
+          eventDate: o.eventDate,
+          deliveryDate: o.deliveryDate || "",
+          deliveryTime: o.deliveryTime,
+          venueAddress: o.venueAddress || "",
+          cakeShape: o.cakeShape || "Round",
+          cakeWeight: o.cakeWeight || "2.0 kg",
+          cakeFlavor: o.cakeFlavor || "",
+          preference: o.preference || "Egg",
+          layers: o.layers || "Double Tier",
+          cakeInscription: o.cakeInscription || "",
+          referenceImage: o.referenceImage || "",
+          specialInstructions: o.specialInstructions || "",
+          expressDelivery: o.deliveryFee > 0,
+          paymentStatus: o.paymentStatus || "Unpaid",
+          initialPaidAmount: o.paidAmount && o.paymentHistory && o.paymentHistory.length > 0 ? String(o.paidAmount) : "",
+          paymentMethod: firstPayment?.method || "UPI",
+          paymentNotes: firstPayment?.notes || "Initial Deposit",
+        });
+        setOverrideBasePrice(String(o.basePrice));
+        setOverrideDecorationCharge(String(o.decorationCharge));
+        setOverrideDeliveryFee(String(o.deliveryFee));
+        setOverrideTotalAmount(String(o.totalAmount));
+
+        // Update refs to prevent initial sync override
+        lastBasePrice.current = String(o.basePrice);
+        lastDecorationCharge.current = String(o.decorationCharge);
+        lastDeliveryFee.current = String(o.deliveryFee);
+        prevCakeAttrs.current = {
+          cakeWeight: o.cakeWeight || "2.0 kg",
+          cakeShape: o.cakeShape || "Round",
+          layers: o.layers || "Double Tier",
+          preference: o.preference || "Egg",
+        };
+
+        // Pre-select customer in AsyncSelect
+        if (o.customerId && o.customerId !== "guest" && o.customerId !== "") {
+          setSelectedCustomerOption({ value: o.customerId, label: `${o.customerName} (${o.customerMobile || ""})` });
+        }
+
+        setViewMode("form");
+      } else if (location.state && (location.state as any).selectedOrderId) {
+        const targetId = (location.state as any).selectedOrderId;
+        const targetOrder = await localDb.orders.get(targetId);
+        if (targetOrder) {
+          setSelectedOrderId(targetId);
+          setViewMode("detail");
+        }
+      } else if (location.state && (location.state as any).highlightOrderId) {
+        const targetId = (location.state as any).highlightOrderId;
+        const targetOrder = await localDb.orders.get(targetId);
+        if (targetOrder) {
+          setSearchTerm(targetOrder.customerName || "");
+          setFilter("all");
+          setViewMode("list");
+        }
+      }
       
-      // Update refs to prevent initial sync override
-      lastBasePrice.current = String(o.basePrice);
-      lastDecorationCharge.current = String(o.decorationCharge);
-      lastDeliveryFee.current = String(o.deliveryFee);
-      prevCakeAttrs.current = {
-        cakeWeight: o.cakeWeight || "2.0 kg",
-        cakeShape: o.cakeShape || "Round",
-        layers: o.layers || "Double Tier",
-        preference: o.preference || "Egg",
-      };
+      if (location.state && (location.state as any).prepopulatedDate) {
+        const pDate = (location.state as any).prepopulatedDate;
+        const pName = (location.state as any).prepopulatedCustomerName || "";
+        const pMobile = (location.state as any).prepopulatedCustomerMobile || "";
+        setFormData((prev) => ({
+          ...prev,
+          eventDate: pDate,
+          deliveryDate: pDate,
+          customerName: pName,
+          customerMobile: pMobile
+        }));
+        setViewMode("form");
+      }
+    }
+    handleRoutingState();
+  }, [location.state]);
 
-      setViewMode("form");
-    } else if (location.state && (location.state as any).selectedOrderId) {
-      const targetId = (location.state as any).selectedOrderId;
-      const targetOrder = orders.find((o) => o.id === targetId);
-      if (targetOrder) {
-        setSelectedOrderId(targetId);
-        setViewMode("detail");
-      }
-    } else if (location.state && (location.state as any).highlightOrderId) {
-      const targetId = (location.state as any).highlightOrderId;
-      const targetOrder = orders.find((o) => o.id === targetId);
-      if (targetOrder) {
-        setSearchTerm(targetOrder.customerName);
-        setFilter("all");
-        setViewMode("list");
-      }
-    }
-    
-    if (location.state && (location.state as any).prepopulatedDate) {
-      const pDate = (location.state as any).prepopulatedDate;
-      const pName = (location.state as any).prepopulatedCustomerName || "";
-      const pMobile = (location.state as any).prepopulatedCustomerMobile || "";
-      setFormData((prev) => ({
-        ...prev,
-        eventDate: pDate,
-        deliveryDate: pDate,
-        customerName: pName,
-        customerMobile: pMobile
-      }));
-      setViewMode("form");
-    }
-  }, [location.state, orders]);
-
-  // Bakery profile
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        const bp = await localDb.bakeryProfile.toArray();
-        const activeBp = bp.filter((item: any) => item.isDeleted !== 1)[0] || null;
-        setBakeryProfile(activeBp);
-      } catch (err) {
-        console.error("Failed to load bakery profile for invoice print:", err);
-      }
-    }
-    loadProfile();
-  }, [viewMode]);
+  // (Bakery profile useEffect removed, managed by useQuery instead)
 
   // Routing params sync
   useEffect(() => {
@@ -249,10 +448,14 @@ export function useOrders({
 
   const defaultFlavors = useMemo(() => ["Belgian Chocolate", "French Vanilla", "Red Velvet", "Butterscotch", "Biscoff"], []);
   const dynamicFlavors = useMemo(() => {
-    const allUsedFlavors = orders.map((o) => o.cakeFlavor).filter(Boolean);
-    const combined = Array.from(new Set([...defaultFlavors, ...allUsedFlavors]));
+    const recipeNames = recipes.map((r) => r.name).filter(Boolean);
+    const combined = [...recipeNames];
+    if (formData.cakeFlavor && !combined.includes(formData.cakeFlavor)) {
+      combined.push(formData.cakeFlavor);
+    }
     return combined.map((f) => ({ value: f, label: f }));
-  }, [orders, defaultFlavors]);
+  }, [recipes, formData.cakeFlavor]);
+
 
   // Reset fields to empty when starting wizard
   useEffect(() => {
@@ -261,46 +464,25 @@ export function useOrders({
     setDifficultiesText("");
   }, [completingOrder]);
 
-  // Load customer dropdown options
-  useEffect(() => {
-    async function loadSelectOptions() {
-      try {
-        // Retrieve all active decrypted customer records from localDb
-        const allCust = await localDb.customers.filter((c: any) => c.isDeleted !== 1).toArray();
-
-        // Perform filtering in memory using the decrypted objects
-        const matched = allCust.filter(c => {
-          if (customerSearch) {
-            const lower = customerSearch.toLowerCase();
-            return (
-              c.name.toLowerCase().includes(lower) || 
-              c.mobile.includes(lower) ||
-              c.id.toLowerCase().includes(lower)
-            );
-          }
-          return true;
-        });
-
-        // Limit the results in memory
-        const limitedMatched = matched.slice(0, 50);
-        const opts = limitedMatched.map(c => ({ value: c.id, label: `${c.name} (${c.mobile})` }));
-
-        if (formData.customerId && formData.customerId !== "new" && formData.customerId !== "" && formData.customerId !== "guest") {
-          const hasSelected = opts.some(o => o.value === formData.customerId);
-          if (!hasSelected) {
-            const selected = await localDb.customers.get(formData.customerId);
-            if (selected) {
-              opts.unshift({ value: selected.id, label: `${selected.name} (${selected.mobile})` });
-            }
-          }
-        }
-        setCustomerOptions(opts);
-      } catch (err) {
-        console.error("Failed to load customer select options from localDb:", err);
-      }
+  // AsyncSelect loadOptions — queries DB only when user types, returns matching customers
+  const loadCustomerOptions = async (inputValue: string): Promise<{ value: string; label: string }[]> => {
+    try {
+      const allCust = await localDb.customers.filter((c: any) => c.isDeleted !== 1).toArray();
+      const lower = inputValue.toLowerCase();
+      const matched = allCust.filter((c: any) => {
+        if (!inputValue) return true;
+        return (
+          (c.name || "").toLowerCase().includes(lower) ||
+          (c.mobile || "").includes(lower) ||
+          (c.id || "").toLowerCase().includes(lower)
+        );
+      });
+      return matched.slice(0, 50).map((c: any) => ({ value: c.id, label: `${c.name} (${c.mobile})` }));
+    } catch (err) {
+      console.error("Failed to load customer options:", err);
+      return [];
     }
-    loadSelectOptions();
-  }, [customerSearch, formData.customerId, refreshTrigger]);
+  };
 
   // Reset pagination on search, filter, dateFilter, sort, viewTab, calMonth, calYear, paymentFilter
   useEffect(() => {
@@ -308,153 +490,7 @@ export function useOrders({
   }, [searchTerm, filter, sortBy, dateFilter, customStartDate, customEndDate, viewTab, calMonth, calYear, paymentFilter]);
 
   // Paginated and sorted orders
-  useEffect(() => {
-    async function loadDbOrders() {
-      try {
-        const getLocalDateString = (offsetDays = 0) => {
-          const d = new Date();
-          if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
-          const yyyy = d.getFullYear();
-          const mm = String(d.getMonth() + 1).padStart(2, '0');
-          const dd = String(d.getDate()).padStart(2, '0');
-          return `${yyyy}-${mm}-${dd}`;
-        };
-
-        const startIndex = (ordersCurrentPage - 1) * ordersItemsPerPage;
-        const isCalendar = viewTab === "calendar";
-
-        // Query the database to retrieve all active (non-deleted) decrypted orders
-        const allOrders = await localDb.orders.filter((o: any) => o.isDeleted !== 1).toArray();
-
-        // Perform all filtering in memory using the decrypted objects
-        const matched = allOrders.filter(o => {
-          // Apply payment status filter
-          if (paymentFilter !== "all" && (o.paymentStatus || "Unpaid") !== paymentFilter) return false;
-
-          if (isCalendar) {
-            // Apply status filter only
-            const statusLower = (o.status || "").toLowerCase();
-            const filterLower = (filter || "").toLowerCase();
-            if (filterLower === "active") {
-              if (statusLower === "completed" || statusLower === "cancelled") return false;
-            } else if (filterLower === "archived") {
-              if (statusLower !== "completed" && statusLower !== "cancelled") return false;
-            } else if (filterLower !== "all") {
-              if (statusLower !== filterLower) return false;
-            }
-
-            // Apply current month date filter only
-            const targetYear = calYear !== undefined ? calYear : new Date().getFullYear();
-            const targetMonth = calMonth !== undefined ? calMonth : new Date().getMonth();
-            const yearMonthPrefix = `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}`;
-            const dateStr = o.deliveryDate || o.eventDate;
-            if (!dateStr || !dateStr.startsWith(yearMonthPrefix)) return false;
-          } else {
-            // Standard List View filtering
-            if (searchTerm) {
-              const term = searchTerm.toLowerCase();
-              const matchesSearch = 
-                (o.customerName || "").toLowerCase().includes(term) ||
-                (o.id || "").toLowerCase().includes(term) ||
-                (o.eventType || "").toLowerCase().includes(term) ||
-                (o.cakeFlavor || "").toLowerCase().includes(term) ||
-                (o.paymentStatus || "unpaid").toLowerCase().includes(term);
-              if (!matchesSearch) return false;
-            }
-
-            const statusLower = (o.status || "").toLowerCase();
-            const filterLower = (filter || "").toLowerCase();
-            if (filterLower === "active") {
-              if (statusLower === "completed" || statusLower === "cancelled") return false;
-            } else if (filterLower === "archived") {
-              if (statusLower !== "completed" && statusLower !== "cancelled") return false;
-            } else if (filterLower !== "all") {
-              if (statusLower !== filterLower) return false;
-            }
-
-            // Apply date filters based on deliveryDate (fallback to eventDate)
-            const dateStr = o.deliveryDate || o.eventDate;
-            if (dateFilter === "future") {
-              const todayStr = getLocalDateString(0);
-              if (!(dateStr && dateStr > todayStr)) return false;
-            } else if (dateFilter === "today") {
-              const todayStr = getLocalDateString(0);
-              if (!(dateStr && dateStr === todayStr)) return false;
-            } else if (dateFilter === "tomorrow") {
-              const tomorrowStr = getLocalDateString(1);
-              if (!(dateStr && dateStr === tomorrowStr)) return false;
-            } else if (dateFilter === "custom") {
-              if (customStartDate && !(dateStr && dateStr >= customStartDate)) return false;
-              if (customEndDate && !(dateStr && dateStr <= customEndDate)) return false;
-            }
-          }
-          return true;
-        });
-
-        // Perform sorting in memory
-        matched.sort((a, b) => {
-          if (sortBy === "created-newest") {
-            const dateA = a.createdAt || "";
-            const dateB = b.createdAt || "";
-            return dateB.localeCompare(dateA);
-          } else if (sortBy === "created-oldest") {
-            const dateA = a.createdAt || "";
-            const dateB = b.createdAt || "";
-            return dateA.localeCompare(dateB);
-          } else if (sortBy === "delivery-soonest") {
-            const dateA = a.deliveryDate || a.eventDate || "";
-            const dateB = b.deliveryDate || b.eventDate || "";
-            if (dateA !== dateB) return dateA.localeCompare(dateB);
-            return (a.deliveryTime || "").localeCompare(b.deliveryTime || "");
-          } else if (sortBy === "delivery-latest") {
-            const dateA = a.deliveryDate || a.eventDate || "";
-            const dateB = b.deliveryDate || b.eventDate || "";
-            if (dateA !== dateB) return dateB.localeCompare(dateA);
-            return (b.deliveryTime || "").localeCompare(a.deliveryTime || "");
-          } else if (sortBy === "amount-highest") {
-            return (b.totalAmount || 0) - (a.totalAmount || 0);
-          } else { // "amount-lowest"
-            return (a.totalAmount || 0) - (b.totalAmount || 0);
-          }
-        });
-
-        // Set counts and paginated results
-        setFilteredCount(matched.length);
-        setFilteredOrders(matched);
-        if (isCalendar) {
-          setPaginatedOrders([]);
-        } else {
-          setPaginatedOrders(matched.slice(startIndex, startIndex + ordersItemsPerPage));
-        }
-      } catch (err) {
-        console.error("Failed to query orders from localDb:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadDbOrders();
-  }, [refreshTrigger, searchTerm, filter, ordersCurrentPage, ordersItemsPerPage, sortBy, dateFilter, customStartDate, customEndDate, calMonth, calYear, viewTab, paymentFilter]);
-
-  const ordersTotalPages = useMemo(() => {
-    return Math.ceil(filteredCount / ordersItemsPerPage);
-  }, [filteredCount, ordersItemsPerPage]);
-
-  // Selected order details query
-  useEffect(() => {
-    async function loadSelectedOrder() {
-      if (!selectedOrderId) {
-        setSelectedOrder(null);
-        return;
-      }
-      try {
-        const o = await localDb.orders.get(selectedOrderId);
-        setSelectedOrder(o || null);
-      } catch (err) {
-        console.error("Failed to load selected order from localDb:", err);
-      }
-    }
-    loadSelectedOrder();
-  }, [selectedOrderId, orders]);
+  // (loadDbOrders and loadSelectedOrder useEffect blocks removed, managed by useQuery instead)
 
   // Price calculations
   const priceCalculation = useMemo(() => {
@@ -648,7 +684,9 @@ export function useOrders({
     };
   }, []);
 
-  const handleCustomerChange = async (customerId: string) => {
+  const handleCustomerChange = async (option: { value: string; label: string } | null) => {
+    const customerId = option?.value || "";
+    setSelectedCustomerOption(option);
     if (customerId === "new" || customerId === "") {
       setFormData(prev => ({
         ...prev,
@@ -692,7 +730,7 @@ export function useOrders({
       const finalTotal = isNaN(parsedTotalAmount) ? priceCalculation.totalAmount : parsedTotalAmount;
 
       if (editingOrderId && onUpdateOrder) {
-        const original = orders.find((o) => o.id === editingOrderId);
+        const original = await localDb.orders.get(editingOrderId);
         let finalPaymentHistory = original?.paymentHistory || [];
         let finalPaidAmount = original?.paidAmount || 0;
         let finalPaymentStatus = original?.paymentStatus || "Unpaid";
@@ -808,8 +846,8 @@ export function useOrders({
           deliveryTime: "09:00",
           venueAddress: "",
           cakeShape: "Round",
-          cakeWeight: "2.0 kg",
-          cakeFlavor: "Belgian Chocolate",
+          cakeWeight: "1.0 kg",
+          cakeFlavor: "",
           preference: "Egg",
           layers: "Double Tier",
           cakeInscription: "",
@@ -831,13 +869,14 @@ export function useOrders({
         lastDecorationCharge.current = "";
         lastDeliveryFee.current = "";
         prevCakeAttrs.current = {
-          cakeWeight: "2.0 kg",
+          cakeWeight: "1.0 kg",
           cakeShape: "Round",
           layers: "Double Tier",
           preference: "Egg",
         };
 
         setEditingOrderId(null);
+        setSelectedCustomerOption(null);
         handleSetViewMode("list");
       }, 1500);
     } catch (e) {
@@ -952,6 +991,7 @@ export function useOrders({
   return {
     loading,
     orders,
+    recipes,
     viewMode,
     setViewMode,
     selectedOrderId,
@@ -979,9 +1019,9 @@ export function useOrders({
     setPaymentNotesInput,
     formData,
     setFormData,
-    customerSearch,
-    setCustomerSearch,
-    customerOptions,
+    selectedCustomerOption,
+    setSelectedCustomerOption,
+    loadCustomerOptions,
     saving,
     saveSuccess,
     videoRef,

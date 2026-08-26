@@ -1,9 +1,12 @@
 // File Path: /src/components/CustomerDetailView.tsx
-import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import React from "react";
+import { useParams } from "react-router-dom";
+import { memoWithData } from "../utils/memo";
 import { type Customer, type Order } from "../types";
 import { formatPrice, formatDate, getOrderSeqId } from "../utils/format";
 import { localDb } from "../db";
+import { useCustomers } from "../hooks/useCustomers";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Phone,
@@ -15,76 +18,38 @@ import {
 import { motion } from "motion/react";
 import Avatar from "./Avatar";
 
-export default function CustomerDetailView() {
-  const navigate = useNavigate();
-  const location = useLocation();
+interface CustomerDetailViewProps {
+  locationSearch?: string;
+  onNavigate?: (path: string | number, state?: any) => void;
+}
+
+function CustomerDetailView({ locationSearch, onNavigate }: CustomerDetailViewProps) {
   const { id } = useParams<{ id: string }>();
 
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [selectedCustomerOrders, setSelectedCustomerOrders] = useState<Order[]>([]);
-  const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const {
+    selectedCustomer,
+    selectedCustomerOrders,
+    handleCall,
+    handleSMS,
+    handleWhatsApp,
+    isLoading: loading,
+  } = useCustomers();
 
-  // Sync refresh trigger on local DB updates
-  useEffect(() => {
-    const handler = () => setRefreshTrigger((prev) => prev + 1);
-    window.addEventListener("db-update", handler);
-    return () => window.removeEventListener("db-update", handler);
-  }, []);
-
-  // Fetch customer details and order logs
-  useEffect(() => {
-    async function fetchSelectedDetails() {
-      if (!id) return;
-      try {
-        const [customer, fullOrders] = await Promise.all([
-          localDb.customers.get(id),
-          localDb.orders.filter(o => o.isDeleted !== 1).toArray()
-        ]);
-        setSelectedCustomer(customer || null);
-        const custOrders = fullOrders.filter(o => o.customerId === id);
-
-        custOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        setSelectedCustomerOrders(custOrders);
-        setAllOrders(fullOrders);
-      } catch (err) {
-        console.error("Failed to fetch customer details:", err);
-      }
+  // Fetch all light orders to compute sequential IDs
+  const { data: allOrders = [] } = useQuery<Order[]>({
+    queryKey: ["orders", "all-light"],
+    queryFn: async () => {
+      return await localDb.orders.query("SELECT id, createdAt, isDeleted FROM orders WHERE isDeleted = 0");
     }
-    fetchSelectedDetails();
-  }, [id, refreshTrigger]);
+  });
 
-  const handleCall = (name: string, num: string) => {
-    if (!num) {
-      window.showToast?.("No phone number available for this customer.", "error");
-      return;
-    }
-    window.showToast?.(`Dialing ${name} (${num})...`, "success");
-    window.location.href = `tel:${num}`;
-  };
-
-  const handleSMS = (name: string, num: string) => {
-    if (!num) {
-      window.showToast?.("No phone number available for this customer.", "error");
-      return;
-    }
-    window.showToast?.(`Opening SMS window for ${name}...`, "success");
-    window.location.href = `sms:${num}`;
-  };
-
-  const handleWhatsApp = (name: string, num: string) => {
-    if (!num) {
-      window.showToast?.("No phone number available for this customer.", "error");
-      return;
-    }
-    const cleanNum = num.replace(/\D/g, "");
-    if (!cleanNum) {
-      window.showToast?.("Invalid phone number format for WhatsApp.", "error");
-      return;
-    }
-    window.showToast?.(`Opening WhatsApp chat with ${name}...`, "success");
-    window.open(`https://wa.me/${cleanNum}`, "_blank");
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-brand dark:border-orange-400"></div>
+      </div>
+    );
+  }
 
   if (!selectedCustomer) {
     return (
@@ -92,7 +57,7 @@ export default function CustomerDetailView() {
         <div className="flex items-center gap-3 bg-white dark:bg-zinc-800 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-700/60 shadow-sm">
           <button
             type="button"
-            onClick={() => navigate("/customers")}
+            onClick={() => onNavigate?.("/customers")}
             className="p-2 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -111,12 +76,12 @@ export default function CustomerDetailView() {
           <button
             type="button"
             onClick={() => {
-              const params = new URLSearchParams(location.search);
+              const params = new URLSearchParams(locationSearch || "");
               const fromOrderId = params.get("fromOrderId");
               if (fromOrderId) {
-                navigate(`/orders/${fromOrderId}`);
+                onNavigate?.(`/orders/${fromOrderId}`);
               } else {
-                navigate("/customers");
+                onNavigate?.("/customers");
               }
             }}
             className="p-2 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors"
@@ -188,7 +153,7 @@ export default function CustomerDetailView() {
             <div className="flex gap-2 pt-2.5">
               <button
                 type="button"
-                onClick={() => navigate("/customers/new", { state: { customer: selectedCustomer } })}
+                onClick={() => onNavigate?.("/customers/new", { state: { customer: selectedCustomer } })}
                 className="w-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700 dark:hover:bg-zinc-650 text-zinc-700 dark:text-zinc-200 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5"
               >
                 <Edit className="w-3.5 h-3.5" /> Edit Profile
@@ -285,3 +250,5 @@ export default function CustomerDetailView() {
     </div>
   );
 }
+
+export default memoWithData(CustomerDetailView);

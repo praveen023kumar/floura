@@ -1,5 +1,6 @@
 // File Path: /src/components/GettingStartedView.tsx
-import React from "react";
+import React, { memo } from "react";
+import { memoWithData } from "../utils/memo";
 import { ArrowRight, Store, User, Phone, MapPin, Mail, Landmark, Calendar, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { useGettingStarted } from "../hooks/useGettingStarted";
@@ -10,7 +11,7 @@ interface GettingStartedViewProps {
   onUpdateBakeryProfile?: (updatedProfile: any) => Promise<void>;
 }
 
-export default function GettingStartedView({ user, onUpdateProfile, onUpdateBakeryProfile }: GettingStartedViewProps) {
+function GettingStartedView({ user, onUpdateProfile, onUpdateBakeryProfile }: GettingStartedViewProps) {
   const {
     chefName,
     setChefName,
@@ -203,3 +204,5 @@ export default function GettingStartedView({ user, onUpdateProfile, onUpdateBake
     </div>
   );
 }
+
+export default memoWithData(GettingStartedView);

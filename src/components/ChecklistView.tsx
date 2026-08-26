@@ -1,5 +1,6 @@
 // File Path: /src/components/ChecklistView.tsx
-import React, { useState } from "react";
+import React, { useState, memo } from "react";
+import { memoWithData } from "../utils/memo";
 import { ChecklistItem } from "../types";
 import {
   CheckCircle2,
@@ -27,7 +28,7 @@ interface ChecklistViewProps {
   onResetChecklist: (date?: string) => void;
 }
 
-export default function ChecklistView({
+function ChecklistView({
   checkerList,
   onToggleChecklistItem,
   onAddChecklistItem,
@@ -506,3 +507,5 @@ export default function ChecklistView({
     </motion.div>
   );
 }
+
+export default memoWithData(ChecklistView);

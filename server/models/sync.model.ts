@@ -127,8 +127,8 @@ export async function performBulkSync(userEmail: string, payload: any) {
           id, customerId, customerName, customerMobile, eventType, eventDate, deliveryDate, deliveryTime, venueAddress,
           cakeShape, cakeWeight, cakeFlavor, preference, layers, cakeInscription, referenceImage,
           specialInstructions, basePrice, decorationCharge, deliveryFee, totalAmount, status, createdAt, updatedAt, user_email, isDeleted,
-          paymentStatus, paidAmount, paymentHistory
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          paymentStatus, paidAmount, paymentHistory, inventoryReduced
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           customerId=excluded.customerId,
           customerName=excluded.customerName,
@@ -156,14 +156,16 @@ export async function performBulkSync(userEmail: string, payload: any) {
           isDeleted=excluded.isDeleted,
           paymentStatus=excluded.paymentStatus,
           paidAmount=excluded.paidAmount,
-          paymentHistory=excluded.paymentHistory
+          paymentHistory=excluded.paymentHistory,
+          inventoryReduced=excluded.inventoryReduced
         WHERE (excluded.updatedAt > orders.updatedAt OR orders.updatedAt IS NULL)
           AND orders.user_email = excluded.user_email
       `, [
         o.id, o.customerId, o.customerName, o.customerMobile, o.eventType, o.eventDate, o.deliveryDate || '', o.deliveryTime, o.venueAddress,
         o.cakeShape, o.cakeWeight, o.cakeFlavor, o.preference, o.layers, o.cakeInscription, o.referenceImage,
         o.specialInstructions, o.basePrice, o.decorationCharge, o.deliveryFee, o.totalAmount, o.status, o.createdAt, o.updatedAt, userEmail, o.isDeleted !== undefined ? o.isDeleted : 0,
-        o.paymentStatus || 'Unpaid', o.paidAmount || 0, typeof o.paymentHistory === "string" ? o.paymentHistory : JSON.stringify(o.paymentHistory || [])
+        o.paymentStatus || 'Unpaid', o.paidAmount || 0, typeof o.paymentHistory === "string" ? o.paymentHistory : JSON.stringify(o.paymentHistory || []),
+        o.inventoryReduced !== undefined ? o.inventoryReduced : 0
       ]);
     }
 
@@ -438,8 +440,8 @@ export async function insertSingleOrder(rawO: any, userEmail: string) {
       id, customerId, customerName, customerMobile, eventType, eventDate, deliveryTime, venueAddress,
       cakeShape, cakeWeight, cakeFlavor, preference, layers, cakeInscription, referenceImage,
       specialInstructions, basePrice, decorationCharge, deliveryFee, totalAmount, status, createdAt, updatedAt, user_email, isDeleted,
-      paymentStatus, paidAmount, paymentHistory
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      paymentStatus, paidAmount, paymentHistory, inventoryReduced
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       customerId=excluded.customerId,
       customerName=excluded.customerName,
@@ -466,14 +468,16 @@ export async function insertSingleOrder(rawO: any, userEmail: string) {
       isDeleted=excluded.isDeleted,
       paymentStatus=excluded.paymentStatus,
       paidAmount=excluded.paidAmount,
-      paymentHistory=excluded.paymentHistory
+      paymentHistory=excluded.paymentHistory,
+      inventoryReduced=excluded.inventoryReduced
     WHERE orders.user_email = excluded.user_email
   `, [
     o.id, o.customerId, o.customerName, o.customerMobile, o.eventType, o.eventDate, o.deliveryTime, o.venueAddress,
     o.cakeShape, o.cakeWeight, o.cakeFlavor, o.preference, o.layers, o.cakeInscription, o.referenceImage,
     o.specialInstructions, o.basePrice, o.decorationCharge, o.deliveryFee, o.totalAmount, o.status, o.createdAt, o.updatedAt,
     userEmail, o.isDeleted !== undefined ? o.isDeleted : 0,
-    o.paymentStatus || 'Unpaid', o.paidAmount || 0, typeof o.paymentHistory === "string" ? o.paymentHistory : JSON.stringify(o.paymentHistory || [])
+    o.paymentStatus || 'Unpaid', o.paidAmount || 0, typeof o.paymentHistory === "string" ? o.paymentHistory : JSON.stringify(o.paymentHistory || []),
+    o.inventoryReduced !== undefined ? o.inventoryReduced : 0
   ]);
   db.close();
 }

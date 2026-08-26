@@ -1,8 +1,13 @@
 // File Path: /src/components/InventoryListView.tsx
-import React, { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { type InventoryItem } from "../types";
+import React, { useState, useMemo, useEffect, memo } from "react";
+import { memoWithData } from "../utils/memo";
+
+import { type InventoryItem, type Recipe, type Order } from "../types";
+import { useInventory } from "../hooks/useInventory";
+import { useQuery } from "@tanstack/react-query";
 import { localDb } from "../db";
+import { parseWeightToGrams, scaleRecipeIngredients } from "../../shared/calculations";
+import { getStatusColors } from "../utils/orderStatus";
 import {
   AlertTriangle,
   Plus,
@@ -19,30 +24,94 @@ import { formatPrice } from "../utils/format";
 
 interface InventoryListViewProps {
   onUpdateInventoryItem?: (item: InventoryItem) => Promise<any>;
+  onNavigate?: (path: string | number, state?: any) => void;
 }
 
-export default function InventoryListView({
+function InventoryListView({
   onUpdateInventoryItem,
+  onNavigate,
 }: InventoryListViewProps) {
-  const navigate = useNavigate();
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const {
+    searchTerm,
+    setSearchTerm,
+    selectedCategory,
+    setSelectedCategory,
+    showOnlyLowStock,
+    setShowOnlyLowStock,
+    dynamicCategories,
+    lowStockCount,
+    lowStockItemsList,
+    paginatedInventory,
+    filteredCount,
+    inventoryCurrentPage,
+    setInventoryCurrentPage,
+    inventoryItemsPerPage,
+    setInventoryItemsPerPage,
+    inventoryTotalPages,
+    isLoading: loading,
+  } = useInventory({
+    onUpdateInventoryItem,
+  });
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
+  // Load recipes and active orders for usage tracking inside the modal
+  const { data: recipes = [] } = useQuery<Recipe[]>({
+    queryKey: ["recipes", "all"],
+    queryFn: async () => {
+      return (await localDb.recipes.query("SELECT * FROM recipes WHERE isDeleted = 0")) as any;
+    }
+  });
+
+  const { data: activeOrders = [] } = useQuery<Order[]>({
+    queryKey: ["orders", "active-tracking"],
+    queryFn: async () => {
+      return (await localDb.orders.query("SELECT * FROM orders WHERE isDeleted = 0 AND status != 'Completed' AND status != 'Cancelled'")) as any;
+    }
+  });
+
+  const [selectedTrackItem, setSelectedTrackItem] = useState<InventoryItem | null>(null);
+
+  const itemUsages = useMemo(() => {
+    if (!selectedTrackItem) return { recipeUsages: [], orderUsages: [] };
+    const itemNameLower = selectedTrackItem.name.trim().toLowerCase();
+
+    const recipeUsages = recipes.filter((recipe) => {
+      return recipe.ingredients.some(
+        (ing) => ing.name.trim().toLowerCase() === itemNameLower
+      );
+    }).map((recipe) => {
+      const ing = recipe.ingredients.find(
+        (ing) => ing.name.trim().toLowerCase() === itemNameLower
+      )!;
+      return { recipe, qty: ing.qty };
+    });
+
+    const orderUsages = activeOrders.filter((order) => {
+      return recipeUsages.some(
+        (usage) => usage.recipe.name.trim().toLowerCase() === (order.cakeFlavor || "").trim().toLowerCase()
+      );
+    }).map((order) => {
+      const usage = recipeUsages.find(
+        (usage) => usage.recipe.name.trim().toLowerCase() === (order.cakeFlavor || "").trim().toLowerCase()
+      )!;
+      const targetWeight = parseWeightToGrams(order.cakeWeight);
+      const scaledIngredients = scaleRecipeIngredients(usage.recipe, targetWeight);
+      const scaledIng = scaledIngredients.find(
+        (ing) => ing.name.trim().toLowerCase() === itemNameLower
+      );
+      const scaledQty = scaledIng ? scaledIng.scaledQty : 0;
+
+      return {
+        order,
+        recipeName: usage.recipe.name,
+        scaledQty,
+        isReduced: order.inventoryReduced === 1
+      };
+    });
+
+    return { recipeUsages, orderUsages };
+  }, [selectedTrackItem, recipes, activeOrders]);
+
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-
-  const defaultCategories = useMemo(() => ["Dry Goods", "Dairy", "Spices & Flavoring", "Equipment"], []);
-  const [dynamicCategories, setDynamicCategories] = useState<string[]>(defaultCategories);
-  const [lowStockCount, setLowStockCount] = useState<number>(0);
-  const [lowStockItemsList, setLowStockItemsList] = useState<InventoryItem[]>([]);
-
-  const [paginatedInventory, setPaginatedInventory] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [filteredCount, setFilteredCount] = useState<number>(0);
-
-  const [inventoryCurrentPage, setInventoryCurrentPage] = useState<number>(1);
-  const [inventoryItemsPerPage, setInventoryItemsPerPage] = useState<number>(10);
   const [editingQuantities, setEditingQuantities] = useState<Record<string, string>>({});
 
   const activeFilterCount = (selectedCategory !== "All" ? 1 : 0) + (searchTerm.trim() ? 1 : 0) + (showOnlyLowStock ? 1 : 0);
@@ -53,86 +122,6 @@ export default function InventoryListView({
     setShowOnlyLowStock(false);
   };
 
-  // Sync refresh trigger on local DB updates
-  useEffect(() => {
-    const handler = () => setRefreshTrigger((prev) => prev + 1);
-    window.addEventListener("db-update", handler);
-    return () => window.removeEventListener("db-update", handler);
-  }, []);
-
-  // Fetch metadata and category list
-  useEffect(() => {
-    async function fetchInventoryMetadata() {
-      try {
-        const [dbCats, allItems] = await Promise.all([
-          localDb.categories.filter(c => c.type === "inventory" && c.isDeleted !== 1).toArray(),
-          localDb.inventory.filter(i => i.isDeleted !== 1).toArray()
-        ]);
-        
-        const lowStock = allItems.filter(i => i.quantity < i.minStockLevel);
-        
-        const catNames = dbCats.map(c => c.name);
-        const combinedCats = Array.from(new Set([...defaultCategories, ...catNames]));
-        setDynamicCategories(combinedCats);
-
-        setLowStockItemsList(lowStock);
-        setLowStockCount(lowStock.length);
-      } catch (err) {
-        console.error("Failed to fetch inventory metadata from localDb:", err);
-      }
-    }
-    fetchInventoryMetadata();
-  }, [refreshTrigger, defaultCategories]);
-
-  // Load paginated and filtered inventory items
-  useEffect(() => {
-    async function loadDbInventory() {
-      try {
-        const startIndex = (inventoryCurrentPage - 1) * inventoryItemsPerPage;
-        
-        // Retrieve all active decrypted inventory records
-        const allItems = await localDb.inventory.filter(i => i.isDeleted !== 1).toArray();
-
-        // Perform filtering in memory
-        const matched = allItems.filter(i => {
-          if (selectedCategory !== "All" && i.category !== selectedCategory) return false;
-          if (showOnlyLowStock && !(i.quantity < i.minStockLevel)) return false;
-          if (searchTerm) {
-            const s = searchTerm.toLowerCase();
-            return (
-              i.name.toLowerCase().includes(s) || 
-              (i.supplier || "").toLowerCase().includes(s)
-            );
-          }
-          return true;
-        });
-
-        // Perform sorting in memory (newest updated first)
-        matched.sort((a, b) => {
-          const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-          const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-          return bTime - aTime;
-        });
-
-        setFilteredCount(matched.length);
-        setPaginatedInventory(matched.slice(startIndex, startIndex + inventoryItemsPerPage));
-      } catch (err) {
-        console.error("Failed to query inventory from localDb:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadDbInventory();
-  }, [refreshTrigger, searchTerm, selectedCategory, showOnlyLowStock, inventoryCurrentPage, inventoryItemsPerPage]);
-
-  // Reset pagination on filter changes
-  useEffect(() => {
-    setInventoryCurrentPage(1);
-  }, [searchTerm, selectedCategory, showOnlyLowStock]);
-
-  const inventoryTotalPages = useMemo(() => {
-    return Math.ceil(filteredCount / inventoryItemsPerPage);
-  }, [filteredCount, inventoryItemsPerPage]);
 
   const handleUpdateQuantity = async (item: InventoryItem, delta: number) => {
     if (!onUpdateInventoryItem) return;
@@ -274,7 +263,7 @@ export default function InventoryListView({
           </button>
           <button
             type="button"
-            onClick={() => navigate("/inventory/new")}
+            onClick={() => onNavigate?.("/inventory/new")}
             className="w-10 h-10 rounded-full bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all active:scale-95 shrink-0"
             title="Add Product"
           >
@@ -492,58 +481,63 @@ export default function InventoryListView({
                       key={item.id}
                       className="bg-white dark:bg-zinc-850 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-750/70 hover:border-zinc-250 dark:hover:bg-zinc-800/80 hover:shadow-sm transition-all flex flex-col justify-between h-full relative"
                     >
-                      {/* Card Header: Category & Stock Status badge */}
-                      <div className="flex items-center justify-between gap-2 mb-3">
-                        <span className="text-[10px] font-bold text-zinc-550 dark:text-zinc-400 uppercase tracking-widest bg-zinc-100 dark:bg-zinc-900 px-2.5 py-0.5 rounded-md">
-                          {item.category}
-                        </span>
-                        {isLow ? (
-                          <span className="bg-rose-50 text-rose-600 dark:bg-rose-955/30 dark:text-rose-400 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider flex items-center gap-1.5 border border-rose-100 dark:border-rose-900/20">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                            Low Stock
+                      <div
+                        className="flex-1 flex flex-col justify-between cursor-pointer group"
+                        onClick={() => setSelectedTrackItem(item)}
+                      >
+                        {/* Card Header: Category & Stock Status badge */}
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <span className="text-[10px] font-bold text-zinc-550 dark:text-zinc-400 uppercase tracking-widest bg-zinc-100 dark:bg-zinc-900 px-2.5 py-0.5 rounded-md">
+                            {item.category}
                           </span>
-                        ) : (
-                          <span className="bg-emerald-50 text-emerald-600 dark:bg-emerald-955/20 dark:text-emerald-400 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider flex items-center gap-1.5 border border-emerald-100 dark:border-emerald-900/10">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            In Stock
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Card Body: Title, Supplier and stock progress status */}
-                      <div className="flex-1 flex flex-col justify-between gap-4">
-                        <div className="space-y-1">
-                          <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-100 tracking-tight text-left leading-tight">
-                            {item.name}
-                          </h4>
-                          {item.supplier && (
-                            <p className="text-[11px] text-zinc-400 dark:text-zinc-500 text-left font-medium">
-                              Supplier: {item.supplier}
-                            </p>
+                          {isLow ? (
+                            <span className="bg-rose-50 text-rose-600 dark:bg-rose-955/30 dark:text-rose-400 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider flex items-center gap-1.5 border border-rose-100 dark:border-rose-900/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                              Low Stock
+                            </span>
+                          ) : (
+                            <span className="bg-emerald-50 text-emerald-600 dark:bg-emerald-955/20 dark:text-emerald-400 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider flex items-center gap-1.5 border border-emerald-100 dark:border-emerald-900/10">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                              In Stock
+                            </span>
                           )}
                         </div>
 
-                        {/* Progress bar and metrics */}
-                        <div className="space-y-2.5">
-                          <div className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-full h-1.5 overflow-hidden">
-                            <div
-                              className={`h-full ${isLow ? "bg-rose-500" : "bg-emerald-500"} rounded-full transition-all duration-300`}
-                              style={{ width: `${Math.max(5, fillPercent)}%` }}
-                            ></div>
+                        {/* Card Body: Title, Supplier and stock progress status */}
+                        <div className="flex-1 flex flex-col justify-between gap-4">
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-100 tracking-tight text-left leading-tight group-hover:text-primary-brand dark:group-hover:text-orange-400 transition-colors">
+                              {item.name}
+                            </h4>
+                            {item.supplier && (
+                              <p className="text-[11px] text-zinc-400 dark:text-zinc-500 text-left font-medium">
+                                Supplier: {item.supplier}
+                              </p>
+                            )}
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-zinc-50/60 dark:bg-zinc-900/25 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800/40 text-left">
-                              <span className="block text-[8px] uppercase tracking-wider font-extrabold text-zinc-400 dark:text-zinc-500">Min Limit</span>
-                              <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                {item.minStockLevel} {item.unit}
-                              </span>
+                          {/* Progress bar and metrics */}
+                          <div className="space-y-2.5">
+                            <div className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className={`h-full ${isLow ? "bg-rose-500" : "bg-emerald-500"} rounded-full transition-all duration-300`}
+                                style={{ width: `${Math.max(5, fillPercent)}%` }}
+                              ></div>
                             </div>
-                            <div className="bg-zinc-50/60 dark:bg-zinc-900/25 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800/40 text-left">
-                              <span className="block text-[8px] uppercase tracking-wider font-extrabold text-zinc-400 dark:text-zinc-500">Total Value</span>
-                              <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                {formatPrice(item.costPrice * item.quantity)}
-                              </span>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="bg-zinc-50/60 dark:bg-zinc-900/25 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800/40 text-left">
+                                <span className="block text-[8px] uppercase tracking-wider font-extrabold text-zinc-400 dark:text-zinc-500">Min Limit</span>
+                                <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                  {item.minStockLevel} {item.unit}
+                                </span>
+                              </div>
+                              <div className="bg-zinc-50/60 dark:bg-zinc-900/25 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800/40 text-left">
+                                <span className="block text-[8px] uppercase tracking-wider font-extrabold text-zinc-400 dark:text-zinc-500">Total Value</span>
+                                <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                  {formatPrice(item.costPrice * item.quantity)}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -603,7 +597,7 @@ export default function InventoryListView({
                         {/* Edit Details Action button */}
                         <button
                           type="button"
-                          onClick={() => navigate("/inventory/new", { state: { item } })}
+                          onClick={() => onNavigate?.("/inventory/new", { state: { item } })}
                           className="w-10 h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 hover:bg-primary-brand hover:text-white dark:hover:bg-orange-500 dark:hover:text-white text-zinc-505 dark:text-zinc-400 border border-zinc-150 dark:border-zinc-800 flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95"
                           title="Edit Product Details"
                         >
@@ -716,6 +710,199 @@ export default function InventoryListView({
           </div>
         </div>
       </div>
+
+      {/* Dynamic Usage Tracking Modal */}
+      <AnimatePresence>
+        {selectedTrackItem && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedTrackItem(null)}
+              className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            >
+              {/* Modal Container */}
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 15 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 15 }}
+                transition={{ type: "spring", duration: 0.4 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-zinc-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl border border-zinc-100 dark:border-zinc-700/60 max-h-[85vh] flex flex-col text-left"
+              >
+                {/* Header */}
+                <div className="px-6 py-5 border-b border-zinc-100 dark:border-zinc-700/60 flex items-center justify-between shrink-0 bg-zinc-50/50 dark:bg-zinc-900/20">
+                  <div>
+                    <h3 className="text-base font-bold text-zinc-850 dark:text-zinc-100 font-serif flex items-center gap-2">
+                      <span>📦</span> Usage Tracking: {selectedTrackItem.name}
+                    </h3>
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">
+                      Detailed ingredient metrics and allocations across recipes and active orders.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedTrackItem(null)}
+                    className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-450 dark:text-zinc-500 hover:text-zinc-650 transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+                  {/* Basic Specifications Card */}
+                  <div className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150/60 dark:border-zinc-850 p-4 rounded-2xl">
+                    <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-450 dark:text-zinc-500 mb-3 font-sans">
+                      Specification & Quantity Summary
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                      <div>
+                        <span className="block text-[10px] text-zinc-400 uppercase font-bold mb-0.5">Ingredient Name</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200">{selectedTrackItem.name}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-zinc-400 uppercase font-bold mb-0.5">Category</span>
+                        <span className="font-semibold text-zinc-750 dark:text-zinc-300">{selectedTrackItem.category}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-zinc-400 uppercase font-bold mb-0.5">Current Stock</span>
+                        <span className="font-extrabold text-primary-brand dark:text-orange-400">
+                          {selectedTrackItem.quantity} {selectedTrackItem.unit}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-zinc-400 uppercase font-bold mb-0.5">Min Stock Limit</span>
+                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                          {selectedTrackItem.minStockLevel} {selectedTrackItem.unit}
+                        </span>
+                      </div>
+                      {selectedTrackItem.supplier && (
+                        <div className="col-span-2">
+                          <span className="block text-[10px] text-zinc-400 uppercase font-bold mb-0.5">Supplier</span>
+                          <span className="font-medium text-zinc-700 dark:text-zinc-300">{selectedTrackItem.supplier}</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="block text-[10px] text-zinc-400 uppercase font-bold mb-0.5">Cost per unit</span>
+                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                          {formatPrice(selectedTrackItem.costPrice)} / {selectedTrackItem.unit}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-zinc-400 uppercase font-bold mb-0.5">Total Value</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                          {formatPrice(selectedTrackItem.costPrice * selectedTrackItem.quantity)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Usage in Recipes */}
+                  <div>
+                    <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-450 dark:text-zinc-500 mb-3 font-sans">
+                      Used In Recipes ({itemUsages.recipeUsages.length})
+                    </h4>
+                    {itemUsages.recipeUsages.length > 0 ? (
+                      <div className="border border-zinc-150/60 dark:border-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-150/50 dark:divide-zinc-800">
+                        {itemUsages.recipeUsages.map(({ recipe, qty }) => (
+                          <div key={recipe.id} className="p-3.5 flex justify-between items-center text-xs hover:bg-zinc-50/50 dark:hover:bg-zinc-900/10">
+                            <div>
+                              <span className="font-bold text-zinc-800 dark:text-zinc-200">{recipe.name}</span>
+                              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 block mt-0.5">Category: {recipe.category}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold text-zinc-700 dark:text-zinc-300">{qty} {selectedTrackItem.unit}</span>
+                              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 block mt-0.5">per {recipe.stdYield} {recipe.yieldUnit} yield</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-400 italic bg-zinc-50/30 dark:bg-zinc-900/10 p-4 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-center">
+                        This ingredient is not defined in any recipe.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Allocated / Used in Active Orders */}
+                  <div>
+                    <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-450 dark:text-zinc-500 mb-3 font-sans">
+                      Allocated for Active Orders ({itemUsages.orderUsages.length})
+                    </h4>
+                    {itemUsages.orderUsages.length > 0 ? (
+                      <div className="space-y-3">
+                        {itemUsages.orderUsages.map(({ order, recipeName, scaledQty, isReduced }) => {
+                          const statusColors = getStatusColors(order.status);
+                          return (
+                            <div key={order.id} className="border border-zinc-150 dark:border-zinc-750/75 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:shadow-xs transition-shadow bg-white dark:bg-zinc-850">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedTrackItem(null);
+                                      onNavigate?.(`/orders/${order.id}`);
+                                    }}
+                                    className="text-xs font-bold text-primary-brand dark:text-orange-400 hover:underline cursor-pointer text-left focus:outline-none"
+                                  >
+                                    #{order.id.slice(-7).toUpperCase()} - {order.customerName}
+                                  </button>
+                                  <span className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${statusColors.bg}`}>
+                                    {order.status}
+                                  </span>
+                                  {isReduced ? (
+                                    <span className="text-[9px] bg-emerald-50 text-emerald-605 dark:bg-emerald-950/20 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-full">
+                                      Deducted
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] bg-amber-50 text-amber-605 dark:bg-amber-955/25 dark:text-amber-400 font-bold px-2 py-0.5 rounded-full">
+                                      Pending Deduct
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-zinc-400 dark:text-zinc-500 font-medium">
+                                  <span>Flavor: {order.cakeFlavor}</span>
+                                  <span className="mx-1.5 text-zinc-300 dark:text-zinc-700">•</span>
+                                  <span>Qty: {order.cakeWeight}</span>
+                                  <span className="mx-1.5 text-zinc-300 dark:text-zinc-700">•</span>
+                                  <span>Delivery: {order.deliveryDate}</span>
+                                </div>
+                              </div>
+                              <div className="text-left sm:text-right shrink-0">
+                                <span className="block text-[8px] uppercase tracking-wider font-extrabold text-zinc-400 dark:text-zinc-500 mb-0.5">Scaled Ingredient Qty</span>
+                                <span className="text-xs font-extrabold text-zinc-850 dark:text-zinc-150">
+                                  {scaledQty} {selectedTrackItem.unit}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-400 italic bg-zinc-50/30 dark:bg-zinc-900/10 p-4 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-center">
+                        No active orders are currently requesting this ingredient.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-700/60 bg-zinc-50/50 dark:bg-zinc-900/20 shrink-0 flex justify-end gap-2.5">
+                  <button
+                    onClick={() => setSelectedTrackItem(null)}
+                    className="px-6 py-2 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-xs font-bold uppercase tracking-wider cursor-pointer active:scale-95 transition-all focus:outline-none"
+                  >
+                    Close
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+
+export default memoWithData(InventoryListView);

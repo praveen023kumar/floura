@@ -1,7 +1,8 @@
 // File Path: /src/components/OrdersList.tsx
-import React, { useMemo } from "react";
+import React, { useMemo, memo } from "react";
+import { memoWithData } from "../utils/memo";
 import { type Order } from "../types";
-import { useNavigate } from "react-router-dom";
+
 import { formatPrice, formatDate, getCurrencySymbol, getOrderSeqId } from "../utils/format";
 import { getStatusColors } from "../utils/orderStatus";
 import { calculatePaidAmount, getPaymentStatus } from "../../shared/calculations";
@@ -30,14 +31,15 @@ interface OrdersListProps {
   onAddOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<any>;
   onUpdateOrder?: (order: Order) => Promise<any>;
   onUpdateOrderStatus: (id: string, status: Order["status"]) => void;
+  onNavigate?: (path: string | number) => void;
 }
 
-export default function OrdersList({
+function OrdersList({
   onAddOrder,
   onUpdateOrder,
   onUpdateOrderStatus,
+  onNavigate,
 }: OrdersListProps) {
-  const navigate = useNavigate();
   const [viewTab, setViewTab] = React.useState<"list" | "calendar">("list");
 
   // Calendar state
@@ -86,7 +88,7 @@ export default function OrdersList({
     onUpdateOrder,
     onUpdateOrderStatus,
     initialViewMode: "list",
-    onViewModeChange: (mode) => navigate(mode === "form" ? "/orders/new" : "/orders"),
+    onViewModeChange: (mode) => onNavigate?.(mode === "form" ? "/orders/new" : "/orders"),
     calMonth,
     calYear,
     viewTab,
@@ -104,7 +106,7 @@ export default function OrdersList({
     { value: "all", label: "All Orders" },
     { value: "Pending", label: "Pending" },
     { value: "Ordered Ingredients", label: "Ordered Ingredients" },
-    { value: "In Progress", label: "In Progress" },
+    { value: "Processing", label: "Processing" },
     { value: "Decorating", label: "Decorating" },
     { value: "Ready for Pickup", label: "Ready for Pickup" },
     { value: "archived", label: "Past Orders (Completed / Cancelled)" },
@@ -147,7 +149,7 @@ export default function OrdersList({
   const STATUS_DOT: Record<Order["status"], string> = {
     "Pending": "bg-amber-400",
     "Ordered Ingredients": "bg-orange-400",
-    "In Progress": "bg-sky-400",
+    "Processing": "bg-sky-400",
     "Decorating": "bg-pink-400",
     "Ready for Pickup": "bg-teal-400",
     "Completed": "bg-emerald-400",
@@ -615,11 +617,11 @@ export default function OrdersList({
                         key={o.id}
                         role="button"
                         tabIndex={0}
-                        onClick={() => navigate(`/orders/${o.id}`)}
+                        onClick={() => onNavigate?.(`/orders/${o.id}`)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
-                            navigate(`/orders/${o.id}`);
+                            onNavigate?.(`/orders/${o.id}`);
                           }
                         }}
                         aria-label={`View details for ${o.customerName}'s order`}
@@ -657,7 +659,7 @@ export default function OrdersList({
                             >
                               <option value="Pending">Pending</option>
                               <option value="Ordered Ingredients">Ingredients Ordered</option>
-                              <option value="In Progress">In Progress</option>
+                              <option value="Processing">Processing</option>
                               <option value="Decorating">Decorating</option>
                               <option value="Ready for Pickup">Ready for Pickup</option>
                               <option value="Completed">Completed</option>
@@ -726,7 +728,7 @@ export default function OrdersList({
                             <button
                               id={`next-phase-btn-${o.id}`}
                               onClick={() => {
-                                const stages: Order["status"][] = ["Pending", "Ordered Ingredients", "In Progress", "Decorating", "Ready for Pickup", "Completed"];
+                                const stages: Order["status"][] = ["Pending", "Ordered Ingredients", "Processing", "Decorating", "Ready for Pickup", "Completed"];
                                 const nextIdx = stages.indexOf(o.status) + 1;
                                 if (nextIdx < stages.length) {
                                   let nextStatus = stages[nextIdx];
@@ -958,8 +960,8 @@ export default function OrdersList({
                             key={o.id}
                             role="button"
                             tabIndex={0}
-                            onClick={() => navigate(`/orders/${o.id}`)}
-                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/orders/${o.id}`); } }}
+                            onClick={() => onNavigate?.(`/orders/${o.id}`)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.(`/orders/${o.id}`); } }}
                             className={`flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors border-l-4 ${si.border}`}
                           >
                             <div className="flex-1 min-w-0">
@@ -1015,8 +1017,8 @@ export default function OrdersList({
                           key={o.id}
                           role="button"
                           tabIndex={0}
-                          onClick={() => navigate(`/orders/${o.id}`)}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/orders/${o.id}`); } }}
+                          onClick={() => onNavigate?.(`/orders/${o.id}`)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.(`/orders/${o.id}`); } }}
                           aria-label={`Open ${o.customerName}'s order`}
                           className={`flex items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors border-l-4 ${si.border} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-brand`}
                         >
@@ -1305,3 +1307,5 @@ export default function OrdersList({
     </div>
   );
 }
+
+export default memoWithData(OrdersList);

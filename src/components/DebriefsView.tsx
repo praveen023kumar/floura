@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { useDebriefs, type SortOption } from "../hooks/useDebriefs";
 import { formatPrice, formatDate } from "../utils/format";
 import {
@@ -61,10 +61,9 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export default function DebriefsView({ }: DebriefsViewProps) {
+function DebriefsView({ }: DebriefsViewProps) {
   const {
     orders,
-    refreshTrigger,
     searchTerm,
     setSearchTerm,
     sortBy,
@@ -864,3 +863,5 @@ export default function DebriefsView({ }: DebriefsViewProps) {
     </motion.div>
   );
 }
+
+export default memo(DebriefsView);

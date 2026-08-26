@@ -1,6 +1,7 @@
 // File Path: /src/components/FeedbackView.tsx
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, memo } from "react";
+import { memoWithData } from "../utils/memo";
+
 import { 
   ArrowLeft, 
   MessageSquare, 
@@ -28,10 +29,10 @@ interface FeedbackItem {
 
 interface FeedbackViewProps {
   user: { name: string; email: string; avatar: string; token?: string } | null;
+  onNavigate?: (path: string | number) => void;
 }
 
-export default function FeedbackView({ user }: FeedbackViewProps) {
-  const navigate = useNavigate();
+function FeedbackView({ user, onNavigate }: FeedbackViewProps) {
 
   // Mode: "list" or "add"
   const [viewMode, setViewMode] = useState<"list" | "add">("list");
@@ -171,7 +172,7 @@ export default function FeedbackView({ user }: FeedbackViewProps) {
               setSubmitSuccess(false);
               setFormError("");
             } else {
-              navigate("/more");
+              onNavigate?.("/more");
             }
           }}
           className="flex items-center gap-2 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 text-xs font-bold uppercase tracking-wider cursor-pointer transition-colors"
@@ -447,3 +448,5 @@ export default function FeedbackView({ user }: FeedbackViewProps) {
     </div>
   );
 }
+
+export default memoWithData(FeedbackView);

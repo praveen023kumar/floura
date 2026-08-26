@@ -2,9 +2,10 @@ import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { type Customer, type Order } from "../types";
 import { localDb } from "../db";
+import { useQuery } from "@tanstack/react-query";
 
 export interface UseCustomersProps {
-  onAddCustomer: (customer: Omit<Customer, "id" | "updatedAt">) => Promise<any>;
+  onAddCustomer?: (customer: Omit<Customer, "id" | "updatedAt">) => Promise<any>;
   onUpdateCustomer?: (customer: Customer) => Promise<any>;
   onDeleteCustomer?: (id: string) => Promise<any>;
   initialViewMode?: "list" | "form" | "detail";
@@ -17,17 +18,11 @@ export function useCustomers({
   onDeleteCustomer,
   initialViewMode = "list",
   onViewModeChange,
-}: UseCustomersProps) {
+}: UseCustomersProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  useEffect(() => {
-    const handler = () => setRefreshTrigger((prev) => prev + 1);
-    window.addEventListener("db-update", handler);
-    return () => window.removeEventListener("db-update", handler);
-  }, []);
 
   const [viewMode, setViewMode] = useState<"list" | "form" | "detail">(initialViewMode);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -37,12 +32,7 @@ export function useCustomers({
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<"All" | "Frequent" | "New" | "Corporate">("All");
-
-  const [paginatedCustomers, setPaginatedCustomers] = useState<Customer[]>([]);
-  const [filteredCount, setFilteredCount] = useState<number>(0);
-  const [customerOrderCounts, setCustomerOrderCounts] = useState<{ [id: string]: number }>({});
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [selectedCustomerOrders, setSelectedCustomerOrders] = useState<Order[]>([]);
+  const [sortBy, setSortBy] = useState<"updated-newest" | "member-newest" | "member-oldest" | "orders-highest" | "orders-lowest" | "name-az">("updated-newest");
 
   const [customersCurrentPage, setCustomersCurrentPage] = useState<number>(1);
   const [customersItemsPerPage, setCustomersItemsPerPage] = useState<number>(10);
@@ -85,69 +75,71 @@ export function useCustomers({
     }
   }, [id, initialViewMode]);
 
-  // Fetch counts of orders for paginated list customers
-  useEffect(() => {
-    async function fetchCounts() {
-      if (paginatedCustomers.length === 0) return;
-      try {
-        const counts: { [id: string]: number } = {};
-        await Promise.all(
-          paginatedCustomers.map(async (c) => {
-            const count = await localDb.orders
-              .filter(o => o.customerId === c.id && o.isDeleted !== 1)
-              .count();
-            counts[c.id] = count;
-          })
+  // Load customers paginated list using useQuery
+  const listQuery = useQuery({
+    queryKey: [
+      "customers",
+      "list",
+      searchTerm,
+      filterType,
+      sortBy,
+      customersCurrentPage,
+      customersItemsPerPage
+    ],
+    queryFn: async () => {
+      const startIndex = (customersCurrentPage - 1) * customersItemsPerPage;
+      const hasEncryptedFilters = searchTerm.trim() !== "" || sortBy === "name-az";
+
+      let filteredCount = 0;
+      let paginatedCustomers: Customer[] = [];
+
+      if (!hasEncryptedFilters) {
+        // No encrypted filters: Paginate directly in SQLite using index queries
+        const conditions = ["isDeleted = 0"];
+        const params: any[] = [];
+
+        if (filterType !== "All") {
+          conditions.push("type = ?");
+          params.push(filterType);
+        }
+
+        const whereClause = conditions.join(" AND ");
+
+        // Count query
+        const countResult = await localDb.customers.query(
+          `SELECT COUNT(*) as count FROM customers WHERE ${whereClause}`,
+          params
         );
-        setCustomerOrderCounts(counts);
-      } catch (err) {
-        console.error("Failed to fetch customer order counts:", err);
-      }
-    }
-    fetchCounts();
-  }, [paginatedCustomers, refreshTrigger]);
+        filteredCount = countResult[0]?.count || 0;
 
-  // Fetch selected customer and orders dynamically
-  useEffect(() => {
-    async function fetchSelectedDetails() {
-      if (!selectedCustomerId) {
-        setSelectedCustomer(null);
-        setSelectedCustomerOrders([]);
-        return;
-      }
-      try {
-        const [customer, custOrders] = await Promise.all([
-          localDb.customers.get(selectedCustomerId),
-          localDb.orders
-            .filter(o => o.customerId === selectedCustomerId && o.isDeleted !== 1)
-            .toArray()
-        ]);
-        setSelectedCustomer(customer || null);
-        custOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        setSelectedCustomerOrders(custOrders);
-      } catch (err) {
-        console.error("Failed to fetch selected customer details:", err);
-      }
-    }
-    fetchSelectedDetails();
-  }, [selectedCustomerId, refreshTrigger]);
+        // Build sorting clause for SQLite
+        let orderByClause = "";
+        if (sortBy === "member-newest") {
+          orderByClause = "ORDER BY COALESCE(memberSince, '') DESC";
+        } else if (sortBy === "member-oldest") {
+          orderByClause = "ORDER BY COALESCE(memberSince, '') ASC";
+        } else if (sortBy === "orders-highest") {
+          orderByClause = "ORDER BY COALESCE(totalOrders, 0) DESC";
+        } else if (sortBy === "orders-lowest") {
+          orderByClause = "ORDER BY COALESCE(totalOrders, 0) ASC";
+        } else { // "updated-newest" (default)
+          orderByClause = "ORDER BY COALESCE(updatedAt, '') DESC";
+        }
 
-  // Reset pagination on filter change
-  useEffect(() => {
-    setCustomersCurrentPage(1);
-  }, [searchTerm, filterType]);
+        const pageCustomers = await localDb.customers.query(
+          `SELECT * FROM customers WHERE ${whereClause} ${orderByClause} LIMIT ? OFFSET ?`,
+          [...params, customersItemsPerPage, startIndex]
+        );
 
-  // Load customers
-  useEffect(() => {
-    async function loadDbCustomers() {
-      try {
-        const startIndex = (customersCurrentPage - 1) * customersItemsPerPage;
-        
-        // Retrieve all active decrypted customer records from database
-        const allCust = await localDb.customers.filter(c => c.isDeleted !== 1).toArray();
+        paginatedCustomers = pageCustomers;
+      } else {
+        // Has encrypted filters: Retrieve lightweight columns to filter/sort in memory
+        const allCustLight = await localDb.customers.query(
+          "SELECT id, name, mobile, type, totalOrders, memberSince, updatedAt FROM customers WHERE isDeleted = 0"
+        );
 
-        // Filter and sort the decrypted records in memory
-        const matched = allCust.filter(c => {
+        // Filter customer records in memory
+        const matched = allCustLight.filter(c => {
           if (filterType !== "All" && c.type !== filterType) return false;
           if (searchTerm) {
             const term = searchTerm.toLowerCase();
@@ -160,21 +152,105 @@ export function useCustomers({
           return true;
         });
 
-        // Sort in memory (newest updated first, to match orderBy("updatedAt").reverse())
+        // Sort in memory
         matched.sort((a, b) => {
-          const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-          const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-          return bTime - aTime;
+          if (sortBy === "member-newest") {
+            return new Date(b.memberSince || 0).getTime() - new Date(a.memberSince || 0).getTime();
+          } else if (sortBy === "member-oldest") {
+            return new Date(a.memberSince || 0).getTime() - new Date(b.memberSince || 0).getTime();
+          } else if (sortBy === "orders-highest") {
+            return (b.totalOrders || 0) - (a.totalOrders || 0);
+          } else if (sortBy === "orders-lowest") {
+            return (a.totalOrders || 0) - (b.totalOrders || 0);
+          } else if (sortBy === "name-az") {
+            return a.name.localeCompare(b.name);
+          } else { // "updated-newest" (default)
+            const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+            const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+            return bTime - aTime;
+          }
         });
 
-        setFilteredCount(matched.length);
-        setPaginatedCustomers(matched.slice(startIndex, startIndex + customersItemsPerPage));
-      } catch (err) {
-        console.error("Failed to query customers from localDb:", err);
+        filteredCount = matched.length;
+
+        const pageIds = matched
+          .slice(startIndex, startIndex + customersItemsPerPage)
+          .map(c => c.id);
+
+        if (pageIds.length > 0) {
+          const placeholders = pageIds.map(() => "?").join(",");
+          const pageCustomers = await localDb.customers.query(
+            `SELECT * FROM customers WHERE id IN (${placeholders})`,
+            pageIds
+          );
+
+          // Re-sort to match the in-memory filtered & sorted pageIds order
+          const customerMap = new Map(pageCustomers.map(c => [c.id, c]));
+          paginatedCustomers = pageIds
+            .map(id => customerMap.get(id))
+            .filter((c): c is Customer => !!c);
+        }
       }
+
+      return { filteredCount, paginatedCustomers };
     }
-    loadDbCustomers();
-  }, [refreshTrigger, searchTerm, filterType, customersCurrentPage, customersItemsPerPage]);
+  });
+
+  const queryResult = listQuery.data || { filteredCount: 0, paginatedCustomers: [] };
+  const filteredCount = queryResult.filteredCount;
+  const paginatedCustomers = queryResult.paginatedCustomers;
+
+  // Load customer order counts using useQuery
+  const paginatedIdsStr = paginatedCustomers.map(c => c.id).join(",");
+  const orderCountsQuery = useQuery<{ [id: string]: number }>({
+    queryKey: ["customers", "orderCounts", paginatedIdsStr],
+    enabled: paginatedCustomers.length > 0,
+    queryFn: async () => {
+      const customerIds = paginatedCustomers.map(c => c.id);
+      const placeholders = customerIds.map(() => "?").join(",");
+      const queryResult = await localDb.orders.query(
+        `SELECT customerId, COUNT(*) as count FROM orders WHERE isDeleted = 0 AND customerId IN (${placeholders}) GROUP BY customerId`,
+        customerIds
+      );
+
+      const counts: { [id: string]: number } = {};
+      for (const c of paginatedCustomers) {
+        const matchedRow = queryResult.find((row: any) => row.customerId === c.id);
+        counts[c.id] = matchedRow ? matchedRow.count : 0;
+      }
+      return counts;
+    }
+  });
+
+  const customerOrderCounts = orderCountsQuery.data || {};
+
+  // Load selected customer details and orders using useQuery
+  const detailsQuery = useQuery({
+    queryKey: ["customers", "detail", selectedCustomerId],
+    enabled: !!selectedCustomerId,
+    queryFn: async () => {
+      const [customer, custOrders] = await Promise.all([
+        localDb.customers.get(selectedCustomerId!),
+        localDb.orders.query(
+          "SELECT * FROM orders WHERE customerId = ? AND isDeleted = 0",
+          [selectedCustomerId!]
+        )
+      ]);
+      custOrders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      return { selectedCustomer: customer || null, selectedCustomerOrders: custOrders };
+    }
+  });
+
+  const detailsResult = detailsQuery.data || { selectedCustomer: null, selectedCustomerOrders: [] };
+  const selectedCustomer = detailsResult.selectedCustomer;
+  const selectedCustomerOrders = detailsResult.selectedCustomerOrders;
+
+  const isLoading = listQuery.isLoading || (!!selectedCustomerId && detailsQuery.isLoading);
+
+  // Reset pagination on filter or sort change
+  useEffect(() => {
+    setCustomersCurrentPage(1);
+  }, [searchTerm, filterType, sortBy]);
 
   const customersTotalPages = useMemo(() => {
     return Math.ceil(filteredCount / customersItemsPerPage);
@@ -234,7 +310,6 @@ export function useCustomers({
   };
 
   return {
-    refreshTrigger,
     viewMode,
     setViewMode,
     selectedCustomerId,
@@ -249,6 +324,8 @@ export function useCustomers({
     setSearchTerm,
     filterType,
     setFilterType,
+    sortBy,
+    setSortBy,
     paginatedCustomers,
     filteredCount,
     customerOrderCounts,
@@ -265,5 +342,6 @@ export function useCustomers({
     handleCall,
     handleSMS,
     handleWhatsApp,
+    isLoading,
   };
 }

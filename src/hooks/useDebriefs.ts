@@ -1,14 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { type Order } from "../types";
 import { localDb } from "../db";
+import { useQuery } from "@tanstack/react-query";
 
 export type SortOption = "date-desc" | "date-asc" | "profit-desc" | "profit-asc" | "sales-desc" | "sales-asc";
 export type LogFilterType = "all" | "difficulties" | "costs";
 
 export function useDebriefs() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [allOrders, setAllOrders] = useState<Order[]>([]);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("date-desc");
@@ -20,28 +19,21 @@ export function useDebriefs() {
   const [debriefsCurrentPage, setDebriefsCurrentPage] = useState<number>(1);
   const [debriefsItemsPerPage, setDebriefsItemsPerPage] = useState<number>(10);
 
-  useEffect(() => {
-    const handler = () => setRefreshTrigger((prev) => prev + 1);
-    window.addEventListener("db-update", handler);
-    return () => window.removeEventListener("db-update", handler);
-  }, []);
 
-  useEffect(() => {
-    async function loadOrders() {
-      try {
-        const allLoaded = await localDb.orders
-          .filter(o => o.isDeleted !== 1)
-          .toArray();
-        setAllOrders(allLoaded);
-        
-        const completedOnly = allLoaded.filter(o => o.status === "Completed");
-        setOrders(completedOnly);
-      } catch (err) {
-        console.error("Failed to load orders in DebriefsView:", err);
-      }
+
+  const { data: dbResult = { completedOnly: [], allFlavorsLoaded: [] } } = useQuery({
+    queryKey: ["debriefs", "orders"],
+    queryFn: async () => {
+      const [completedOnly, allFlavorsLoaded] = await Promise.all([
+        localDb.orders.query("SELECT * FROM orders WHERE isDeleted = 0 AND status = 'Completed'"),
+        localDb.orders.query("SELECT cakeFlavor FROM orders WHERE isDeleted = 0 AND cakeFlavor IS NOT NULL AND cakeFlavor != ''")
+      ]);
+      return { completedOnly, allFlavorsLoaded: allFlavorsLoaded as any };
     }
-    loadOrders();
-  }, [refreshTrigger]);
+  });
+
+  const orders = dbResult.completedOnly;
+  const allOrders = dbResult.allFlavorsLoaded;
 
   const completedOrders = useMemo(() => {
     return orders;
@@ -274,7 +266,6 @@ export function useDebriefs() {
 
   return {
     orders,
-    refreshTrigger,
     searchTerm,
     setSearchTerm,
     sortBy,

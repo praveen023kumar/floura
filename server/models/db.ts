@@ -103,7 +103,8 @@ export async function initDb() {
       user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
       paymentStatus TEXT NOT NULL DEFAULT 'Unpaid',
       paidAmount REAL NOT NULL DEFAULT 0,
-      paymentHistory TEXT NOT NULL DEFAULT '[]'
+      paymentHistory TEXT NOT NULL DEFAULT '[]',
+      inventoryReduced INTEGER NOT NULL DEFAULT 0
     )
   `);
 
@@ -324,6 +325,9 @@ export async function initDb() {
   } catch {}
   try {
     await runSql(db, `ALTER TABLE orders ADD COLUMN paymentHistory TEXT NOT NULL DEFAULT '[]'`);
+  } catch {}
+  try {
+    await runSql(db, `ALTER TABLE orders ADD COLUMN inventoryReduced INTEGER NOT NULL DEFAULT 0`);
   } catch {}
 
   // Safe migrations for feedbacks table fields

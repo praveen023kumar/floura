@@ -1,10 +1,12 @@
 // File Path: /src/components/OrderCreate.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
+import { memoWithData } from "../utils/memo";
 import Select from "react-select";
+import AsyncSelect from "react-select/async";
 import CreatableSelect from "react-select/creatable";
 import { customSelectStyles } from "./customSelectStyles";
 import { type Order } from "../types";
-import { useNavigate } from "react-router-dom";
+
 import { formatDate, getCurrencySymbol } from "../utils/format";
 import {
   ArrowLeft,
@@ -98,21 +100,23 @@ interface OrderCreateProps {
   onAddOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<any>;
   onUpdateOrder?: (order: Order) => Promise<any>;
   onUpdateOrderStatus: (id: string, status: Order["status"]) => void;
+  onNavigate?: (path: string) => void;
 }
 
-export default function OrderCreate({
+function OrderCreate({
   onAddOrder,
   onUpdateOrder,
   onUpdateOrderStatus,
+  onNavigate,
 }: OrderCreateProps) {
-  const navigate = useNavigate();
   const {
     viewMode,
+    recipes,
     formData,
     setFormData,
-    customerSearch,
-    setCustomerSearch,
-    customerOptions,
+    loadCustomerOptions,
+    selectedCustomerOption,
+    setSelectedCustomerOption,
     saving,
     saveSuccess,
     videoRef,
@@ -141,8 +145,37 @@ export default function OrderCreate({
     onUpdateOrder,
     onUpdateOrderStatus,
     initialViewMode: "form",
-    onViewModeChange: (mode) => navigate(mode === "form" ? "/orders/new" : "/orders"),
+    onViewModeChange: (mode) => onNavigate?.(mode === "form" ? "/orders/new" : "/orders"),
   });
+
+  const matchingRecipe = recipes.find(
+    (r: any) => r.name.trim().toLowerCase() === (formData.cakeFlavor || "").trim().toLowerCase()
+  );
+  const recipeUnit = matchingRecipe ? matchingRecipe.yieldUnit : "kg";
+
+  const getWeightOptions = (unit: string) => {
+    const normalizedUnit = (unit || "kg").toLowerCase();
+    if (normalizedUnit === "kg" || normalizedUnit === "g") {
+      return [
+        { value: "0.5 kg", label: "0.5 kg" },
+        { value: "1.0 kg", label: "1.0 kg" },
+        { value: "2.0 kg", label: "2.0 kg" },
+        { value: "3.0 kg", label: "3.0 kg" },
+        { value: "Custom", label: "Custom" }
+      ];
+    } else {
+      const unitLabel = unit || "pcs";
+      return [
+        { value: `6 ${unitLabel}`, label: `6 ${unitLabel}` },
+        { value: `12 ${unitLabel}`, label: `12 ${unitLabel}` },
+        { value: `24 ${unitLabel}`, label: `24 ${unitLabel}` },
+        { value: "Custom", label: "Custom" }
+      ];
+    }
+  };
+
+  const standardOptions = getWeightOptions(recipeUnit);
+  const isCustomWeight = formData.cakeWeight === "" || !standardOptions.some(opt => opt.value === formData.cakeWeight);
 
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -347,30 +380,20 @@ export default function OrderCreate({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Select customer profile</label>
-                      <Select
-                        styles={customSelectStyles}
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        className="react-select-container"
-                        classNamePrefix="react-select"
-                        placeholder="Search / Select profile..."
-                        value={(() => {
-                          const allOpts = [
-                            { value: "", label: "Add Custom/New Client" },
-                            ...customerOptions
-                          ];
-                          if (!formData.customerId || formData.customerId === "new" || formData.customerId === "guest") {
-                            return { value: "", label: "Add Custom/New Client" };
-                          }
-                          return allOpts.find(o => o.value === formData.customerId) || { value: "", label: "Add Custom/New Client" };
-                        })()}
-                        options={[
-                          { value: "", label: "Add Custom/New Client" },
-                          ...customerOptions
-                        ]}
-                        onInputChange={(inputValue) => setCustomerSearch(inputValue)}
-                        onChange={(option) => handleCustomerChange(option?.value || "")}
-                      />
+                      <AsyncSelect
+                         styles={customSelectStyles}
+                         menuPortalTarget={document.body}
+                         menuPosition="fixed"
+                         className="react-select-container"
+                         classNamePrefix="react-select"
+                         placeholder="Search by name or mobile..."
+                         loadOptions={loadCustomerOptions}
+                         defaultOptions
+                         cacheOptions
+                         value={selectedCustomerOption}
+                         onChange={(option) => handleCustomerChange(option)}
+                         isClearable
+                       />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
@@ -559,34 +582,81 @@ export default function OrderCreate({
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-zinc-555">Weight</label>
+                      <label className="text-xs font-bold text-zinc-555">
+                        {recipeUnit === "Pieces" ? "Quantity" : "Weight"} {recipeUnit && `(${recipeUnit})`}
+                      </label>
                       <Select
                         styles={customSelectStyles}
                         menuPortalTarget={document.body}
                         menuPosition="fixed"
                         isSearchable={false}
-                        value={{ value: formData.cakeWeight, label: formData.cakeWeight }}
-                        options={[
-                          { value: "0.5 kg", label: "0.5 kg" },
-                          { value: "1.0 kg", label: "1.0 kg" },
-                          { value: "2.0 kg", label: "2.0 kg" },
-                          { value: "3.0 kg", label: "3.0 kg" },
-                          { value: "Custom", label: "Custom" }
-                        ]}
-                        onChange={(opt) => setFormData({ ...formData, cakeWeight: opt?.value || "1.0 kg" })}
+                        value={
+                          isCustomWeight
+                            ? { value: "Custom", label: "Custom" }
+                            : { value: formData.cakeWeight, label: formData.cakeWeight }
+                        }
+                        options={getWeightOptions(recipeUnit)}
+                        onChange={(opt) => {
+                          if (opt?.value === "Custom") {
+                            setFormData({ ...formData, cakeWeight: "" });
+                          } else {
+                            setFormData({ ...formData, cakeWeight: opt?.value || "1.0 kg" });
+                          }
+                        }}
                       />
+                      {isCustomWeight && (
+                        <div className="mt-1.5">
+                          <FastInput
+                            type="text"
+                            placeholder={recipeUnit === "Pieces" ? "e.g. 15 Pieces" : "e.g. 1.5 kg"}
+                            value={formData.cakeWeight}
+                            onChange={(val) => setFormData({ ...formData, cakeWeight: val })}
+                            className="bg-white dark:bg-zinc-800 text-xs p-2 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand text-zinc-850 dark:text-zinc-150 text-left w-full"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-1.5 text-left">
                       <label className="text-xs font-bold text-zinc-555">Flavor</label>
-                      <CreatableSelect
+                      <Select
                         styles={customSelectStyles}
                         menuPortalTarget={document.body}
                         menuPosition="fixed"
-                        placeholder="Select or type custom..."
+                        placeholder="Select recipe flavor..."
                         value={formData.cakeFlavor ? { value: formData.cakeFlavor, label: formData.cakeFlavor } : null}
                         options={dynamicFlavors}
-                        onChange={(opt) => setFormData({ ...formData, cakeFlavor: opt?.value || "" })}
+                        onChange={(opt) => {
+                          const selectedFlavor = opt?.value || "";
+                          const match = recipes.find(
+                            (r: any) => r.name.trim().toLowerCase() === selectedFlavor.trim().toLowerCase()
+                          );
+                          
+                          let newWeight = formData.cakeWeight;
+                          if (match && !editingOrderId) {
+                            const unit = (match.yieldUnit || "kg").toLowerCase();
+                            const yieldVal = match.stdYield;
+                            
+                            const isOneKg = (yieldVal === 1000 && unit === "g") || (yieldVal === 1 && unit === "kg");
+                            
+                            if (isOneKg) {
+                              newWeight = "1.0 kg";
+                            } else {
+                              if (unit === "kg" || unit === "g") {
+                                const weightInKg = unit === "g" ? yieldVal / 1000 : yieldVal;
+                                newWeight = `${weightInKg.toFixed(1)} kg`;
+                              } else {
+                                newWeight = `${yieldVal} ${match.yieldUnit}`;
+                              }
+                            }
+                          }
+                          
+                          setFormData({
+                            ...formData,
+                            cakeFlavor: selectedFlavor,
+                            cakeWeight: newWeight
+                          });
+                        }}
                       />
                     </div>
 
@@ -1095,3 +1165,5 @@ export default function OrderCreate({
     </div>
   );
 }
+
+export default memoWithData(OrderCreate);

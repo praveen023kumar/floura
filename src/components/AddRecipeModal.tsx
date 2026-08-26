@@ -1,8 +1,10 @@
 // File Path: /src/components/AddRecipeModal.tsx
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import CreatableSelect from "react-select/creatable";
-import { customSelectStyles } from "./customSelectStyles";
+import AsyncCreatableSelect from "react-select/async-creatable";
+import { customSelectStyles, tableSelectStyles } from "./customSelectStyles";
 import { type Recipe } from "../types";
+import { localDb } from "../db";
 import { X, Plus, Trash2, CheckCircle2, ImagePlus } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { compressImage } from "../hooks/useProfile";
@@ -27,13 +29,60 @@ export default function AddRecipeModal({
   const [stdYield, setStdYield] = useState<number | "">(1000);
   const [yieldUnit, setYieldUnit] = useState<string>("G");
   const [formIngredients, setFormIngredients] = useState<any[]>([
-    { name: "Flour", qty: 250 },
-    { name: "Sugar", qty: 100 }
+    { name: "", qty: "" }
   ]);
   const [imageBase64, setImageBase64] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [ingredientUnits, setIngredientUnits] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const names = formIngredients.map((i: any) => i.name).filter(Boolean);
+    if (names.length === 0) return;
+
+    const placeholders = names.map(() => "?").join(",");
+    localDb.inventory.query(`SELECT name, unit FROM inventory WHERE name IN (${placeholders})`, names)
+      .then((rows: any) => {
+        const newUnits: Record<string, string> = {};
+        rows.forEach((r: any) => {
+          newUnits[r.name] = r.unit;
+        });
+        setIngredientUnits(prev => ({ ...prev, ...newUnits }));
+      })
+      .catch((err: any) => console.error("Failed to load ingredient units in AddRecipeModal:", err));
+  }, [formIngredients, isOpen]);
+
+  const loadIngredientOptions = async (inputValue: string): Promise<{ value: string; label: string }[]> => {
+    try {
+      let items;
+      if (!inputValue) {
+        items = await localDb.inventory.query(
+          "SELECT * FROM inventory WHERE isDeleted = 0 ORDER BY name ASC LIMIT 30"
+        );
+      } else {
+        items = await localDb.inventory.query(
+          "SELECT * FROM inventory WHERE isDeleted = 0 AND name LIKE ? ORDER BY name ASC LIMIT 30",
+          [`%${inputValue}%`]
+        );
+      }
+
+      const newUnits: Record<string, string> = {};
+      items.forEach((item: any) => {
+        newUnits[item.name] = item.unit;
+      });
+      setIngredientUnits(prev => ({ ...prev, ...newUnits }));
+
+      return items.map((invItem: any) => ({
+        value: invItem.name,
+        label: `${invItem.name} (${invItem.unit})`
+      }));
+    } catch (err) {
+      console.error("Failed to search inventory items:", err);
+      return [];
+    }
+  };
 
   const defaultRecipeCategories = useMemo(() => ["Cakes", "Viennoiserie", "Tarts", "Confectionary", "Classic", "Pastry"], []);
   const dynamicRecipeCategories = useMemo(() => {
@@ -131,7 +180,7 @@ export default function AddRecipeModal({
         setName("");
         setCategory("Cakes");
         setStdYield(1000);
-        setFormIngredients([{ name: "Flour", qty: 250 }, { name: "Sugar", qty: 100 }]);
+        setFormIngredients([{ name: "", qty: "" }]);
         setImageBase64("");
         onClose();
       }, 1000);
@@ -304,7 +353,7 @@ export default function AddRecipeModal({
                     <thead>
                       <tr className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-750 text-zinc-500 font-bold uppercase tracking-wider">
                         <th className="px-4 py-2 bg-zinc-50 dark:bg-zinc-900">Ingredient Name</th>
-                        <th className="px-4 py-2">Quantity (Grams)</th>
+                        <th className="px-4 py-2">Quantity</th>
                         <th className="px-4 py-2 w-16"></th>
                       </tr>
                     </thead>
@@ -312,14 +361,23 @@ export default function AddRecipeModal({
                       {formIngredients.map((item, idx) => (
                         <tr key={idx}>
                           <td className="px-4 py-1.5">
-                            <input
-                              required
-                              type="text"
-                              placeholder="e.g. Vanilla Extract"
-                              value={item.name}
-                              onChange={(e) => handleIngredientChange(idx, "name", e.target.value)}
-                              className="w-full bg-transparent border-none p-0 focus:ring-0 text-xs text-zinc-800 dark:text-zinc-200 font-bold focus:outline-none"
-                            />
+                              <AsyncCreatableSelect
+                                required
+                                styles={tableSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                placeholder="Select ingredient..."
+                                loadOptions={loadIngredientOptions}
+                                defaultOptions
+                                cacheOptions
+                                value={item.name ? { 
+                                  value: item.name, 
+                                  label: ingredientUnits[item.name] 
+                                    ? `${item.name} (${ingredientUnits[item.name]})` 
+                                    : item.name 
+                                } : null}
+                                onChange={(opt) => handleIngredientChange(idx, "name", opt ? opt.value : "")}
+                              />
                           </td>
                           <td className="px-4 py-1.5">
                             <input

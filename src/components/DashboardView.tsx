@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { memoWithData } from "../utils/memo";
 import { motion } from "motion/react";
 import {
   Search,
@@ -92,7 +93,7 @@ interface DashboardViewProps {
   user: { name: string; avatar: string } | null;
 }
 
-export default function DashboardView({
+function DashboardView({
   onNavigate,
   checklist,
   onToggleChecklistItem,
@@ -104,6 +105,8 @@ export default function DashboardView({
     todayStr,
     todayProfit,
     todayDeliveryCount,
+    todayTotalDeliveryCount,
+    todayCompletedDeliveryCount,
     activeOrders,
     lowStockItems,
     averageProfitMarginPercent,
@@ -134,6 +137,10 @@ export default function DashboardView({
       return aMins - bMins;
     });
   }, [scheduleOrders]);
+
+  const upcomingOrders = useMemo(() => {
+    return activeOrders.filter(o => o.status !== "Completed" && o.status !== "Cancelled");
+  }, [activeOrders]);
 
   return (
     <motion.div
@@ -216,13 +223,21 @@ export default function DashboardView({
                     {todayDeliveryCount}
                   </span>
                   <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500">
-                    {todayDeliveryCount === 0 ? "No dispatches" : `${todayDeliveryCount} due today`}
+                    {todayTotalDeliveryCount === 0
+                      ? "No dispatches"
+                      : todayDeliveryCount === 0
+                        ? `All completed (${todayCompletedDeliveryCount}/${todayTotalDeliveryCount})`
+                        : `${todayDeliveryCount} due today`}
                   </span>
                 </div>
                 <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                   <div 
                     className="h-full rounded-full bg-indigo-600 transition-all duration-550"
-                    style={{ width: todayDeliveryCount > 0 ? "100%" : "0%" }}
+                    style={{
+                      width: todayTotalDeliveryCount > 0
+                        ? `${Math.round((todayCompletedDeliveryCount / todayTotalDeliveryCount) * 100)}%`
+                        : "0%"
+                    }}
                   />
                 </div>
               </div>
@@ -534,11 +549,10 @@ export default function DashboardView({
                 View All
               </button>
             </div>
-
             {/* Upcoming queue items */}
             <div className="space-y-3">
-              {activeOrders.length > 0 ? (
-                activeOrders.slice(0, 3).map((order) => (
+              {upcomingOrders.length > 0 ? (
+                upcomingOrders.slice(0, 3).map((order) => (
                   <div
                     key={order.id}
                     className="p-3 border border-zinc-100 dark:border-zinc-800 bg-zinc-50/20 dark:bg-zinc-950/20 rounded-2xl flex flex-col gap-2.5"
@@ -583,3 +597,5 @@ export default function DashboardView({
     </motion.div>
   );
 }
+
+export default memoWithData(DashboardView);

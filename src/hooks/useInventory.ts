@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { type InventoryItem } from "../types";
 import { localDb } from "../db";
+import { useQuery } from "@tanstack/react-query";
 
 export interface UseInventoryProps {
-  onAddInventoryItem: (item: Omit<InventoryItem, "id" | "updatedAt">) => Promise<any>;
+  onAddInventoryItem?: (item: Omit<InventoryItem, "id" | "updatedAt">) => Promise<any>;
   onUpdateInventoryItem?: (item: InventoryItem) => Promise<any>;
   initialViewMode?: "list" | "form";
   onViewModeChange?: (mode: "list" | "form") => void;
@@ -14,14 +15,8 @@ export function useInventory({
   onUpdateInventoryItem,
   initialViewMode = "list",
   onViewModeChange,
-}: UseInventoryProps) {
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+}: UseInventoryProps = {}) {
 
-  useEffect(() => {
-    const handler = () => setRefreshTrigger((prev) => prev + 1);
-    window.addEventListener("db-update", handler);
-    return () => window.removeEventListener("db-update", handler);
-  }, []);
 
   const [viewMode, setViewMode] = useState<"list" | "form">(initialViewMode);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -32,16 +27,7 @@ export function useInventory({
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
 
   const defaultCategories = useMemo(() => ["Dry Goods", "Dairy", "Spices & Flavoring", "Equipment"], []);
-  const [dynamicCategories, setDynamicCategories] = useState<string[]>(["Dry Goods", "Dairy", "Spices & Flavoring", "Equipment"]);
-  const [lowStockCount, setLowStockCount] = useState<number>(0);
-  const [lowStockItemsList, setLowStockItemsList] = useState<InventoryItem[]>([]);
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
-
   const defaultUnits = useMemo(() => ["KG", "L", "Pieces"], []);
-  const [dynamicUnits, setDynamicUnits] = useState<string[]>(["KG", "L", "Pieces"]);
-
-  const [paginatedInventory, setPaginatedInventory] = useState<InventoryItem[]>([]);
-  const [filteredCount, setFilteredCount] = useState<number>(0);
 
   const [inventoryCurrentPage, setInventoryCurrentPage] = useState<number>(1);
   const [inventoryItemsPerPage, setInventoryItemsPerPage] = useState<number>(10);
@@ -66,73 +52,119 @@ export function useInventory({
     }
   };
 
-  // Metadata loader
-  useEffect(() => {
-    async function fetchInventoryMetadata() {
-      try {
-        const [dbCats, allItems] = await Promise.all([
-          localDb.categories.filter(c => c.type === "inventory" && c.isDeleted !== 1).toArray(),
-          localDb.inventory.filter(i => i.isDeleted !== 1).toArray()
-        ]);
-        
-        const lowStock = allItems.filter(i => i.quantity < i.minStockLevel);
-        
-        const catNames = dbCats.map(c => c.name);
-        const combinedCats = Array.from(new Set([...defaultCategories, ...catNames]));
-        setDynamicCategories(combinedCats);
+  // Load metadata using TanStack useQuery
+  const metadataQuery = useQuery({
+    queryKey: ["inventory", "metadata"],
+    queryFn: async () => {
+      const [dbCats, lowStock, activeUnits, allItemsLight] = await Promise.all([
+        localDb.categories.filter(c => c.type === "inventory" && c.isDeleted !== 1).toArray(),
+        localDb.inventory.query("SELECT * FROM inventory WHERE isDeleted = 0 AND quantity < minStockLevel"),
+        localDb.inventory.query("SELECT unit FROM inventory WHERE isDeleted = 0"),
+        localDb.inventory.query("SELECT id, name, category, quantity, minStockLevel, supplier, unit, updatedAt FROM inventory WHERE isDeleted = 0")
+      ]);
 
-        const allUsedUnits = allItems.map((item) => item.unit).filter(Boolean);
-        const combinedUnits = Array.from(new Set([...defaultUnits, ...allUsedUnits]));
-        setDynamicUnits(combinedUnits);
+      const catNames = dbCats.map(c => c.name);
+      const combinedCats = Array.from(new Set([...defaultCategories, ...catNames]));
 
-        setLowStockItemsList(lowStock);
-        setLowStockCount(lowStock.length);
-        setInventoryItems(allItems);
-      } catch (err) {
-        console.error("Failed to fetch inventory metadata from localDb:", err);
-      }
+      const allUsedUnits = activeUnits.map((item: any) => item.unit).filter(Boolean);
+      const combinedUnits = Array.from(new Set([...defaultUnits, ...allUsedUnits]));
+
+      return {
+        dynamicCategories: combinedCats,
+        dynamicUnits: combinedUnits,
+        lowStockItemsList: lowStock,
+        lowStockCount: lowStock.length,
+        inventoryItems: allItemsLight
+      };
     }
-    fetchInventoryMetadata();
-  }, [refreshTrigger, defaultCategories, defaultUnits]);
+  });
 
-  // Load paginated inventory dynamically
-  useEffect(() => {
-    async function loadDbInventory() {
-      try {
-        const startIndex = (inventoryCurrentPage - 1) * inventoryItemsPerPage;
-        
-        // Retrieve all active decrypted inventory items
-        const allItems = await localDb.inventory.filter(i => i.isDeleted !== 1).toArray();
+  const metadata = metadataQuery.data || {
+    dynamicCategories: ["Dry Goods", "Dairy", "Spices & Flavoring", "Equipment"],
+    dynamicUnits: ["KG", "L", "Pieces"],
+    lowStockItemsList: [],
+    lowStockCount: 0,
+    inventoryItems: []
+  };
 
-        // Filter items in memory
-        const matched = allItems.filter(i => {
-          if (selectedCategory !== "All" && i.category !== selectedCategory) return false;
-          if (showOnlyLowStock && !(i.quantity < i.minStockLevel)) return false;
-          if (searchTerm) {
-            const s = searchTerm.toLowerCase();
-            return (
-              i.name.toLowerCase().includes(s) || 
-              (i.supplier || "").toLowerCase().includes(s)
-            );
-          }
-          return true;
-        });
+  const dynamicCategories = metadata.dynamicCategories;
+  const dynamicUnits = metadata.dynamicUnits;
+  const lowStockItemsList = metadata.lowStockItemsList;
+  const lowStockCount = metadata.lowStockCount;
+  const inventoryItems = metadata.inventoryItems;
 
-        // Sort items in memory (newest updated first)
-        matched.sort((a, b) => {
-          const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-          const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-          return bTime - aTime;
-        });
+  // Load paginated list of inventory items using useQuery
+  const listQuery = useQuery({
+    queryKey: [
+      "inventory",
+      "list",
+      searchTerm,
+      selectedCategory,
+      showOnlyLowStock,
+      inventoryCurrentPage,
+      inventoryItemsPerPage
+    ],
+    queryFn: async () => {
+      const startIndex = (inventoryCurrentPage - 1) * inventoryItemsPerPage;
 
-        setFilteredCount(matched.length);
-        setPaginatedInventory(matched.slice(startIndex, startIndex + inventoryItemsPerPage));
-      } catch (err) {
-        console.error("Failed to query inventory from localDb:", err);
+      // Since name, category, and supplier are encrypted in SQLite,
+      // we must fetch lightweight decrypted records and filter/sort in memory.
+      const allItemsLight = await localDb.inventory.query(
+        "SELECT id, name, category, quantity, minStockLevel, supplier, updatedAt FROM inventory WHERE isDeleted = 0"
+      );
+
+      // Perform filtering on decrypted fields
+      const matched = allItemsLight.filter(i => {
+        if (selectedCategory !== "All" && i.category !== selectedCategory) return false;
+        if (showOnlyLowStock && !(i.quantity < i.minStockLevel)) return false;
+        if (searchTerm) {
+          const s = searchTerm.toLowerCase();
+          return (
+            i.name.toLowerCase().includes(s) || 
+            (i.supplier || "").toLowerCase().includes(s)
+          );
+        }
+        return true;
+      });
+
+      // Perform stable sorting by name (alphabetically, case-insensitive)
+      matched.sort((a, b) => {
+        const nameCompare = a.name.localeCompare(b.name);
+        if (nameCompare !== 0) return nameCompare;
+        const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return bTime - aTime;
+      });
+
+      const filteredCount = matched.length;
+      let paginatedInventory: InventoryItem[] = [];
+
+      const pageIds = matched
+        .slice(startIndex, startIndex + inventoryItemsPerPage)
+        .map(i => i.id);
+
+      if (pageIds.length > 0) {
+        const placeholders = pageIds.map(() => "?").join(",");
+        const pageInventory = await localDb.inventory.query(
+          `SELECT * FROM inventory WHERE id IN (${placeholders})`,
+          pageIds
+        );
+
+        // Re-sort to match the in-memory filtered & sorted pageIds order
+        const itemMap = new Map(pageInventory.map(i => [i.id, i]));
+        paginatedInventory = pageIds
+          .map(id => itemMap.get(id))
+          .filter((i): i is InventoryItem => !!i);
       }
+
+      return { filteredCount, paginatedInventory };
     }
-    loadDbInventory();
-  }, [refreshTrigger, searchTerm, selectedCategory, showOnlyLowStock, inventoryCurrentPage, inventoryItemsPerPage]);
+  });
+
+  const listResult = listQuery.data || { filteredCount: 0, paginatedInventory: [] };
+  const filteredCount = listResult.filteredCount;
+  const paginatedInventory = listResult.paginatedInventory;
+  const isLoading = metadataQuery.isLoading || listQuery.isLoading;
 
   const [formInputs, setFormInputs] = useState<any>({
     name: "",
@@ -184,7 +216,6 @@ export function useInventory({
   };
 
   return {
-    refreshTrigger,
     viewMode,
     setViewMode,
     isCreateModalOpen,
@@ -218,5 +249,6 @@ export function useInventory({
     setSuccess,
     handleSetViewMode,
     handleUpdateProduct,
+    isLoading,
   };
 }

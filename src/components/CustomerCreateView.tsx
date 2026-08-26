@@ -1,25 +1,26 @@
 // File Path: /src/components/CustomerCreateView.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
+import { memoWithData } from "../utils/memo";
 import Select from "react-select";
 import { customSelectStyles } from "./customSelectStyles";
 import { type Customer } from "../types";
-import { useNavigate, useLocation } from "react-router-dom";
+
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { motion } from "motion/react";
 
 interface CustomerCreateViewProps {
   onAddCustomer: (customer: Omit<Customer, "id" | "updatedAt">) => Promise<any>;
   onUpdateCustomer?: (customer: Customer) => Promise<any>;
+  onNavigate?: (path: string | number) => void;
+  customerToEdit?: Customer | null;
 }
 
-export default function CustomerCreateView({
+function CustomerCreateView({
   onAddCustomer,
   onUpdateCustomer,
+  onNavigate,
+  customerToEdit,
 }: CustomerCreateViewProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const customerToEdit = location.state?.customer as Customer | null;
 
   const [formData, setFormData] = useState({
     name: "",
@@ -87,7 +88,7 @@ export default function CustomerCreateView({
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
-        navigate("/customers");
+        onNavigate?.("/customers");
       }, 1000);
     } catch (err) {
       console.error(err);
@@ -103,7 +104,7 @@ export default function CustomerCreateView({
       <div className="flex items-center gap-4 bg-white dark:bg-zinc-800 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-700/60 shadow-sm">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => onNavigate?.(-1)}
           className="p-2 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-550 dark:text-zinc-400 cursor-pointer transition-colors"
           title="Go back"
         >
@@ -207,7 +208,7 @@ export default function CustomerCreateView({
           <div className="flex justify-end gap-3 pt-6 border-t border-zinc-100 dark:border-zinc-800">
             <button
               type="button"
-              onClick={() => navigate("/customers")}
+              onClick={() => onNavigate?.("/customers")}
               className="px-6 py-2.5 border border-zinc-250 dark:border-zinc-700 text-zinc-650 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-bold rounded-full transition-colors cursor-pointer"
             >
               Cancel
@@ -233,3 +234,5 @@ export default function CustomerCreateView({
     </div>
   );
 }
+
+export default memoWithData(CustomerCreateView);

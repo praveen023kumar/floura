@@ -74,7 +74,7 @@ function normalizeOrderStatus(status: string): string {
   const lower = status.trim().toLowerCase();
   if (lower === "pending") return "Pending";
   if (lower === "ordered ingredients" || lower === "ingredients ordered") return "Ordered Ingredients";
-  if (lower === "in progress" || lower === "inprogress") return "In Progress";
+  if (lower === "in progress" || lower === "inprogress" || lower === "processing") return "Processing";
   if (lower === "decorating") return "Decorating";
   if (lower === "ready for pickup" || lower === "ready for pick up" || lower === "readyforpickup") return "Ready for Pickup";
   if (lower === "completed") return "Completed";
@@ -89,6 +89,14 @@ const requestQueue: Array<{ fn: () => Promise<any>; resolve: (val: any) => void;
 
 // Web Worker instance
 const worker = new Worker(new URL("./db-worker.ts", import.meta.url), { type: "module" });
+
+// Clean up old worker on hot module replacement to release SQLite OPFS file lock
+if ((import.meta as any).hot) {
+  (import.meta as any).hot.dispose(() => {
+    console.log("[DB] Terminating old database worker due to HMR...");
+    worker.terminate();
+  });
+}
 
 worker.onmessage = (e) => {
   const { id, type, result, error } = e.data;
@@ -110,31 +118,47 @@ worker.onmessage = (e) => {
   
   if (type === "DB_READY") {
     console.log("SQLite WASM + OPFS Worker is ready. Running migration check...");
-    dbReady = true;
     
-    // Auto-load user key on startup from localStorage
-    if (typeof window !== "undefined") {
-      try {
-        const savedUserStr = localStorage.getItem("patisserie_user");
-        if (savedUserStr) {
-          const userData = JSON.parse(savedUserStr);
-          if (userData && userData.email && userData.token) {
-            setDatabaseEncryptionKey(userData.email, userData.token).catch((err) => {
-              console.error("Failed to automatically set database encryption key:", err);
-            });
+    const initDb = async () => {
+      if (typeof window !== "undefined") {
+        try {
+          const savedUserStr = localStorage.getItem("patisserie_user");
+          if (savedUserStr) {
+            const userData = JSON.parse(savedUserStr);
+            if (userData && userData.email && userData.token) {
+              // Direct send to worker bypassing the dbReady check to avoid deadlock
+              await new Promise((resolve, reject) => {
+                const reqId = messageId++;
+                pendingRequests.set(reqId, { resolve, reject });
+                worker.postMessage({ id: reqId, type: "SET_KEY", payload: { email: userData.email, token: userData.token } });
+              });
+              console.log("[DB] Restored database encryption key successfully on startup.");
+            }
           }
+        } catch (e) {
+          console.error("Failed to restore DB key from localStorage on startup:", e);
         }
-      } catch (e) {
-        console.error("Failed to restore DB key from localStorage on startup:", e);
       }
-    }
 
-    while (requestQueue.length > 0) {
-      const { fn, resolve, reject } = requestQueue.shift()!;
-      fn().then(resolve).catch(reject);
-    }
-    
-    triggerMigration();
+      dbReady = true;
+
+      while (requestQueue.length > 0) {
+        const { fn, resolve, reject } = requestQueue.shift()!;
+        fn().then(resolve).catch(reject);
+      }
+      
+      triggerMigration();
+    };
+
+    initDb().catch((err) => {
+      console.error("Error during database initialization sequence:", err);
+      // Fallback to prevent app freeze
+      dbReady = true;
+      while (requestQueue.length > 0) {
+        const { fn, resolve, reject } = requestQueue.shift()!;
+        fn().then(resolve).catch(reject);
+      }
+    });
     return;
   }
   
@@ -217,6 +241,14 @@ class SQLiteTable<T> {
     return sendToWorker("QUERY", {
       sql: `SELECT * FROM ${this.tableName}`,
       params: [],
+      table: this.tableName
+    });
+  }
+
+  async query(sql: string, params: any[] = []): Promise<any[]> {
+    return sendToWorker("QUERY", {
+      sql,
+      params,
       table: this.tableName
     });
   }
@@ -335,13 +367,14 @@ export const localDb = {
   bakeryProfile: new SQLiteTable<BakeryProfile>("bakeryProfile"),
   categories: new SQLiteTable<Category>("categories"),
   preferences: new SQLitePreferencesTable(),
+  updated_tables: new SQLiteTable<any>("updated_tables"),
 
   async transaction(type: string, tables: any[], callback: () => Promise<void>) {
     await callback();
   },
 
   async delete(): Promise<void> {
-    const tables = ["customers", "orders", "inventory", "recipes", "checklist", "customEvents", "dispatchedNotifications", "scheduledAlerts", "bakeryProfile", "categories", "preferences"];
+    const tables = ["customers", "orders", "inventory", "recipes", "checklist", "customEvents", "dispatchedNotifications", "scheduledAlerts", "bakeryProfile", "categories", "preferences", "updated_tables"];
     for (const table of tables) {
       await sendToWorker("CLEAR", { table });
     }

@@ -1,9 +1,11 @@
 // File Path: /src/components/RecipeCreateView.tsx
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, memo } from "react";
+import { memoWithData } from "../utils/memo";
 import CreatableSelect from "react-select/creatable";
-import { customSelectStyles } from "./customSelectStyles";
+import AsyncCreatableSelect from "react-select/async-creatable";
+import { customSelectStyles, tableSelectStyles } from "./customSelectStyles";
 import { type Recipe } from "../types";
-import { useNavigate, useLocation } from "react-router-dom";
+
 import { ArrowLeft, CheckCircle2, Plus, Trash2, ImagePlus, X } from "lucide-react";
 import { motion } from "motion/react";
 import { localDb } from "../db";
@@ -12,25 +14,24 @@ import { compressImage } from "../hooks/useProfile";
 interface RecipeCreateViewProps {
   onAddRecipe: (recipe: Omit<Recipe, "id" | "updatedAt">) => Promise<any>;
   onUpdateRecipe?: (recipe: Recipe) => Promise<any>;
+  onNavigate?: (path: string | number) => void;
+  recipeToEdit?: Recipe | null;
 }
 
-export default function RecipeCreateView({
+function RecipeCreateView({
   onAddRecipe,
   onUpdateRecipe,
+  onNavigate,
+  recipeToEdit,
 }: RecipeCreateViewProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const recipeToEdit = location.state?.recipe as Recipe | null;
 
   const [name, setName] = useState("");
   const [category, setCategory] = useState<string>("Cakes");
   const [stdYield, setStdYield] = useState<number | "">(1000);
   const [yieldUnit, setYieldUnit] = useState<string>("G");
   const [formIngredients, setFormIngredients] = useState<any[]>([
-    { name: "Flour", qty: 250 },
-    { name: "Sugar", qty: 100 }
+    { name: "", qty: "" }
   ]);
   // base64 image state — only set from file upload
   const [imageBase64, setImageBase64] = useState("");
@@ -51,8 +52,7 @@ export default function RecipeCreateView({
       setStdYield(1000);
       setYieldUnit("G");
       setFormIngredients([
-        { name: "Flour", qty: 250 },
-        { name: "Sugar", qty: 100 }
+        { name: "", qty: "" }
       ]);
       setImageBase64("");
     }
@@ -60,6 +60,53 @@ export default function RecipeCreateView({
 
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [ingredientUnits, setIngredientUnits] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const names = formIngredients.map((i: any) => i.name).filter(Boolean);
+    if (names.length === 0) return;
+
+    const placeholders = names.map(() => "?").join(",");
+    localDb.inventory.query(`SELECT name, unit FROM inventory WHERE name IN (${placeholders})`, names)
+      .then((rows: any) => {
+        const newUnits: Record<string, string> = {};
+        rows.forEach((r: any) => {
+          newUnits[r.name] = r.unit;
+        });
+        setIngredientUnits(prev => ({ ...prev, ...newUnits }));
+      })
+      .catch((err: any) => console.error("Failed to load ingredient units in RecipeCreateView:", err));
+  }, [formIngredients]);
+
+  const loadIngredientOptions = async (inputValue: string): Promise<{ value: string; label: string }[]> => {
+    try {
+      let items;
+      if (!inputValue) {
+        items = await localDb.inventory.query(
+          "SELECT * FROM inventory WHERE isDeleted = 0 ORDER BY name ASC LIMIT 30"
+        );
+      } else {
+        items = await localDb.inventory.query(
+          "SELECT * FROM inventory WHERE isDeleted = 0 AND name LIKE ? ORDER BY name ASC LIMIT 30",
+          [`%${inputValue}%`]
+        );
+      }
+
+      const newUnits: Record<string, string> = {};
+      items.forEach((item: any) => {
+        newUnits[item.name] = item.unit;
+      });
+      setIngredientUnits(prev => ({ ...prev, ...newUnits }));
+
+      return items.map((invItem: any) => ({
+        value: invItem.name,
+        label: `${invItem.name} (${invItem.unit})`
+      }));
+    } catch (err) {
+      console.error("Failed to search inventory items:", err);
+      return [];
+    }
+  };
 
   const defaultRecipeCategories = useMemo(() => ["Cakes", "Viennoiserie", "Tarts", "Confectionary", "Classic", "Pastry"], []);
   const [dynamicRecipeCategories, setDynamicRecipeCategories] = useState<string[]>(defaultRecipeCategories);
@@ -70,12 +117,12 @@ export default function RecipeCreateView({
   useEffect(() => {
     async function loadOptions() {
       try {
-        const [dbCats, activeRecipes] = await Promise.all([
+        const [dbCats, activeRecipesUnits] = await Promise.all([
           localDb.categories.filter(c => c.type === "recipe" && c.isDeleted !== 1).toArray(),
-          localDb.recipes.filter(r => r.isDeleted !== 1).toArray()
+          localDb.recipes.query("SELECT yieldUnit FROM recipes WHERE isDeleted = 0")
         ]);
         const catNames = dbCats.map(c => c.name);
-        const allUsedUnits = activeRecipes.map((r) => r.yieldUnit).filter(Boolean);
+        const allUsedUnits = activeRecipesUnits.map((r: any) => r.yieldUnit).filter(Boolean);
 
         setDynamicRecipeCategories(Array.from(new Set([...defaultRecipeCategories, ...catNames])));
         setDynamicYieldUnits(Array.from(new Set([...defaultYieldUnits, ...allUsedUnits])));
@@ -196,10 +243,10 @@ export default function RecipeCreateView({
           setName("");
           setCategory("Cakes");
           setStdYield(1000);
-          setFormIngredients([{ name: "Flour", qty: 250 }, { name: "Sugar", qty: 100 }]);
+          setFormIngredients([{ name: "", qty: "" }]);
           setImageBase64("");
         }
-        navigate("/recipes");
+        onNavigate?.("/recipes");
       }, 1000);
     } catch (err) {
       console.error(err);
@@ -215,7 +262,7 @@ export default function RecipeCreateView({
       <div className="flex items-center gap-4 bg-white dark:bg-zinc-800 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-700/60 shadow-sm">
         <button
           type="button"
-          onClick={() => navigate("/recipes")}
+          onClick={() => onNavigate?.("/recipes")}
           className="p-2 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-755 text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors"
           title="Go back"
         >
@@ -381,7 +428,7 @@ export default function RecipeCreateView({
                       <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 font-bold uppercase tracking-wider">
                           <th className="px-4 py-2.5 bg-zinc-50 dark:bg-zinc-900">Ingredient Name</th>
-                          <th className="px-4 py-2.5">Quantity (Grams)</th>
+                          <th className="px-4 py-2.5">Quantity</th>
                           <th className="px-4 py-2.5 w-16"></th>
                         </tr>
                       </thead>
@@ -389,13 +436,22 @@ export default function RecipeCreateView({
                         {formIngredients.map((item, idx) => (
                           <tr key={idx}>
                             <td className="px-4 py-1.5">
-                              <input
+                              <AsyncCreatableSelect
                                 required
-                                type="text"
-                                placeholder="e.g. Vanilla Extract"
-                                value={item.name}
-                                onChange={(e) => handleIngredientChange(idx, "name", e.target.value)}
-                                className="w-full bg-transparent border-none p-0 focus:ring-0 text-xs text-zinc-800 dark:text-zinc-250 font-bold focus:outline-none"
+                                styles={tableSelectStyles}
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                placeholder="Select ingredient..."
+                                loadOptions={loadIngredientOptions}
+                                defaultOptions
+                                cacheOptions
+                                value={item.name ? { 
+                                  value: item.name, 
+                                  label: ingredientUnits[item.name] 
+                                    ? `${item.name} (${ingredientUnits[item.name]})` 
+                                    : item.name 
+                                } : null}
+                                onChange={(opt) => handleIngredientChange(idx, "name", opt ? opt.value : "")}
                               />
                             </td>
                             <td className="px-4 py-1.5">
@@ -442,7 +498,7 @@ export default function RecipeCreateView({
           <div className="flex justify-end gap-3 pt-6 border-t border-zinc-100 dark:border-zinc-800">
             <button
               type="button"
-              onClick={() => navigate("/recipes")}
+              onClick={() => onNavigate?.("/recipes")}
               className="px-6 py-2.5 border border-zinc-250 dark:border-zinc-700 text-zinc-650 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-bold rounded-full transition-colors cursor-pointer"
             >
               Cancel
@@ -468,3 +524,5 @@ export default function RecipeCreateView({
     </div>
   );
 }
+
+export default memoWithData(RecipeCreateView);

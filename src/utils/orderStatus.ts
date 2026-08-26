@@ -14,7 +14,7 @@ export const getStatusColors = (status: Order["status"]) => {
         bg: "bg-orange-50 dark:bg-orange-950/20 text-orange-700 dark:text-orange-400 border-orange-250 dark:border-orange-900/40",
         accentBg: "bg-orange-500/10 text-orange-700 dark:text-orange-400"
       };
-    case "In Progress":
+    case "Processing":
       return {
         border: "border-l-sky-500",
         bg: "bg-sky-50 dark:bg-sky-950/20 text-sky-700 dark:text-sky-400 border-sky-250 dark:border-sky-900/40",

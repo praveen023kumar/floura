@@ -1,5 +1,5 @@
 // File Path: /src/App.tsx
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState, lazy, Suspense, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -63,7 +63,6 @@ const RecipeDetailView = lazy(() => import("./components/RecipeDetailView"));
 const ProfileView = lazy(() => import("./components/ProfileView"));
 const GettingStartedView = lazy(() => import("./components/GettingStartedView"));
 const MoreView = lazy(() => import("./components/MoreView"));
-const CalendarView = lazy(() => import("./components/CalendarView"));
 const DebriefsView = lazy(() => import("./components/DebriefsView"));
 const FeedbackView = lazy(() => import("./components/FeedbackView"));
 
@@ -71,6 +70,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
+      staleTime: Infinity,
     },
   },
 });
@@ -93,7 +93,6 @@ function MainAppContent() {
     if (pathname.startsWith("/profile")) return "profile";
     if (pathname.startsWith("/getting-started")) return "getting-started";
     if (pathname.startsWith("/more")) return "more";
-    if (pathname.startsWith("/calendar")) return "calendar";
     if (pathname.startsWith("/feedback")) return "feedback";
     return "dashboard";
   };
@@ -113,9 +112,6 @@ function MainAppContent() {
     pullingProgress,
     syncStatus,
     checkerList,
-    customEvents,
-    dispatchedNotifications,
-    scheduledAlerts,
     bakeryProfile,
     setBakeryProfile,
     completedOrdersCount,
@@ -130,12 +126,6 @@ function MainAppContent() {
     handleAddOrder,
     handleUpdateOrderStatus,
     handleUpdateOrder,
-    handleAddCustomEvent,
-    handleDeleteCustomEvent,
-    handleAddScheduledAlert,
-    handleDeleteScheduledAlert,
-    handleAddDispatchedNotification,
-    handleClearDispatchedNotifications,
     handleAddCustomer,
     handleUpdateCustomer,
     handleDeleteCustomer,
@@ -170,6 +160,167 @@ function MainAppContent() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [location.pathname]);
+
+  // Memoized page elements to prevent unnecessary route-level re-renders when parent states update
+  const dashboardViewElement = useMemo(() => (
+    <DashboardView
+      onNavigate={(scName) => {
+        if (scName === "dashboard") navigate("/dashboard");
+        else if (scName === "orders") navigate("/orders");
+        else if (scName === "orders-form") navigate("/orders/new");
+        else if (scName === "customers") navigate("/customers");
+        else if (scName === "customers-form") navigate("/customers/new");
+        else if (scName === "inventory") navigate("/inventory");
+        else if (scName === "inventory-form") navigate("/inventory/new");
+        else if (scName === "recipes") navigate("/recipes");
+        else if (scName === "recipes-form") navigate("/recipes/new");
+        else if (scName === "debriefs") navigate("/debriefs");
+        else if (scName === "checklist") navigate("/checklist");
+        else if (scName === "profile") navigate("/profile");
+        else if (scName === "more") navigate("/more");
+      }}
+      productionCount={productionCount}
+      activeOrdersCount={activeOrdersCount}
+      lowStockCount={lowStockCount}
+      checklist={checkerList}
+      onToggleChecklistItem={handleToggleChecklistItem}
+      onAlertClick={(orderId) => {
+        navigate(`/orders/${orderId}`);
+      }}
+      user={user}
+    />
+  ), [productionCount, activeOrdersCount, lowStockCount, checkerList, user, navigate, handleToggleChecklistItem]);
+
+  const ordersListElement = useMemo(() => (
+    <OrdersList
+      onAddOrder={handleAddOrder}
+      onUpdateOrder={handleUpdateOrder}
+      onUpdateOrderStatus={handleUpdateOrderStatus}
+      onNavigate={navigate}
+    />
+  ), [handleAddOrder, handleUpdateOrder, handleUpdateOrderStatus, navigate]);
+
+  const orderCreateElement = useMemo(() => (
+    <OrderCreate
+      onAddOrder={handleAddOrder}
+      onUpdateOrder={handleUpdateOrder}
+      onUpdateOrderStatus={handleUpdateOrderStatus}
+      onNavigate={navigate}
+    />
+  ), [handleAddOrder, handleUpdateOrder, handleUpdateOrderStatus, navigate]);
+
+  const orderDetailElement = useMemo(() => (
+    <OrderDetail
+      onAddOrder={handleAddOrder}
+      onUpdateOrder={handleUpdateOrder}
+      onUpdateOrderStatus={handleUpdateOrderStatus}
+      onNavigate={navigate}
+    />
+  ), [handleAddOrder, handleUpdateOrder, handleUpdateOrderStatus, navigate]);
+
+  const customersListViewElement = useMemo(() => (
+    <CustomersListView
+      locationState={location.state}
+      onNavigate={navigate}
+    />
+  ), [location.state, navigate]);
+
+  const customerCreateViewElement = useMemo(() => (
+    <CustomerCreateView 
+      onAddCustomer={handleAddCustomer}
+      onUpdateCustomer={handleUpdateCustomer}
+      customerToEdit={location.state?.customer}
+      onNavigate={navigate}
+    />
+  ), [handleAddCustomer, handleUpdateCustomer, location.state?.customer, navigate]);
+
+  const customerDetailViewElement = useMemo(() => (
+    <CustomerDetailView
+      locationSearch={location.search}
+      onNavigate={navigate}
+    />
+  ), [location.search, navigate]);
+
+  const inventoryListViewElement = useMemo(() => (
+    <InventoryListView
+      onUpdateInventoryItem={handleUpdateInventoryItem}
+      onNavigate={navigate}
+    />
+  ), [handleUpdateInventoryItem, navigate]);
+
+  const inventoryCreateViewElement = useMemo(() => (
+    <InventoryCreateView
+      onAddInventoryItem={handleAddInventoryItem}
+      onUpdateInventoryItem={handleUpdateInventoryItem}
+      itemToEdit={location.state?.item}
+      onNavigate={navigate}
+    />
+  ), [handleAddInventoryItem, handleUpdateInventoryItem, location.state?.item, navigate]);
+
+  const checklistViewElement = useMemo(() => (
+    <ChecklistView
+      checkerList={checkerList}
+      onToggleChecklistItem={handleToggleChecklistItem}
+      onAddChecklistItem={handleAddChecklistItem}
+      onResetChecklist={handleResetChecklist}
+    />
+  ), [checkerList, handleToggleChecklistItem, handleAddChecklistItem, handleResetChecklist]);
+
+  const recipesViewElement = useMemo(() => <RecipesView onNavigate={navigate} />, [navigate]);
+
+  const recipeCreateViewElement = useMemo(() => (
+    <RecipeCreateView 
+      onAddRecipe={handleAddRecipe}
+      onUpdateRecipe={handleUpdateRecipe}
+      recipeToEdit={location.state?.recipe}
+      onNavigate={navigate}
+    />
+  ), [handleAddRecipe, handleUpdateRecipe, location.state?.recipe, navigate]);
+
+  const recipeDetailViewElement = useMemo(() => (
+    <RecipeDetailView
+      onNavigate={navigate}
+    />
+  ), [navigate]);
+
+  const gettingStartedViewElement = useMemo(() => (
+    <GettingStartedView
+      user={user}
+      onUpdateProfile={handleUpdateProfile}
+      onUpdateBakeryProfile={handleUpdateBakeryProfile}
+    />
+  ), [user, handleUpdateProfile, handleUpdateBakeryProfile]);
+
+  const profileViewElement = useMemo(() => (
+    <ProfileView
+      user={user}
+      onUpdateProfile={handleUpdateProfile}
+      bakeryProfile={bakeryProfile}
+      onUpdateBakeryProfile={handleUpdateBakeryProfile}
+    />
+  ), [user, bakeryProfile, handleUpdateProfile, handleUpdateBakeryProfile]);
+
+  const moreViewElement = useMemo(() => (
+    <MoreView
+      initialMoreTab="menu"
+      onLogout={handleLogout}
+      user={user}
+      darkMode={darkMode}
+      setDarkMode={setDarkMode}
+      syncStatus={syncStatus}
+      onSync={triggerSync}
+      onNavigate={navigate}
+    />
+  ), [user, darkMode, syncStatus, handleLogout, setDarkMode, triggerSync, navigate]);
+
+  const debriefsViewElement = useMemo(() => <DebriefsView />, []);
+
+  const feedbackViewElement = useMemo(() => (
+    <FeedbackView 
+      user={user}
+      onNavigate={navigate}
+    />
+  ), [user, navigate]);
 
   if (initializing || isLoadingFromDb) {
     return (
@@ -280,13 +431,7 @@ function MainAppContent() {
             </div>
           }>
             <Routes>
-              <Route path="/getting-started" element={
-                <GettingStartedView
-                  user={user}
-                  onUpdateProfile={handleUpdateProfile}
-                  onUpdateBakeryProfile={handleUpdateBakeryProfile}
-                />
-              } />
+              <Route path="/getting-started" element={gettingStartedViewElement} />
               <Route path="*" element={<Navigate to="/getting-started" replace />} />
             </Routes>
           </Suspense>
@@ -505,164 +650,24 @@ function MainAppContent() {
           }>
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              
-              <Route path="/dashboard" element={
-                <DashboardView
-                  onNavigate={(scName) => {
-                    if (scName === "dashboard") navigate("/dashboard");
-                    else if (scName === "orders") navigate("/orders");
-                    else if (scName === "orders-form") navigate("/orders/new");
-                    else if (scName === "customers") navigate("/customers");
-                    else if (scName === "customers-form") navigate("/customers/new");
-                    else if (scName === "inventory") navigate("/inventory");
-                    else if (scName === "inventory-form") navigate("/inventory/new");
-                    else if (scName === "recipes") navigate("/recipes");
-                    else if (scName === "recipes-form") navigate("/recipes/new");
-                    else if (scName === "debriefs") navigate("/debriefs");
-                    else if (scName === "checklist") navigate("/checklist");
-                    else if (scName === "profile") navigate("/profile");
-                    else if (scName === "more") navigate("/more");
-                  }}
-                  productionCount={productionCount}
-                  activeOrdersCount={activeOrdersCount}
-                  lowStockCount={lowStockCount}
-                  checklist={checkerList}
-                  onToggleChecklistItem={handleToggleChecklistItem}
-                  onAlertClick={(orderId) => {
-                    navigate(`/orders/${orderId}`);
-                  }}
-                  user={user}
-                />
-              } />
-
-              <Route path="/orders" element={
-                <OrdersList
-                  onAddOrder={handleAddOrder}
-                  onUpdateOrder={handleUpdateOrder}
-                  onUpdateOrderStatus={handleUpdateOrderStatus}
-                />
-              } />
-
-              <Route path="/orders/new" element={
-                <OrderCreate
-                  onAddOrder={handleAddOrder}
-                  onUpdateOrder={handleUpdateOrder}
-                  onUpdateOrderStatus={handleUpdateOrderStatus}
-                />
-              } />
-
-              <Route path="/orders/:id" element={
-                <OrderDetail
-                  onAddOrder={handleAddOrder}
-                  onUpdateOrder={handleUpdateOrder}
-                  onUpdateOrderStatus={handleUpdateOrderStatus}
-                />
-              } />
-
-              <Route path="/customers" element={
-                <CustomersListView />
-              } />
-
-              <Route path="/customers/new" element={
-                <CustomerCreateView 
-                  onAddCustomer={handleAddCustomer}
-                  onUpdateCustomer={handleUpdateCustomer}
-                />
-              } />
-
-              <Route path="/customers/:id" element={
-                <CustomerDetailView />
-              } />
-               <Route path="/inventory" element={
-                <InventoryListView
-                  onUpdateInventoryItem={handleUpdateInventoryItem}
-                />
-              } />
-
-              <Route path="/inventory/new" element={
-                <InventoryCreateView
-                  onAddInventoryItem={handleAddInventoryItem}
-                  onUpdateInventoryItem={handleUpdateInventoryItem}
-                />
-              } />
-
-              <Route path="/checklist" element={
-                <ChecklistView
-                  checkerList={checkerList}
-                  onToggleChecklistItem={handleToggleChecklistItem}
-                  onAddChecklistItem={handleAddChecklistItem}
-                  onResetChecklist={handleResetChecklist}
-                />
-              } />
-
-              <Route path="/recipes" element={
-                <RecipesView />
-              } />
-
-              <Route path="/recipes/new" element={
-                <RecipeCreateView 
-                  onAddRecipe={handleAddRecipe}
-                  onUpdateRecipe={handleUpdateRecipe}
-                />
-              } />
-
-              <Route path="/recipes/:id" element={
-                <RecipeDetailView />
-              } />
-
-              <Route path="/getting-started" element={
-                <GettingStartedView
-                  user={user}
-                  onUpdateProfile={handleUpdateProfile}
-                  onUpdateBakeryProfile={handleUpdateBakeryProfile}
-                />
-              } />
-
-              <Route path="/profile" element={
-                <ProfileView
-                  user={user}
-                  onUpdateProfile={handleUpdateProfile}
-                  bakeryProfile={bakeryProfile}
-                  onUpdateBakeryProfile={handleUpdateBakeryProfile}
-                />
-              } />
-
-              <Route path="/more" element={
-                <MoreView
-                  initialMoreTab="menu"
-                  onLogout={handleLogout}
-                  user={user}
-                  darkMode={darkMode}
-                  setDarkMode={setDarkMode}
-                  syncStatus={syncStatus}
-                  onSync={triggerSync}
-                />
-              } />
-
-              <Route path="/calendar" element={
-                <CalendarView
-                  onUpdateOrderStatus={handleUpdateOrderStatus}
-                  customEvents={customEvents}
-                  dispatchedLogs={dispatchedNotifications}
-                  scheduledAlerts={scheduledAlerts}
-                  onAddCustomEvent={handleAddCustomEvent}
-                  onDeleteCustomEvent={handleDeleteCustomEvent}
-                  onAddScheduledAlert={handleAddScheduledAlert}
-                  onDeleteScheduledAlert={handleDeleteScheduledAlert}
-                  onAddDispatchedNotification={handleAddDispatchedNotification}
-                  onClearDispatchedNotifications={handleClearDispatchedNotifications}
-                />
-              } />
-
-              <Route path="/debriefs" element={
-                <DebriefsView />
-              } />
-
-              <Route path="/feedback" element={
-                <FeedbackView user={user} />
-              } />
-
-              {/* Catch-all fallback */}
+              <Route path="/dashboard" element={dashboardViewElement} />
+              <Route path="/orders" element={ordersListElement} />
+              <Route path="/orders/new" element={orderCreateElement} />
+              <Route path="/orders/:id" element={orderDetailElement} />
+              <Route path="/customers" element={customersListViewElement} />
+              <Route path="/customers/new" element={customerCreateViewElement} />
+              <Route path="/customers/:id" element={customerDetailViewElement} />
+              <Route path="/inventory" element={inventoryListViewElement} />
+              <Route path="/inventory/new" element={inventoryCreateViewElement} />
+              <Route path="/checklist" element={checklistViewElement} />
+              <Route path="/recipes" element={recipesViewElement} />
+              <Route path="/recipes/new" element={recipeCreateViewElement} />
+              <Route path="/recipes/:id" element={recipeDetailViewElement} />
+              <Route path="/getting-started" element={gettingStartedViewElement} />
+              <Route path="/profile" element={profileViewElement} />
+              <Route path="/more" element={moreViewElement} />
+              <Route path="/debriefs" element={debriefsViewElement} />
+              <Route path="/feedback" element={feedbackViewElement} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Suspense>
@@ -755,6 +760,39 @@ function MainAppContent() {
 
 export default function App() {
   const Router = isNativeApp() ? HashRouter : BrowserRouter;
+
+  useEffect(() => {
+    const handleDbUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ table?: string | string[] }>;
+      const table = customEvent.detail?.table;
+      
+      if (table) {
+        const tables = Array.isArray(table) ? table : [table];
+        for (const t of tables) {
+          queryClient.invalidateQueries({ queryKey: [t] });
+        }
+        
+        // If orders, inventory, or checklist changes, invalidate dashboard
+        const dashboardNeedsInvalidation = tables.some(t => 
+          ["orders", "inventory", "checklist"].includes(t)
+        );
+        if (dashboardNeedsInvalidation) {
+          queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        }
+        // If orders change, also invalidate debriefs
+        if (tables.includes("orders")) {
+          queryClient.invalidateQueries({ queryKey: ["debriefs"] });
+        }
+      } else {
+        // If no table is specified (e.g. initial sync or pull), invalidate everything
+        queryClient.invalidateQueries();
+      }
+    };
+    window.addEventListener("db-update", handleDbUpdate);
+    return () => {
+      window.removeEventListener("db-update", handleDbUpdate);
+    };
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

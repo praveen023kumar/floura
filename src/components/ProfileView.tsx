@@ -1,5 +1,6 @@
 // File Path: /src/components/ProfileView.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
+import { memoWithData } from "../utils/memo";
 import { User, Shield, Store, Mail, Phone, MapPin, Check, Edit2, Sparkles, Camera } from "lucide-react";
 import { motion } from "motion/react";
 import Avatar, { AVATAR_PRESETS } from "./Avatar";
@@ -16,7 +17,7 @@ interface ProfileViewProps {
   onUpdateBakeryProfile?: (updatedProfile: any) => Promise<void>;
 }
 
-export default function ProfileView({ user, onUpdateProfile, bakeryProfile, onUpdateBakeryProfile }: ProfileViewProps) {
+function ProfileView({ user, onUpdateProfile, bakeryProfile, onUpdateBakeryProfile }: ProfileViewProps) {
   const {
     isNewUser,
     showOnboarding,
@@ -309,3 +310,5 @@ export default function ProfileView({ user, onUpdateProfile, bakeryProfile, onUp
     </motion.div>
   );
 }
+
+export default memoWithData(ProfileView);

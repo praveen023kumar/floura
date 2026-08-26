@@ -43,7 +43,11 @@ export function scaleRecipeIngredients(recipe: Recipe, targetYield: number): Sca
     }));
   }
 
-  const ratio = targetYield / recipe.stdYield;
+  // Normalize standard yield with its unit using parseWeightToGrams
+  const stdYieldStr = `${recipe.stdYield} ${recipe.yieldUnit || "kg"}`;
+  const stdVal = parseWeightToGrams(stdYieldStr);
+
+  const ratio = stdVal > 0 ? (targetYield / stdVal) : 1;
   return recipe.ingredients.map(ing => ({
     name: ing.name,
     originalQty: ing.qty,
@@ -66,7 +70,7 @@ export function computeDashboardStats(
   orders: Order[],
   inventory: InventoryItem[]
 ): DashboardStats {
-  const activeStatuses = ["Pending", "Ordered Ingredients", "In Progress", "Decorating", "Ready for Pickup"];
+  const activeStatuses = ["Pending", "Ordered Ingredients", "Processing", "Decorating", "Ready for Pickup"];
   
   const completedOrders = orders.filter(o => o.status === "Completed" && o.isDeleted !== 1);
   const activeOrders = orders.filter(o => activeStatuses.includes(o.status) && o.isDeleted !== 1);
@@ -87,4 +91,20 @@ export function computeDashboardStats(
     totalRevenue,
     pendingPaymentCount
   };
+}
+
+/**
+ * Helper to parse weight/quantity string (e.g. "2.0 kg", "12 Pieces") to numeric value (grams or unit count).
+ */
+export function parseWeightToGrams(weightStr: string): number {
+  if (!weightStr) return 1000;
+  const clean = weightStr.toLowerCase().replace(/,/g, '');
+  const numMatch = clean.match(/([\d.]+)/);
+  if (!numMatch) return 1000;
+  const num = parseFloat(numMatch[1]);
+  if (isNaN(num)) return 1000;
+  if (clean.includes("kg") || clean.includes("kilo")) {
+    return num * 1000;
+  }
+  return num;
 }

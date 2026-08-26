@@ -1,7 +1,11 @@
 // File Path: /src/components/OrderDetail.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect, memo } from "react";
+import { memoWithData } from "../utils/memo";
 import { type Order } from "../types";
-import { useNavigate } from "react-router-dom";
+import { localDb } from "../db";
+import { scaleRecipeIngredients, parseWeightToGrams } from "../../shared/calculations";
+
+
 import { formatPrice, formatDate, getCurrencySymbol, getOrderSeqId } from "../utils/format";
 import { getStatusColors } from "../utils/orderStatus";
 import {
@@ -31,14 +35,15 @@ interface OrderDetailProps {
   onAddOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<any>;
   onUpdateOrder?: (order: Order) => Promise<any>;
   onUpdateOrderStatus: (id: string, status: Order["status"]) => void;
+  onNavigate?: (path: string | number, state?: any) => void;
 }
 
-export default function OrderDetail({
+function OrderDetail({
   onAddOrder,
   onUpdateOrder,
   onUpdateOrderStatus,
+  onNavigate,
 }: OrderDetailProps) {
-  const navigate = useNavigate();
   const {
     orders,
     selectedOrder,
@@ -68,8 +73,103 @@ export default function OrderDetail({
     onUpdateOrder,
     onUpdateOrderStatus,
     initialViewMode: "detail",
-    onViewModeChange: (mode) => navigate(mode === "form" ? "/orders/new" : "/orders"),
+    onViewModeChange: (mode) => onNavigate?.(mode === "form" ? "/orders/new" : "/orders"),
   });
+
+  const [recipesList, setRecipesList] = useState<any[]>([]);
+  const [inventoryList, setInventoryList] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const loadData = async () => {
+      try {
+        const [recs, invs] = await Promise.all([
+          localDb.recipes.filter((r: any) => r.isDeleted !== 1).toArray(),
+          localDb.inventory.filter((i: any) => i.isDeleted !== 1).toArray()
+        ]);
+        if (active) {
+          setRecipesList(recs);
+          setInventoryList(invs);
+        }
+      } catch (err) {
+        console.error("Failed to load recipes/inventory in OrderDetail:", err);
+      }
+    };
+    loadData();
+    
+    // Also listen to db updates so we reload when inventory updates
+    const handleDbUpdate = () => {
+      loadData();
+    };
+    window.addEventListener("db-update", handleDbUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener("db-update", handleDbUpdate);
+    };
+  }, [selectedOrder, completingOrder]);
+
+  const getInventoryConversionFactor = (inventoryUnit: string): number => {
+    const unit = (inventoryUnit || "").toLowerCase().trim();
+    if (unit === "kg" || unit === "kilogram" || unit === "kilograms" || unit === "l" || unit === "liter" || unit === "liters" || unit === "litre" || unit === "litres") {
+      return 1000;
+    }
+    return 1;
+  };
+
+  const calculateOrderIngredients = (order: Order) => {
+    if (!order || !order.cakeFlavor) return { list: [], totalCost: 0, recipeFound: false };
+    
+    const matchingRecipe = recipesList.find(
+      (r: any) => r.isDeleted !== 1 && r.name.trim().toLowerCase() === order.cakeFlavor.trim().toLowerCase()
+    );
+    
+    if (!matchingRecipe) {
+      return { list: [], totalCost: 0, recipeFound: false };
+    }
+    
+    const targetWeight = parseWeightToGrams(order.cakeWeight);
+    const scaledIngredients = scaleRecipeIngredients(matchingRecipe, targetWeight);
+    
+    let totalCost = 0;
+    const list = scaledIngredients.map(ing => {
+      const invItem = inventoryList.find(
+        (item: any) => item.isDeleted !== 1 && item.name.trim().toLowerCase() === ing.name.trim().toLowerCase()
+      );
+      
+      let costPrice = 0;
+      let unit = "g";
+      let quantityInInvUnits = ing.scaledQty;
+      let invItemFound = false;
+      
+      if (invItem) {
+        invItemFound = true;
+        costPrice = invItem.costPrice;
+        unit = invItem.unit;
+        const conversion = getInventoryConversionFactor(invItem.unit);
+        quantityInInvUnits = ing.scaledQty / conversion;
+      }
+      
+      const cost = quantityInInvUnits * costPrice;
+      totalCost += cost;
+      
+      return {
+        name: ing.name,
+        gramsQty: ing.scaledQty,
+        invQty: quantityInInvUnits,
+        unit,
+        costPrice,
+        cost,
+        invItemFound
+      };
+    });
+    
+    return {
+      list,
+      totalCost: parseFloat(totalCost.toFixed(2)),
+      recipeFound: true,
+      recipeName: matchingRecipe.name
+    };
+  };
 
   const handleShareWhatsApp = (order: Order) => {
     if (!order.customerMobile) {
@@ -115,7 +215,7 @@ export default function OrderDetail({
               <div className="flex items-start gap-3.5">
                 <button
                   type="button"
-                  onClick={() => navigate("/orders")}
+                  onClick={() => onNavigate?.("/orders")}
                   className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors mt-0.5"
                   title="Back to orders list"
                 >
@@ -147,7 +247,7 @@ export default function OrderDetail({
                       >
                         <option value="Pending">Pending</option>
                         <option value="Ordered Ingredients">Ingredients Ordered</option>
-                        <option value="In Progress">In Progress</option>
+                        <option value="Processing">Processing</option>
                         <option value="Decorating">Decorating</option>
                         <option value="Ready for Pickup">Ready for Pickup</option>
                         <option value="Completed">Completed</option>
@@ -192,8 +292,8 @@ export default function OrderDetail({
                 Active Baking & Order Milestones
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-left">
-                {(["Pending", "Ordered Ingredients", "In Progress", "Decorating", "Ready for Pickup", "Completed"] as Order["status"][]).map((stage, idx) => {
-                  const stages = ["Pending", "Ordered Ingredients", "In Progress", "Decorating", "Ready for Pickup", "Completed"];
+                {(["Pending", "Ordered Ingredients", "Processing", "Decorating", "Ready for Pickup", "Completed"] as Order["status"][]).map((stage, idx) => {
+                  const stages = ["Pending", "Ordered Ingredients", "Processing", "Decorating", "Ready for Pickup", "Completed"];
                   const currentIdx = stages.indexOf(selectedOrder.status);
                   const isCompleted = idx < currentIdx || selectedOrder.status === "Completed";
                   const isActive = stage === selectedOrder.status;
@@ -272,7 +372,7 @@ export default function OrderDetail({
                       {selectedOrder.cakeFlavor}
                     </h3>
                     <p className="text-xs text-zinc-500 font-sans text-left">
-                      Shape: <strong>{selectedOrder.cakeShape}</strong> • Weight: <strong>{selectedOrder.cakeWeight}</strong> • Preference:{" "}
+                      Shape: <strong>{selectedOrder.cakeShape}</strong> • {selectedOrder.cakeWeight.toLowerCase().includes("pieces") || selectedOrder.cakeWeight.toLowerCase().includes("pcs") ? "Quantity" : "Weight"}: <strong>{selectedOrder.cakeWeight}</strong> • Preference:{" "}
                       <span className={`px-1.5 py-0.5 rounded font-bold text-[9px] ${
                         selectedOrder.preference === "Eggless"
                           ? "bg-emerald-150/25 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400"
@@ -329,7 +429,7 @@ export default function OrderDetail({
                       >
                         <option value="Pending">Pending</option>
                         <option value="Ordered Ingredients">Ingredients Ordered</option>
-                        <option value="In Progress">In Progress</option>
+                        <option value="Processing">Processing</option>
                         <option value="Decorating">Decorating</option>
                         <option value="Ready for Pickup">Ready for Pickup</option>
                         <option value="Completed">Completed</option>
@@ -342,7 +442,7 @@ export default function OrderDetail({
                       <button
                         type="button"
                         onClick={() => {
-                          const stages: Order["status"][] = ["Pending", "Ordered Ingredients", "In Progress", "Decorating", "Ready for Pickup", "Completed"];
+                          const stages: Order["status"][] = ["Pending", "Ordered Ingredients", "Processing", "Decorating", "Ready for Pickup", "Completed"];
                           const nextIdx = stages.indexOf(selectedOrder.status) + 1;
                           if (nextIdx < stages.length) {
                             let nextStatus = stages[nextIdx];
@@ -411,7 +511,7 @@ export default function OrderDetail({
                         <button
                           type="button"
                           onClick={() => {
-                            navigate("/customers", { state: { searchCustomerName: selectedOrder.customerName, fromOrderId: selectedOrder.id } });
+                            onNavigate?.("/customers", { state: { searchCustomerName: selectedOrder.customerName, fromOrderId: selectedOrder.id } });
                           }}
                           className="flex-1 bg-primary-brand/10 text-primary-brand dark:bg-orange-400/10 dark:text-orange-500 hover:bg-primary-brand/20 py-2 rounded-xl text-center text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors font-sans"
                         >
@@ -497,6 +597,48 @@ export default function OrderDetail({
                     </div>
                   </div>
                 </div>
+
+                {/* Ingredient cost breakdown for Completed orders */}
+                {selectedOrder.status === "Completed" && (() => {
+                  const ingDetails = calculateOrderIngredients(selectedOrder);
+                  if (!ingDetails.recipeFound) {
+                    return (
+                      <div className="bg-amber-50 dark:bg-amber-950/20 p-5 rounded-2xl border border-amber-250 dark:border-amber-900/30 text-xs text-amber-700 dark:text-amber-400 text-left">
+                        No matching recipe found for flavor "{selectedOrder.cakeFlavor}" to display ingredient costs.
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="bg-zinc-50 dark:bg-zinc-900/60 p-5 rounded-2xl border border-zinc-150 dark:border-zinc-750 space-y-3 text-left font-sans">
+                      <div className="flex justify-between items-center border-b border-zinc-200/60 dark:border-zinc-700/60 pb-2">
+                        <h4 className="text-xs font-bold text-zinc-505 uppercase tracking-wider">
+                          Ingredient Cost Breakdown
+                        </h4>
+                        <span className="text-[10px] text-zinc-400">
+                          Recipe: {ingDetails.recipeName}
+                        </span>
+                      </div>
+                      <div className="space-y-2 text-xs">
+                        {ingDetails.list.map((ing, idx) => (
+                          <div key={idx} className="flex justify-between text-zinc-650 dark:text-zinc-400">
+                            <span>{ing.name} ({ing.gramsQty}g)</span>
+                            <div className="space-x-4 font-mono">
+                              <span className="text-zinc-400">{ing.invQty.toFixed(2)} {ing.unit} @ {formatPrice(ing.costPrice)}/{ing.unit}</span>
+                              <span className="font-bold text-zinc-700 dark:text-zinc-300">{formatPrice(ing.cost)}</span>
+                            </div>
+                          </div>
+                        ))}
+                        <hr className="border-zinc-200 dark:border-zinc-700/60 my-1" />
+                        <div className="flex justify-between text-sm font-bold text-zinc-855 dark:text-zinc-100 pt-1">
+                          <span>Total Ingredient Cost Spent</span>
+                          <span className="font-serif text-emerald-600 dark:text-emerald-450 font-bold">
+                            {formatPrice(ingDetails.totalCost)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Payment Installments Tracking Widget */}
                 <div className="bg-white dark:bg-zinc-800 p-5 rounded-2xl border border-zinc-150 dark:border-zinc-750 shadow-sm space-y-4 text-left font-sans">
@@ -935,6 +1077,41 @@ export default function OrderDetail({
                 </div>
               </div>
 
+              {/* Ingredient Breakdown inside completion modal */}
+              {(() => {
+                const ingDetails = calculateOrderIngredients(completingOrder);
+                if (!ingDetails.recipeFound) {
+                  return (
+                    <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-2xl text-[11px] text-amber-700 dark:text-amber-400 text-left">
+                      No matching recipe found for flavor "{completingOrder.cakeFlavor}" to auto-calculate ingredient costs.
+                    </div>
+                  );
+                }
+                return (
+                  <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl space-y-2 text-xs">
+                    <div className="flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-1.5 text-left">
+                      <span className="font-bold text-zinc-700 dark:text-zinc-300">Ingredient Cost Summary</span>
+                      <span className="text-[10px] text-zinc-400">Recipe: {ingDetails.recipeName} ({completingOrder.cakeWeight})</span>
+                    </div>
+                    <div className="max-h-[120px] overflow-y-auto space-y-1.5 pr-1">
+                      {ingDetails.list.map((ing, idx) => (
+                        <div key={idx} className="flex justify-between text-[11px]">
+                          <span className="text-zinc-650 dark:text-zinc-400">{ing.name} ({ing.gramsQty}g)</span>
+                          <div className="space-x-2 font-mono">
+                            <span className="text-zinc-400">{ing.invQty.toFixed(2)} {ing.unit}</span>
+                            <span className="text-zinc-700 dark:text-zinc-300 font-bold">{formatPrice(ing.cost)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-zinc-200 dark:border-zinc-800 pt-1.5 flex justify-between font-bold">
+                      <span className="text-zinc-700 dark:text-zinc-300">Total Ingredient Cost:</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-450">{formatPrice(ingDetails.totalCost)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="flex gap-3 pt-3 font-sans">
                 <button
                   type="button"
@@ -958,3 +1135,5 @@ export default function OrderDetail({
     </div>
   );
 }
+
+export default memoWithData(OrderDetail);

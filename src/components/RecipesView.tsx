@@ -1,6 +1,6 @@
 // File Path: /src/components/RecipesView.tsx
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { memoWithData } from "../utils/memo";
 import {
   Search,
   Plus,
@@ -14,8 +14,11 @@ import { motion, AnimatePresence } from "motion/react";
 
 import { useRecipes } from "../hooks/useRecipes";
 
-export default function RecipesView() {
-  const navigate = useNavigate();
+interface RecipesViewProps {
+  onNavigate: (path: string) => void;
+}
+
+function RecipesView({ onNavigate }: RecipesViewProps) {
   const {
     loading,
     searchTerm,
@@ -103,7 +106,7 @@ export default function RecipesView() {
           </button>
           <button
             type="button"
-            onClick={() => navigate("/recipes/new")}
+            onClick={() => onNavigate("/recipes/new")}
             className="w-10 h-10 rounded-full bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all active:scale-95 shrink-0"
             title="Add Formula"
           >
@@ -306,7 +309,7 @@ export default function RecipesView() {
                   return (
                     <div
                       key={r.id}
-                      onClick={() => navigate(`/recipes/${r.id}`)}
+                      onClick={() => onNavigate(`/recipes/${r.id}`)}
                       className="group cursor-pointer bg-white dark:bg-zinc-850/80 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-750/70 hover:border-primary-brand/40 dark:hover:border-orange-400/40 hover:bg-zinc-50/30 dark:hover:bg-zinc-800/40 hover:shadow-lg hover:shadow-primary-brand/5 dark:hover:shadow-orange-500/5 hover:-translate-y-0.5 active:scale-99 transition-all duration-300 flex flex-col justify-between select-none animate-fadeIn"
                     >
                       <div className="flex gap-4">
@@ -460,3 +463,5 @@ export default function RecipesView() {
     </div>
   );
 }
+
+export default memoWithData(RecipesView);

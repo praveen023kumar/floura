@@ -34,7 +34,7 @@ const TABLE_COLUMNS: Record<string, string[]> = {
     "preference", "layers", "cakeInscription", "referenceImage", "specialInstructions",
     "basePrice", "decorationCharge", "deliveryFee", "totalAmount", "status", "paymentStatus",
     "paidAmount", "paymentHistory", "profitAmount", "profitDifficulties", "profitCostGoing",
-    "createdAt", "updatedAt", "localChange", "isDeleted"
+    "createdAt", "updatedAt", "localChange", "isDeleted", "inventoryReduced"
   ],
   inventory: ["id", "name", "category", "quantity", "unit", "minStockLevel", "supplier", "costPrice", "updatedAt", "localChange", "isDeleted"],
   recipes: ["id", "name", "category", "stdYield", "yieldUnit", "ingredients", "imageUrl", "imageBase64", "updatedAt", "localChange", "isDeleted"],
@@ -44,7 +44,8 @@ const TABLE_COLUMNS: Record<string, string[]> = {
   scheduledAlerts: ["id", "customerName", "customerMobile", "alertDate", "notes", "createdAt", "type", "localChange", "isDeleted"],
   bakeryProfile: ["id", "bakeryName", "email", "phone", "address", "role", "currency", "dateFormat", "updatedAt", "localChange", "isDeleted"],
   categories: ["id", "name", "type", "updatedAt", "localChange", "isDeleted"],
-  preferences: ["key", "value"]
+  preferences: ["key", "value"],
+  updated_tables: ["tableName", "hasChanges"]
 };
 
 const ALLOWED_TABLES = new Set(Object.keys(TABLE_COLUMNS));
@@ -376,9 +377,15 @@ function createTables() {
         createdAt TEXT,
         updatedAt TEXT,
         localChange INTEGER DEFAULT 0,
-        isDeleted INTEGER DEFAULT 0
+        isDeleted INTEGER DEFAULT 0,
+        inventoryReduced INTEGER DEFAULT 0
       );
     `);
+    try {
+      db.exec("ALTER TABLE orders ADD COLUMN inventoryReduced INTEGER DEFAULT 0;");
+    } catch (e) {
+      // column already exists
+    }
     db.exec("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);");
     db.exec("CREATE INDEX IF NOT EXISTS idx_orders_customerId ON orders(customerId);");
     db.exec("CREATE INDEX IF NOT EXISTS idx_orders_eventDate ON orders(eventDate);");
@@ -538,6 +545,57 @@ function createTables() {
         value TEXT
       );
     `);
+
+    // 12. Updated Tables Metadata
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS updated_tables (
+        tableName TEXT PRIMARY KEY,
+        hasChanges INTEGER DEFAULT 0
+      );
+    `);
+
+    const syncTables = [
+      "customers",
+      "orders",
+      "inventory",
+      "recipes",
+      "checklist",
+      "customEvents",
+      "dispatchedNotifications",
+      "scheduledAlerts",
+      "bakeryProfile",
+      "categories"
+    ];
+
+    for (const t of syncTables) {
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS t_${t}_sync_insert AFTER INSERT ON ${t}
+        BEGIN
+          INSERT OR REPLACE INTO updated_tables (tableName, hasChanges)
+          VALUES ('${t}', EXISTS (SELECT 1 FROM ${t} WHERE localChange = 1));
+        END;
+      `);
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS t_${t}_sync_update AFTER UPDATE OF localChange ON ${t}
+        BEGIN
+          INSERT OR REPLACE INTO updated_tables (tableName, hasChanges)
+          VALUES ('${t}', EXISTS (SELECT 1 FROM ${t} WHERE localChange = 1));
+        END;
+      `);
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS t_${t}_sync_delete AFTER DELETE ON ${t}
+        BEGIN
+          INSERT OR REPLACE INTO updated_tables (tableName, hasChanges)
+          VALUES ('${t}', EXISTS (SELECT 1 FROM ${t} WHERE localChange = 1));
+        END;
+      `);
+
+      // Initialize table state in updated_tables
+      db.exec(`
+        INSERT OR REPLACE INTO updated_tables (tableName, hasChanges)
+        VALUES ('${t}', EXISTS (SELECT 1 FROM ${t} WHERE localChange = 1));
+      `);
+    }
   });
 }
 
@@ -727,8 +785,10 @@ self.onmessage = async (e: MessageEvent) => {
         const result: any[] = [];
         const pkName = table === "preferences" ? "key" : "id";
         
+        const sql = `SELECT * FROM ${table} WHERE ${pkName} = ? LIMIT 1`;
+        console.log(`[SQLite Worker] GET | SQL: ${sql} | Bind:`, [key]);
         db.exec({
-          sql: `SELECT * FROM ${table} WHERE ${pkName} = ? LIMIT 1`,
+          sql,
           bind: [key],
           rowMode: "object",
           callback: (row: any) => result.push(row)
@@ -759,6 +819,7 @@ self.onmessage = async (e: MessageEvent) => {
         const columns = keys.join(", ");
         const sql = `INSERT OR REPLACE INTO ${table} (${columns}) VALUES (${placeholders})`;
         const params = keys.map(k => encrypted[k]);
+        console.log(`[SQLite Worker] PUT | SQL: ${sql} | Bind:`, params);
 
         db.exec({
           sql,
@@ -777,8 +838,10 @@ self.onmessage = async (e: MessageEvent) => {
         }
         
         const pkName = table === "preferences" ? "key" : "id";
+        const sql = `DELETE FROM ${table} WHERE ${pkName} = ?`;
+        console.log(`[SQLite Worker] DELETE | SQL: ${sql} | Bind:`, [key]);
         db.exec({
-          sql: `DELETE FROM ${table} WHERE ${pkName} = ?`,
+          sql,
           bind: [key]
         });
         self.postMessage({ id, type, result: { success: true } });
@@ -792,8 +855,18 @@ self.onmessage = async (e: MessageEvent) => {
           break;
         }
         
-        db.exec({
-          sql: `DELETE FROM ${table}`
+        const sql = `DELETE FROM ${table}`;
+        console.log(`[SQLite Worker] CLEAR | SQL: ${sql}`);
+        db.transaction(() => {
+          db.exec({
+            sql
+          });
+          if (table !== "updated_tables" && table !== "preferences") {
+            db.exec({
+              sql: `INSERT OR REPLACE INTO updated_tables (tableName, hasChanges) VALUES (?, 0)`,
+              bind: [table]
+            });
+          }
         });
         self.postMessage({ id, type, result: { success: true } });
         break;
@@ -807,8 +880,10 @@ self.onmessage = async (e: MessageEvent) => {
         }
         
         const result: any[] = [];
+        const sql = `SELECT COUNT(*) as count FROM ${table}`;
+        console.log(`[SQLite Worker] COUNT | SQL: ${sql}`);
         db.exec({
-          sql: `SELECT COUNT(*) as count FROM ${table}`,
+          sql,
           rowMode: "object",
           callback: (row: any) => result.push(row)
         });
@@ -829,6 +904,7 @@ self.onmessage = async (e: MessageEvent) => {
         }
         
         const result: any[] = [];
+        console.log(`[SQLite Worker] QUERY | SQL: ${sql} | Bind:`, params || []);
         db.exec({
           sql,
           bind: params || [],

@@ -1,9 +1,9 @@
 // File Path: /src/components/CustomersListView.tsx
-import React, { useState, useMemo, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import React, { useState, useMemo, useEffect, memo } from "react";
+import { memoWithData } from "../utils/memo";
 import { type Customer } from "../types";
 import { formatDate } from "../utils/format";
-import { localDb } from "../db";
+import { useCustomers } from "../hooks/useCustomers";
 import {
   Search,
   Plus,
@@ -19,15 +19,34 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import Avatar from "./Avatar";
 
-export default function CustomersListView() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+interface CustomersListViewProps {
+  locationState?: any;
+  onNavigate?: (path: string | number, state?: any) => void;
+}
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<"All" | "Frequent" | "New" | "Corporate">("All");
+function CustomersListView({ locationState, onNavigate }: CustomersListViewProps) {
+  const {
+    searchTerm,
+    setSearchTerm,
+    filterType,
+    setFilterType,
+    sortBy,
+    setSortBy,
+    paginatedCustomers,
+    filteredCount,
+    customerOrderCounts,
+    customersCurrentPage,
+    setCustomersCurrentPage,
+    customersItemsPerPage,
+    setCustomersItemsPerPage,
+    customersTotalPages,
+    handleCall,
+    handleSMS,
+    handleWhatsApp,
+    isLoading: loading,
+  } = useCustomers();
+
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [sortBy, setSortBy] = useState<"updated-newest" | "member-newest" | "member-oldest" | "orders-highest" | "orders-lowest" | "name-az">("updated-newest");
 
   const activeFilterCount = (filterType !== "All" ? 1 : 0) + (sortBy !== "updated-newest" ? 1 : 0);
 
@@ -35,157 +54,6 @@ export default function CustomersListView() {
     setFilterType("All");
     setSortBy("updated-newest");
     setSearchTerm("");
-  };
-
-  const [paginatedCustomers, setPaginatedCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [filteredCount, setFilteredCount] = useState<number>(0);
-  const [customerOrderCounts, setCustomerOrderCounts] = useState<{ [id: string]: number }>({});
-
-  const [customersCurrentPage, setCustomersCurrentPage] = useState<number>(1);
-  const [customersItemsPerPage, setCustomersItemsPerPage] = useState<number>(10);
-
-  // Sync refresh trigger on local DB updates
-  useEffect(() => {
-    const handler = () => setRefreshTrigger((prev) => prev + 1);
-    window.addEventListener("db-update", handler);
-    return () => window.removeEventListener("db-update", handler);
-  }, []);
-
-  // Handle router state for search
-  useEffect(() => {
-    const state = location.state as { searchCustomerName?: string; fromOrderId?: string } | null;
-    if (state?.searchCustomerName) {
-      async function findAndSelect() {
-        try {
-          const allCust = await localDb.customers.toArray();
-          const match = allCust.find(c => c.name.toLowerCase() === state!.searchCustomerName!.toLowerCase() && c.isDeleted !== 1);
-          if (match) {
-            navigate(`/customers/${match.id}${state!.fromOrderId ? `?fromOrderId=${state!.fromOrderId}` : ""}`, { replace: true });
-          } else {
-            setSearchTerm(state!.searchCustomerName!);
-          }
-        } catch (err) {
-          console.error("Failed to auto-select customer in CustomersListView:", err);
-        }
-      }
-      findAndSelect();
-    }
-  }, [location.state, navigate]);
-
-  // Load and filter customers
-  useEffect(() => {
-    async function loadCustomers() {
-      try {
-        const startIndex = (customersCurrentPage - 1) * customersItemsPerPage;
-
-        // Retrieve all active decrypted customer records
-        const allCust = await localDb.customers.filter(c => c.isDeleted !== 1).toArray();
-
-        // Filter customer records in memory
-        const matched = allCust.filter(c => {
-          if (filterType !== "All" && c.type !== filterType) return false;
-          if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            return (
-              c.name.toLowerCase().includes(term) ||
-              c.id.toLowerCase().includes(term) ||
-              c.mobile.includes(term)
-            );
-          }
-          return true;
-        });
-
-        // Sort customer records in memory
-        matched.sort((a, b) => {
-          if (sortBy === "member-newest") {
-            return new Date(b.memberSince || 0).getTime() - new Date(a.memberSince || 0).getTime();
-          } else if (sortBy === "member-oldest") {
-            return new Date(a.memberSince || 0).getTime() - new Date(b.memberSince || 0).getTime();
-          } else if (sortBy === "orders-highest") {
-            return (b.totalOrders || 0) - (a.totalOrders || 0);
-          } else if (sortBy === "orders-lowest") {
-            return (a.totalOrders || 0) - (b.totalOrders || 0);
-          } else if (sortBy === "name-az") {
-            return a.name.localeCompare(b.name);
-          } else { // "updated-newest" (default)
-            const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-            const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-            return bTime - aTime;
-          }
-        });
-
-        setFilteredCount(matched.length);
-        setPaginatedCustomers(matched.slice(startIndex, startIndex + customersItemsPerPage));
-      } catch (err) {
-        console.error("Failed to query customers from localDb:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadCustomers();
-  }, [refreshTrigger, searchTerm, filterType, sortBy, customersCurrentPage, customersItemsPerPage]);
-
-  // Reset pagination on filter or sort change
-  useEffect(() => {
-    setCustomersCurrentPage(1);
-  }, [searchTerm, filterType, sortBy]);
-
-  // Fetch counts of orders for list customers
-  useEffect(() => {
-    async function fetchCounts() {
-      if (paginatedCustomers.length === 0) return;
-      try {
-        const counts: { [id: string]: number } = {};
-        
-        // Load all active decrypted orders
-        const allOrders = await localDb.orders.filter(o => o.isDeleted !== 1).toArray();
-        
-        for (const c of paginatedCustomers) {
-          counts[c.id] = allOrders.filter(o => o.customerId === c.id).length;
-        }
-        setCustomerOrderCounts(counts);
-      } catch (err) {
-        console.error("Failed to fetch customer order counts:", err);
-      }
-    }
-    fetchCounts();
-  }, [paginatedCustomers, refreshTrigger]);
-
-  const customersTotalPages = useMemo(() => {
-    return Math.ceil(filteredCount / customersItemsPerPage);
-  }, [filteredCount, customersItemsPerPage]);
-
-  const handleCall = (name: string, num: string) => {
-    if (!num) {
-      window.showToast?.("No phone number available for this customer.", "error");
-      return;
-    }
-    window.showToast?.(`Dialing ${name} (${num})...`, "success");
-    window.location.href = `tel:${num}`;
-  };
-
-  const handleSMS = (name: string, num: string) => {
-    if (!num) {
-      window.showToast?.("No phone number available for this customer.", "error");
-      return;
-    }
-    window.showToast?.(`Opening SMS window for ${name}...`, "success");
-    window.location.href = `sms:${num}`;
-  };
-
-  const handleWhatsApp = (name: string, num: string) => {
-    if (!num) {
-      window.showToast?.("No phone number available for this customer.", "error");
-      return;
-    }
-    const cleanNum = num.replace(/\D/g, "");
-    if (!cleanNum) {
-      window.showToast?.("Invalid phone number format for WhatsApp.", "error");
-      return;
-    }
-    window.showToast?.(`Opening WhatsApp chat with ${name}...`, "success");
-    window.open(`https://wa.me/${cleanNum}`, "_blank");
   };
 
   const customerTypeOptions = [
@@ -296,7 +164,7 @@ export default function CustomersListView() {
           </button>
           <button
             type="button"
-            onClick={() => navigate("/customers/new")}
+            onClick={() => onNavigate?.("/customers/new")}
             className="w-10 h-10 rounded-full bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all active:scale-95 shrink-0"
             title="Add Customer"
           >
@@ -515,7 +383,7 @@ export default function CustomersListView() {
                       <div className="flex gap-1 items-center">
                         <button
                           type="button"
-                          onClick={() => navigate("/customers/new", { state: { customer: c } })}
+                          onClick={() => onNavigate?.("/customers/new", { state: { customer: c } })}
                           title="Modify profile"
                           className="p-1.5 rounded-lg text-zinc-400 hover:text-primary-brand dark:hover:text-pink-400 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 cursor-pointer transition-colors"
                         >
@@ -572,7 +440,7 @@ export default function CustomersListView() {
                       <button
                         type="button"
                         onClick={() => {
-                          navigate(`/customers/${c.id}`);
+                          onNavigate?.(`/customers/${c.id}`);
                         }}
                         className="text-[11px] font-bold text-primary-brand hover:text-primary-brand-dark dark:text-orange-400 dark:hover:text-orange-350 flex items-center justify-center gap-1 w-full py-1.5 cursor-pointer hover:underline transition-all"
                       >
@@ -684,3 +552,5 @@ export default function CustomersListView() {
     </div>
   );
 }
+
+export default memoWithData(CustomersListView);

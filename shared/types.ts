@@ -40,7 +40,7 @@ export interface Order {
   decorationCharge: number;
   deliveryFee: number;
   totalAmount: number;
-  status: 'Pending' | 'Ordered Ingredients' | 'In Progress' | 'Decorating' | 'Ready for Pickup' | 'Completed' | 'Cancelled';
+  status: 'Pending' | 'Ordered Ingredients' | 'Processing' | 'Decorating' | 'Ready for Pickup' | 'Completed' | 'Cancelled';
   paymentStatus?: 'Unpaid' | 'Partially Paid' | 'Fully Paid';
   paidAmount?: number;
   paymentHistory?: PaymentInstallment[];
@@ -50,6 +50,7 @@ export interface Order {
   createdAt: string; // ISO string
   updatedAt: string; // ISO string
   isDeleted?: number;
+  inventoryReduced?: number;
 }
 
 export interface InventoryItem {

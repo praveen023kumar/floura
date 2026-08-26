@@ -1,15 +1,17 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { type ChecklistItem } from "../types";
+import { localDb } from "../db";
+import { useQuery } from "@tanstack/react-query";
 
 export interface UseChecklistProps {
-  checkerList: ChecklistItem[];
+  checkerList?: ChecklistItem[];
   onToggleChecklistItem: (id: string, checked: boolean, date?: string) => void;
   onAddChecklistItem?: (text: string, date?: string) => Promise<any>;
   onResetChecklist: (date?: string) => void;
 }
 
 export function useChecklist({
-  checkerList,
+  checkerList: propCheckerList,
   onToggleChecklistItem,
   onAddChecklistItem,
   onResetChecklist,
@@ -18,6 +20,9 @@ export function useChecklist({
   const [filterMode, setFilterMode] = useState<"all" | "pending" | "completed">("all");
   const [searchTerm, setSearchTerm] = useState("");
 
+
+  const [checklistCurrentPage, setChecklistCurrentPage] = useState<number>(1);
+  const [checklistItemsPerPage, setChecklistItemsPerPage] = useState<number>(10);
   const [todayStr, setTodayStr] = useState(() => new Date().toISOString().split("T")[0]);
 
   useEffect(() => {
@@ -54,6 +59,19 @@ export function useChecklist({
     prevTodayStrRef.current = todayStr;
   }, [todayStr, selectedDate]);
 
+  // (checkerList state variable removed, managed by useQuery instead)
+
+  // Load checklist items using useQuery
+  const { data: checkerList = [] } = useQuery<ChecklistItem[]>({
+    queryKey: ["checklist", "all", selectedDate],
+    queryFn: async () => {
+      return await localDb.checklist.query(
+        "SELECT * FROM checklist WHERE isDeleted = 0 AND (date IS NULL OR date = '' OR date <= ?)",
+        [selectedDate]
+      );
+    }
+  });
+
   const formatChecklistDate = (dateStr: string) => {
     try {
       const parts = dateStr.split("-");
@@ -68,25 +86,137 @@ export function useChecklist({
     return dateStr;
   };
 
-  const dateFilteredList = useMemo(() => {
-    return checkerList
-      .filter((item) => !item.date || item.date <= selectedDate)
-      .map((item) => {
+  // (pagination & count states removed, managed by useQuery instead)
+
+  // Load paginated list of checklist items using useQuery
+  const { data: listResult = { totalCount: 0, completedCount: 0, filteredCount: 0, paginatedChecklist: [] } } = useQuery({
+    queryKey: [
+      "checklist",
+      "list",
+      selectedDate,
+      searchTerm,
+      filterMode,
+      checklistCurrentPage,
+      checklistItemsPerPage
+    ],
+    queryFn: async () => {
+      const startIndex = (checklistCurrentPage - 1) * checklistItemsPerPage;
+
+      // Fetch lightweight columns for all items up to the selected date to compute total counts & stats
+      const allItemsLight = await localDb.checklist.query(
+        "SELECT id, date, completedDates, checked FROM checklist WHERE isDeleted = 0 AND (date IS NULL OR date = '' OR date <= ?)",
+        [selectedDate]
+      );
+
+      // Map checked status in memory
+      const mappedAllItems = allItemsLight.map((item) => {
         const isChecked = item.completedDates && Array.isArray(item.completedDates)
           ? item.completedDates.includes(selectedDate)
           : (item.date === selectedDate ? !!item.checked : false);
-        return {
-          ...item,
-          checked: isChecked,
-        };
+        return { ...item, checked: isChecked };
       });
-  }, [checkerList, selectedDate]);
 
-  const completedCount = useMemo(() => {
-    return dateFilteredList.filter((item) => item.checked).length;
-  }, [dateFilteredList]);
+      const dayTotal = mappedAllItems.length;
+      const dayCompleted = mappedAllItems.filter(item => item.checked).length;
 
-  const totalCount = dateFilteredList.length;
+      let filteredCount = 0;
+      let paginatedChecklist: ChecklistItem[] = [];
+
+      const hasEncryptedFilters = searchTerm.trim() !== "";
+
+      if (!hasEncryptedFilters) {
+        // No encrypted filters: Paginate directly in SQLite using index parameters
+        const conditions = ["isDeleted = 0 AND (date IS NULL OR date = '' OR date <= ?)"];
+        const params: any[] = [selectedDate];
+
+        if (filterMode === "pending") {
+          conditions.push("(completedDates NOT LIKE ? OR completedDates IS NULL)");
+          params.push(`%"${selectedDate}"%`);
+        } else if (filterMode === "completed") {
+          conditions.push("completedDates LIKE ?");
+          params.push(`%"${selectedDate}"%`);
+        }
+
+        const whereClause = conditions.join(" AND ");
+
+        const countResult = await localDb.checklist.query(
+          `SELECT COUNT(*) as count FROM checklist WHERE ${whereClause}`,
+          params
+        );
+        filteredCount = countResult[0]?.count || 0;
+
+        const pageItems = await localDb.checklist.query(
+          `SELECT * FROM checklist WHERE ${whereClause} LIMIT ? OFFSET ?`,
+          [...params, checklistItemsPerPage, startIndex]
+        );
+
+        // Map checked status for page items
+        paginatedChecklist = pageItems.map((item) => {
+          const isChecked = item.completedDates && Array.isArray(item.completedDates)
+            ? item.completedDates.includes(selectedDate)
+            : (item.date === selectedDate ? !!item.checked : false);
+          return { ...item, checked: isChecked };
+        });
+      } else {
+        // Has encrypted search filter: Fetch text column and filter in-memory
+        const allItemsSearch = await localDb.checklist.query(
+          "SELECT id, text, date, completedDates, checked FROM checklist WHERE isDeleted = 0 AND (date IS NULL OR date = '' OR date <= ?)",
+          [selectedDate]
+        );
+
+        const mappedSearchItems = allItemsSearch.map((item) => {
+          const isChecked = item.completedDates && Array.isArray(item.completedDates)
+            ? item.completedDates.includes(selectedDate)
+            : (item.date === selectedDate ? !!item.checked : false);
+          return { ...item, checked: isChecked };
+        });
+
+        const matched = mappedSearchItems.filter(item => {
+          if (filterMode === "pending" && item.checked) return false;
+          if (filterMode === "completed" && !item.checked) return false;
+          if (searchTerm) {
+            const s = searchTerm.toLowerCase();
+            return item.text.toLowerCase().includes(s);
+          }
+          return true;
+        });
+
+        filteredCount = matched.length;
+
+        const pageIds = matched
+          .slice(startIndex, startIndex + checklistItemsPerPage)
+          .map(i => i.id);
+
+        if (pageIds.length > 0) {
+          const placeholders = pageIds.map(() => "?").join(",");
+          const pageItems = await localDb.checklist.query(
+            `SELECT * FROM checklist WHERE id IN (${placeholders})`,
+            pageIds
+          );
+
+          // Re-sort and map checked status
+          const itemMap = new Map(pageItems.map(i => [i.id, i]));
+          paginatedChecklist = pageIds
+            .map(id => itemMap.get(id))
+            .filter((i): i is ChecklistItem => !!i)
+            .map(item => {
+              const isChecked = item.completedDates && Array.isArray(item.completedDates)
+                ? item.completedDates.includes(selectedDate)
+                : (item.date === selectedDate ? !!item.checked : false);
+              return { ...item, checked: isChecked };
+            });
+        }
+      }
+
+      return { totalCount: dayTotal, completedCount: dayCompleted, filteredCount, paginatedChecklist };
+    }
+  });
+
+  const totalCount = listResult.totalCount;
+  const completedCount = listResult.completedCount;
+  const filteredCount = listResult.filteredCount;
+  const paginatedChecklist = listResult.paginatedChecklist;
+
   const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   const handleAddCustomTask = async (e: React.FormEvent) => {
@@ -116,35 +246,19 @@ export function useChecklist({
     }
   };
 
-  const filteredList = useMemo(() => {
-    let list = dateFilteredList;
-    if (filterMode === "pending") {
-      list = dateFilteredList.filter((item) => !item.checked);
-    } else if (filterMode === "completed") {
-      list = dateFilteredList.filter((item) => item.checked);
-    }
-    if (searchTerm.trim()) {
-      const s = searchTerm.toLowerCase();
-      list = list.filter((item) => item.text.toLowerCase().includes(s));
-    }
-    return list;
-  }, [dateFilteredList, filterMode, searchTerm]);
 
-  const [checklistCurrentPage, setChecklistCurrentPage] = useState<number>(1);
-  const [checklistItemsPerPage, setChecklistItemsPerPage] = useState<number>(10);
 
   useEffect(() => {
     setChecklistCurrentPage(1);
   }, [filterMode, selectedDate, searchTerm]);
 
-  const paginatedChecklist = useMemo(() => {
-    const startIndex = (checklistCurrentPage - 1) * checklistItemsPerPage;
-    return filteredList.slice(startIndex, startIndex + checklistItemsPerPage);
-  }, [filteredList, checklistCurrentPage, checklistItemsPerPage]);
-
   const checklistTotalPages = useMemo(() => {
-    return Math.ceil(filteredList.length / checklistItemsPerPage);
-  }, [filteredList.length, checklistItemsPerPage]);
+    return Math.ceil(filteredCount / checklistItemsPerPage);
+  }, [filteredCount, checklistItemsPerPage]);
+
+  const filteredList = useMemo(() => {
+    return { length: filteredCount };
+  }, [filteredCount]);
 
   return {
     customTask,
@@ -158,7 +272,7 @@ export function useChecklist({
     todayStr,
     yesterdayStr,
     formatChecklistDate,
-    dateFilteredList,
+    dateFilteredList: [] as ChecklistItem[],
     completedCount,
     totalCount,
     completionRate,
