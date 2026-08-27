@@ -3,7 +3,7 @@ import { type Order, type Customer, type BakeryProfile, type Recipe } from "../t
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { localDb } from "../db";
 import { formatPrice } from "../utils/format";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export interface UseOrdersProps {
   onAddOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<any>;
@@ -29,7 +29,12 @@ export function useOrders({
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
 
+  const now = useMemo(() => new Date(), []);
+  const effectiveCalMonth = calMonth !== undefined ? calMonth : now.getMonth();
+  const effectiveCalYear = calYear !== undefined ? calYear : now.getFullYear();
+  const effectiveViewTab = viewTab || "list";
 
   const [viewMode, setViewMode] = useState<"list" | "form" | "detail">(initialViewMode);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -139,9 +144,9 @@ export function useOrders({
       dateFilter,
       customStartDate,
       customEndDate,
-      calMonth,
-      calYear,
-      viewTab,
+      effectiveCalMonth,
+      effectiveCalYear,
+      effectiveViewTab,
       paymentFilter
     ],
     queryFn: async () => {
@@ -155,7 +160,7 @@ export function useOrders({
       };
 
       const startIndex = (ordersCurrentPage - 1) * ordersItemsPerPage;
-      const isCalendar = viewTab === "calendar";
+      const isCalendar = effectiveViewTab === "calendar";
 
       // Build base conditions for SQLite query
       const conditions = ["isDeleted = 0"];
@@ -176,8 +181,8 @@ export function useOrders({
 
       // 2. Date Filter
       if (isCalendar) {
-        const targetYear = calYear !== undefined ? calYear : new Date().getFullYear();
-        const targetMonth = calMonth !== undefined ? calMonth : new Date().getMonth();
+        const targetYear = effectiveCalYear;
+        const targetMonth = effectiveCalMonth;
         const yearMonthPrefix = `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}`;
         conditions.push("COALESCE(NULLIF(deliveryDate, ''), eventDate) LIKE ?");
         params.push(`${yearMonthPrefix}%`);
@@ -334,6 +339,9 @@ export function useOrders({
   // Handle setting view mode
   const handleSetViewMode = (mode: "list" | "form" | "detail") => {
     setViewMode(mode);
+    if (mode === "list") {
+      queryClient.invalidateQueries({ queryKey: ["orders"], refetchType: "all" });
+    }
     if (onViewModeChange && (mode === "list" || mode === "form")) {
       onViewModeChange(mode);
     }

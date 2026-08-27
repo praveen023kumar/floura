@@ -811,7 +811,7 @@ export default function App() {
       if (table) {
         const tables = Array.isArray(table) ? table : [table];
         for (const t of tables) {
-          queryClient.invalidateQueries({ queryKey: [t] });
+          queryClient.invalidateQueries({ queryKey: [t], refetchType: "all" });
         }
         
         // If orders, inventory, or checklist changes, invalidate dashboard
@@ -819,15 +819,15 @@ export default function App() {
           ["orders", "inventory", "checklist"].includes(t)
         );
         if (dashboardNeedsInvalidation) {
-          queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard"], refetchType: "all" });
         }
         // If orders change, also invalidate debriefs
         if (tables.includes("orders")) {
-          queryClient.invalidateQueries({ queryKey: ["debriefs"] });
+          queryClient.invalidateQueries({ queryKey: ["debriefs"], refetchType: "all" });
         }
       } else {
         // If no table is specified (e.g. initial sync or pull), invalidate everything
-        queryClient.invalidateQueries();
+        queryClient.invalidateQueries({ refetchType: "all" });
       }
     };
     window.addEventListener("db-update", handleDbUpdate);
