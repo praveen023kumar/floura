@@ -630,6 +630,12 @@ async function bootDb() {
         console.log("Opened opfs-sahpool database: /databases/patisserie.db");
       } catch (err: any) {
         console.error("Failed to initialize opfs-sahpool database:", err);
+        const isLockError = err.name === "NoModificationAllowedError" || 
+                            (err.message && err.message.includes("Access Handles cannot be created"));
+        if (isLockError) {
+          self.postMessage({ type: "DB_LOCKED", error: "Database is locked by another tab" });
+          return;
+        }
       }
     }
 

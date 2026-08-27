@@ -24,6 +24,18 @@ export function useAppEngine() {
   const [isLoadingFromDb, setIsLoadingFromDb] = useState<boolean>(true);
   const [profileChecked, setProfileChecked] = useState<boolean>(false);
 
+  // DB Lock State & Event Listener
+  const [isDbLocked, setIsDbLocked] = useState<boolean>(false);
+  useEffect(() => {
+    const handleDbLocked = () => {
+      setIsDbLocked(true);
+    };
+    window.addEventListener("db-locked", handleDbLocked);
+    return () => {
+      window.removeEventListener("db-locked", handleDbLocked);
+    };
+  }, []);
+
   // accessibility Dark Mode State
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     return localStorage.getItem("patisserie_dark_mode") === "true";
@@ -38,6 +50,7 @@ export function useAppEngine() {
   const [syncStatus, setSyncStatus] = useState<"synced" | "offline" | "syncing" | "error">("synced");
   const isSyncingRef = useRef(false);
   const syncQueueRef = useRef(false);
+  const isLoggingOutRef = useRef(false);
 
   // Local state replicas of IndexedDB tables (Empty references used purely as lightweight reactive triggers)
   const [checkerList, setCheckerList] = useState<ChecklistItem[]>([]);
@@ -151,8 +164,10 @@ export function useAppEngine() {
 
   // Keep a reference to the latest refreshReactStates to prevent stale closures in event listeners
   const refreshReactStatesRef = useRef(refreshReactStates);
+  const handleLogoutRef = useRef(handleLogout);
   useEffect(() => {
     refreshReactStatesRef.current = refreshReactStates;
+    handleLogoutRef.current = handleLogout;
   });
 
   // Automatically refresh states when document visibility changes
@@ -170,12 +185,16 @@ export function useAppEngine() {
     };
   }, []);
 
-  // Listen for db updates broadcast from other tabs
+  // Listen for db updates and logout broadcasts from other tabs
   useEffect(() => {
     if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
 
     const channel = new BroadcastChannel("floura_db_sync");
     const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === "logout") {
+        handleLogoutRef.current(true);
+        return;
+      }
       const { table } = event.data;
       refreshReactStatesRef.current(false, table, false, true);
     };
@@ -257,29 +276,8 @@ export function useAppEngine() {
         await refreshReactStates(true);
         setProfileChecked(true);
 
-        const [custCount, ordCount, bakeryProfileCount] = await Promise.all([
-          localDb.customers.count(),
-          localDb.orders.count(),
-          localDb.bakeryProfile.count()
-        ]);
-
         if (typeof navigator !== "undefined" && navigator.onLine) {
-          if (custCount === 0 && ordCount === 0 && bakeryProfileCount === 0) {
-            setIsSyncingInitialData(true);
-            try {
-              await fetchMasterData(user, (step, percent) => {
-                setPullingStep(step);
-                setPullingProgress(percent);
-              });
-              await new Promise((resolve) => setTimeout(resolve, 800));
-            } catch (err) {
-              console.error("Auto-sync fetchMasterData failed:", err);
-            } finally {
-              setIsSyncingInitialData(false);
-            }
-          } else {
-            await triggerSync();
-          }
+          await triggerSync();
         } else {
           setSyncStatus("offline");
         }
@@ -413,6 +411,7 @@ export function useAppEngine() {
     if (isSyncingRef.current) {
       return;
     }
+
     isSyncingRef.current = true;
     setSyncStatus("syncing");
 
@@ -447,6 +446,18 @@ export function useAppEngine() {
         changedTables.has("bakeryProfile") ? localDb.bakeryProfile.where("localChange").equals(1).toArray() : Promise.resolve([]),
         changedTables.has("categories") ? localDb.categories.where("localChange").equals(1).toArray() : Promise.resolve([])
       ]);
+
+      const hasDirtyChanges =
+        dirtyCustomers.length > 0 ||
+        dirtyOrders.length > 0 ||
+        dirtyInventory.length > 0 ||
+        dirtyRecipes.length > 0 ||
+        dirtyChecklist.length > 0 ||
+        dirtyCustomEvents.length > 0 ||
+        dirtyDispatchedNotifications.length > 0 ||
+        dirtyScheduledAlerts.length > 0 ||
+        dirtyBakeryProfile.length > 0 ||
+        dirtyCategories.length > 0;
 
       // If no dirty changes are present, we fast-path exit!
       if (!hasDirtyChanges) {
@@ -534,6 +545,7 @@ export function useAppEngine() {
   }
 
   const handleLogin = async (authenticatedUser: { name: string; email: string; avatar: string; token?: string; isNew?: boolean; role?: string }) => {
+    isLoggingOutRef.current = false;
     console.log("[Auth Debug] handleLogin received authenticatedUser:", authenticatedUser);
     if (authenticatedUser.role === "admin" || authenticatedUser.role === "superadmin") {
       setUser({
@@ -630,54 +642,99 @@ export function useAppEngine() {
     }
   };
 
-  const handleLogout = async () => {
+  async function handleLogout(isFromBroadcast = false) {
+    if (isLoggingOutRef.current) return;
+    isLoggingOutRef.current = true;
+
+    // 1. Immediately nullify React user state to unmount protected views & stop background checks
+    setUser(null);
+
+    // 2. Immediately clear localStorage to prevent session resurrection
     try {
-      // Completely delete the local IndexedDB database and open a fresh schema instance
-      await localDb.delete();
-      await localDb.open();
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("patisserie_user");
+        localStorage.removeItem("patisserie_last_synced_email");
+      }
     } catch (e) {
-      console.warn("Could not delete IndexedDB database on logout:", e);
+      console.warn("Could not remove session from localStorage on logout:", e);
     }
 
     // Reset local memory states to prevent UI remnants
     setCheckerList([]);
     setBakeryProfile(null);
 
-    setUser(null);
-    navigate("/");
-  };
+    try {
+      // Delete local SQLite tables & open a fresh schema instance
+      await localDb.delete();
+      await localDb.open();
+    } catch (e) {
+      console.warn("Could not delete IndexedDB database on logout:", e);
+    }
 
-  // Periodic security token check to verify that this session hasn't been overwritten by logging in on another device.
+    // Clear preferences/session in database
+    await removePreference("patisserie_user");
+    await removePreference("patisserie_last_synced_email");
+
+    // Broadcast logout to other tabs if this logout action was triggered locally on this tab
+    if (!isFromBroadcast && typeof window !== "undefined" && "BroadcastChannel" in window) {
+      try {
+        const channel = new BroadcastChannel("floura_db_sync");
+        channel.postMessage({ type: "logout" });
+        channel.close();
+      } catch (e) {
+        console.warn("Failed to broadcast logout event:", e);
+      }
+    }
+
+    isLoggingOutRef.current = false;
+    navigate("/");
+  }
+
+  // Security token check on window focus — verify this session hasn't been displaced
+  // by a login on another device. Runs on tab focus / page visibility restore instead
+  // of a polling interval to avoid unnecessary network traffic.
   useEffect(() => {
-    if (!user) return;
+    if (!user || isLoggingOutRef.current) return;
     if ((user as any).role === "admin" || (user as any).role === "superadmin") return;
 
-    const intervalId = setInterval(async () => {
-      // Only verify if we are online and not already syncing/initing
-      if (!navigator.onLine) return;
-
+    async function verifySession() {
+      if (!navigator.onLine || !user || isLoggingOutRef.current) return;
       try {
         const response = await fetch(getApiUrl("/api/auth/verify"), {
           method: "GET",
           headers: {
-            "Authorization": "Bearer " + (user.token || ""),
-            "x-user-email": user.email
+            "Authorization": "Bearer " + (user!.token || ""),
+            "x-user-email": user!.email
           }
         });
 
         if (response.status === 401 || response.status === 403) {
-          clearInterval(intervalId);
-          window.showToast("Logged out: This account has been logged in on another device.", "warning");
-          // Show a browser alert so the user immediately notices and knows why they are logged out
-          alert("Session Expired: You have logged in on another mobile device. This device has been logged out.");
-          handleLogout();
+          if (isLoggingOutRef.current) return;
+          window.showToast("Session Expired: You have logged in on another device.", "warning");
+          await handleLogout();
         }
       } catch (err) {
-        console.error("Session verification ping failed", err);
+        console.error("Session verification failed", err);
       }
-    }, 15000); // verify every 15 seconds
+    }
 
-    return () => clearInterval(intervalId);
+    function onFocus() {
+      verifySession();
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        verifySession();
+      }
+    }
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [user]);
 
   // --- CRUD WRAPPERS ---
@@ -765,14 +822,6 @@ export function useAppEngine() {
     return orderRecord;
   };
 
-  // Helper to get inventory conversion factor
-  const getInventoryConversionFactor = (inventoryUnit: string): number => {
-    const unit = (inventoryUnit || "").toLowerCase().trim();
-    if (unit === "kg" || unit === "kilogram" || unit === "kilograms" || unit === "l" || unit === "liter" || unit === "liters" || unit === "litre" || unit === "litres") {
-      return 1000;
-    }
-    return 1;
-  };
 
   // Reduce inventory quantities based on order flavor recipe and weight
   const reduceInventoryForOrder = async (order: Order) => {
@@ -796,8 +845,7 @@ export function useAppEngine() {
           (item: any) => item.isDeleted !== 1 && item.name.trim().toLowerCase() === ing.name.trim().toLowerCase()
         );
         if (invItem) {
-          const conversion = getInventoryConversionFactor(invItem.unit);
-          const qtyToReduce = ing.scaledQty / conversion;
+          const qtyToReduce = ing.scaledQty;
           const newQty = Math.max(0, invItem.quantity - qtyToReduce);
           
           await localDb.inventory.put({
@@ -816,6 +864,45 @@ export function useAppEngine() {
     }
   };
 
+  // Restore inventory quantities based on order flavor recipe and weight
+  const restoreInventoryForOrder = async (order: Order) => {
+    try {
+      const recipes = await localDb.recipes.toArray();
+      const matchingRecipe = recipes.find(
+        (r: any) => r.isDeleted !== 1 && r.name.trim().toLowerCase() === order.cakeFlavor.trim().toLowerCase()
+      );
+      
+      if (!matchingRecipe) {
+        console.log(`[Inventory Sync] No matching recipe found for flavor: ${order.cakeFlavor}`);
+        return;
+      }
+      
+      const targetWeight = parseWeightToGrams(order.cakeWeight);
+      const scaledIngredients = scaleRecipeIngredients(matchingRecipe, targetWeight);
+      
+      const inventoryItems = await localDb.inventory.toArray();
+      for (const ing of scaledIngredients) {
+        const invItem = inventoryItems.find(
+          (item: any) => item.isDeleted !== 1 && item.name.trim().toLowerCase() === ing.name.trim().toLowerCase()
+        );
+        if (invItem) {
+          const qtyToRestore = ing.scaledQty;
+          const newQty = invItem.quantity + qtyToRestore;
+          
+          await localDb.inventory.put({
+            ...invItem,
+            quantity: parseFloat(newQty.toFixed(3)),
+            updatedAt: new Date().toISOString(),
+            localChange: 1
+          });
+          console.log(`[Inventory Sync] Restored ${ing.name} by ${qtyToRestore} ${invItem.unit} (new qty: ${newQty})`);
+        }
+      }
+    } catch (err) {
+      console.error("[Inventory Sync] Failed to restore inventory for order:", err);
+    }
+  };
+
   // Update order status trigger with extended stages
   const handleUpdateOrderStatus = async (id: string, status: Order["status"]) => {
     const timeStr = new Date().toISOString();
@@ -824,10 +911,14 @@ export function useAppEngine() {
       let inventoryReducedVal = record.inventoryReduced || 0;
       const isOtherStatus = status !== "Pending" && status !== "Ordered Ingredients" && status !== "Cancelled";
       const shouldReduce = isOtherStatus && !inventoryReducedVal;
+      const shouldRestore = !isOtherStatus && inventoryReducedVal;
 
       if (shouldReduce) {
         await reduceInventoryForOrder(record);
         inventoryReducedVal = 1;
+      } else if (shouldRestore) {
+        await restoreInventoryForOrder(record);
+        inventoryReducedVal = 0;
       }
 
       const updated = {
@@ -886,7 +977,12 @@ export function useAppEngine() {
     let inventoryReducedVal = originalOrder?.inventoryReduced || 0;
     const newStatus = updatedOrder.status;
     const isOtherStatus = newStatus !== "Pending" && newStatus !== "Ordered Ingredients" && newStatus !== "Cancelled";
-    const shouldReduce = isOtherStatus && !inventoryReducedVal;
+    
+    // Check if details affecting inventory changed
+    const detailsChanged = originalOrder && (
+      originalOrder.cakeFlavor !== updatedOrder.cakeFlavor ||
+      originalOrder.cakeWeight !== updatedOrder.cakeWeight
+    );
 
     const updated = {
       ...originalOrder,
@@ -897,7 +993,19 @@ export function useAppEngine() {
       localChange: 1,
     };
 
-    if (shouldReduce && originalOrder) {
+    if (originalOrder && inventoryReducedVal === 1) {
+      if (!isOtherStatus) {
+        // Status changed to non-reduced status: restore inventory
+        await restoreInventoryForOrder(originalOrder);
+        updated.inventoryReduced = 0;
+      } else if (detailsChanged) {
+        // Details changed on an already reduced order: restore old, reduce new
+        await restoreInventoryForOrder(originalOrder);
+        await reduceInventoryForOrder(updated);
+        updated.inventoryReduced = 1;
+      }
+    } else if (isOtherStatus && inventoryReducedVal === 0) {
+      // Status changed to active: reduce inventory
       await reduceInventoryForOrder(updated);
       updated.inventoryReduced = 1;
     }
@@ -1171,6 +1279,7 @@ export function useAppEngine() {
     setUser,
     initializing,
     isLoadingFromDb,
+    isDbLocked,
     profileChecked,
     darkMode,
     setDarkMode,

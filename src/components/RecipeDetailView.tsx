@@ -38,6 +38,35 @@ function RecipeDetailView({ onNavigate }: RecipeDetailViewProps) {
     loadRecipe();
   }, [id]);
 
+  const [ingredientUnits, setIngredientUnits] = useState<Record<string, string>>({});
+
+  const getIngredientUnit = (name: string): string => {
+    return ingredientUnits[name] || "g";
+  };
+
+  // Load ingredient units from inventory table
+  useEffect(() => {
+    async function loadUnits() {
+      if (recipe && recipe.ingredients) {
+        const names = recipe.ingredients.map(ing => ing.name).filter(Boolean);
+        if (names.length === 0) return;
+        try {
+          const items = await localDb.inventory.toArray();
+          const newUnits: Record<string, string> = {};
+          items.forEach((item: any) => {
+            if (names.includes(item.name)) {
+              newUnits[item.name] = item.unit;
+            }
+          });
+          setIngredientUnits(newUnits);
+        } catch (err) {
+          console.error("Failed to load units in RecipeDetailView:", err);
+        }
+      }
+    }
+    loadUnits();
+  }, [recipe]);
+
   // Scaled ingredient weights memoization
   const scaledIngredients = useMemo(() => {
     if (!recipe) return [];
@@ -184,7 +213,7 @@ function RecipeDetailView({ onNavigate }: RecipeDetailViewProps) {
                     >
                       <span className="text-xs font-medium text-white/90">{ing.name}</span>
                       <span className="text-xs font-bold font-mono tracking-wide bg-white/20 dark:bg-zinc-900 px-2.5 py-0.5 rounded-lg text-white">
-                        {ing.scaledQty}g
+                        {ing.scaledQty} {getIngredientUnit(ing.name)}
                       </span>
                     </div>
                   ))
@@ -222,7 +251,9 @@ function RecipeDetailView({ onNavigate }: RecipeDetailViewProps) {
                     return (
                       <tr key={idx} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-700/10">
                         <td className="px-4 py-2.5 text-zinc-800 dark:text-zinc-300 font-medium">{ing.name}</td>
-                        <td className="px-4 py-2.5 text-right font-mono text-zinc-650 dark:text-zinc-350">{ing.qty}g</td>
+                        <td className="px-4 py-2.5 text-right font-mono text-zinc-650 dark:text-zinc-350">
+                          {ing.qty} {getIngredientUnit(ing.name)}
+                        </td>
                         <td className="px-4 py-2.5 text-right text-zinc-405 font-mono">{percentage}%</td>
                       </tr>
                     );

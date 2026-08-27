@@ -42,12 +42,13 @@ export default function AddRecipeModal({
     const names = formIngredients.map((i: any) => i.name).filter(Boolean);
     if (names.length === 0) return;
 
-    const placeholders = names.map(() => "?").join(",");
-    localDb.inventory.query(`SELECT name, unit FROM inventory WHERE name IN (${placeholders})`, names)
-      .then((rows: any) => {
+    localDb.inventory.toArray()
+      .then((items: any) => {
         const newUnits: Record<string, string> = {};
-        rows.forEach((r: any) => {
-          newUnits[r.name] = r.unit;
+        items.forEach((item: any) => {
+          if (names.includes(item.name)) {
+            newUnits[item.name] = item.unit;
+          }
         });
         setIngredientUnits(prev => ({ ...prev, ...newUnits }));
       })
@@ -56,17 +57,20 @@ export default function AddRecipeModal({
 
   const loadIngredientOptions = async (inputValue: string): Promise<{ value: string; label: string }[]> => {
     try {
-      let items;
-      if (!inputValue) {
-        items = await localDb.inventory.query(
-          "SELECT * FROM inventory WHERE isDeleted = 0 ORDER BY name ASC LIMIT 30"
-        );
-      } else {
-        items = await localDb.inventory.query(
-          "SELECT * FROM inventory WHERE isDeleted = 0 AND name LIKE ? ORDER BY name ASC LIMIT 30",
-          [`%${inputValue}%`]
+      const allItems = await localDb.inventory.toArray();
+      const activeItems = allItems.filter((item: any) => item.isDeleted !== 1);
+      
+      let filtered = activeItems;
+      if (inputValue) {
+        const queryLower = inputValue.toLowerCase();
+        filtered = activeItems.filter((item: any) => 
+          item.name.toLowerCase().includes(queryLower)
         );
       }
+      
+      const items = filtered
+        .sort((a: any, b: any) => a.name.localeCompare(b.name))
+        .slice(0, 30);
 
       const newUnits: Record<string, string> = {};
       items.forEach((item: any) => {

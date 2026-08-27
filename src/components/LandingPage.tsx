@@ -21,7 +21,6 @@ import {
   ArrowUpRight,
   ClipboardList,
   Package,
-  WifiOff,
   Lock,
   RefreshCcw,
   Utensils,
@@ -101,9 +100,9 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
       desc: "Create and manage daily kitchen task lists to stay organized and never miss a prep step.",
     },
     {
-      icon: <WifiOff className="w-5 h-5" />,
-      title: "Offline First",
-      desc: "Your data is saved directly on your device. The app works fully without internet and syncs automatically when back online.",
+      icon: <RefreshCcw className="w-5 h-5" />,
+      title: "Auto Sync",
+      desc: "Your data is saved securely on your device and synced to the cloud automatically, keeping everything up to date.",
     },
   ];
 
@@ -179,7 +178,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
       <nav className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/85 dark:bg-zinc-950/85 border-b border-zinc-100 dark:border-zinc-800/60 px-6 lg:px-10 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3 select-none">
           <div className="w-9 h-9 rounded-xl overflow-hidden border border-zinc-100 dark:border-zinc-800 shadow-sm flex items-center justify-center bg-pink-50">
-            <img src={flouraLogo} alt="Floura Logo" className="w-full h-full object-cover" />
+            <img src={flouraLogo} alt="Floura" width={36} height={36} loading="lazy" className="w-full h-full object-cover" />
           </div>
           <div className="flex items-baseline gap-2">
             <span className="font-serif text-xl font-black tracking-tight text-primary-brand dark:text-pink-400 italic">Floura</span>
@@ -187,14 +186,14 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
         </div>
 
         <div className="hidden lg:flex items-center gap-8 text-[13px] font-semibold text-zinc-500 dark:text-zinc-400">
-          <a id="nav-link-features" href="#features" onClick={(e) => { e.preventDefault(); scrollToSection(featuresSectionRef); }} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">Features</a>
-          <a id="nav-link-how-it-works" href="#how-it-works" onClick={(e) => { e.preventDefault(); scrollToSection(howItWorksSectionRef); }} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">How It Works</a>
-          <a id="nav-link-modules" href="#modules" onClick={(e) => { e.preventDefault(); scrollToSection(demoSectionRef); }} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">Modules</a>
-          <a id="nav-link-signin" href="#login-section" onClick={(e) => { e.preventDefault(); scrollToSection(loginSectionRef); }} className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors cursor-pointer">Sign In</a>
+          <a id="nav-link-features" href="#features" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">Features</a>
+          <a id="nav-link-how-it-works" href="#how-it-works" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">How It Works</a>
+          <a id="nav-link-modules" href="#modules" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">Modules</a>
+          <a id="nav-link-signin" href="#login-section" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">Sign In</a>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button id="btn-toggle-dark-mode" onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all text-zinc-500 dark:text-zinc-400 cursor-pointer mr-1" aria-label="Toggle Dark Mode">
+          <button id="btn-toggle-dark-mode" onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all text-zinc-500 dark:text-zinc-400 cursor-pointer mr-1" aria-label="Toggle dark mode" aria-pressed={darkMode}>
             {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-zinc-600" />}
           </button>
 
@@ -226,7 +225,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
             <div className="inline-flex">
               <div className={`${pill} bg-pink-50/80 dark:bg-pink-950/40 border-pink-200/50 dark:border-pink-850/30 text-primary-brand dark:text-pink-400`}>
                 <Sparkles className="w-3.5 h-3.5 text-primary-brand dark:text-pink-400" />
-                <span>Offline-First Bakery Management</span>
+                <span>Smart Bakery Management</span>
               </div>
             </div>
 
@@ -236,7 +235,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
             </h1>
 
             <p className="text-zinc-500 dark:text-zinc-400 text-base md:text-lg leading-relaxed max-w-xl">
-              Floura is your all-in-one bakery command center — manage custom cake orders, track customers, monitor inventory, and analyze profits, all from a single encrypted workspace that works even offline.
+              Floura is your all-in-one bakery command center — manage custom cake orders, track customers, monitor inventory, and analyze profits, all from a single encrypted workspace.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3">
@@ -269,45 +268,48 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
             </div>
           </div>
 
-          <div className="lg:col-span-5 relative flex justify-center lg:justify-end">
-            <div className="relative w-full max-w-[380px] aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl border-4 border-white dark:border-zinc-900 bg-pink-50">
-              <img src={chefHeroPhoto} alt="Bakery Dashboard" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-pink-950/20 via-transparent to-transparent pointer-events-none" />
-            </div>
-
-            {/* Floating Card 1: Offline ready */}
-            <div className="absolute -left-6 top-10 bg-white dark:bg-zinc-900 p-3 rounded-2xl shadow-xl border border-pink-50 dark:border-zinc-800/85 flex items-center gap-3 animate-bounce-subtle max-w-[200px]">
-              <div className="w-9 h-9 rounded-xl bg-green-500/10 text-green-500 flex items-center justify-center shrink-0">
-                <WifiOff className="w-4 h-4" />
+          <div className="lg:col-span-5 flex justify-center lg:justify-end">
+            <div className="relative w-full max-w-[380px] aspect-[3/4]">
+              {/* Central Chef Hero Photo Container */}
+              <div className="w-full h-full rounded-3xl overflow-hidden shadow-2xl border-4 border-white dark:border-zinc-900 bg-pink-50">
+                <img src={chefHeroPhoto} alt="Baker managing custom cake orders in Floura app" width={380} height={507} fetchPriority="high" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-pink-950/20 via-transparent to-transparent pointer-events-none" />
               </div>
-              <div className="text-left">
-                <p className="text-[10px] font-extrabold text-zinc-900 dark:text-white leading-tight">Offline Ready</p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-[9px] font-semibold text-zinc-400">Works without internet</span>
+
+              {/* Floating Card 1: Encrypted */}
+              <div className="absolute -left-6 top-10 bg-white dark:bg-zinc-900 p-3 rounded-2xl shadow-xl border border-pink-50 dark:border-zinc-800/85 flex items-center gap-3 animate-bounce-subtle max-w-[200px]">
+                <div className="w-9 h-9 rounded-xl bg-pink-500/10 text-primary-brand flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] font-extrabold text-zinc-900 dark:text-white leading-tight">End-to-End Encrypted</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="w-1.5 h-1.5 bg-primary-brand rounded-full animate-pulse" />
+                    <span className="text-[9px] font-semibold text-zinc-400">Your data, always private</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Floating Card 2: Encrypted */}
-            <div className="absolute -right-4 bottom-24 bg-white dark:bg-zinc-900 p-3.5 rounded-2xl shadow-xl border border-pink-50 dark:border-zinc-800/85 flex items-center gap-2 max-w-[170px]">
-              <div className="w-8 h-8 rounded-full bg-pink-50 dark:bg-pink-950 flex items-center justify-center text-primary-brand dark:text-pink-400 shrink-0">
-                <Lock className="w-4 h-4" />
+              {/* Floating Card 2: Orders */}
+              <div className="absolute -right-4 bottom-24 bg-white dark:bg-zinc-900 p-3.5 rounded-2xl shadow-xl border border-pink-50 dark:border-zinc-800/85 flex items-center gap-2 max-w-[170px]">
+                <div className="w-8 h-8 rounded-full bg-pink-50 dark:bg-pink-950 flex items-center justify-center text-primary-brand dark:text-pink-400 shrink-0">
+                  <ClipboardList className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <p className="text-[11px] font-extrabold text-zinc-900 dark:text-white">Order Tracking</p>
+                  <p className="text-[9px] text-zinc-400 font-semibold leading-tight mt-0.5">Every order, end-to-end</p>
+                </div>
               </div>
-              <div className="text-left">
-                <p className="text-[11px] font-extrabold text-zinc-900 dark:text-white">Fully Encrypted</p>
-                <p className="text-[9px] text-zinc-400 font-semibold leading-tight mt-0.5">Your data, always private</p>
-              </div>
-            </div>
 
-            {/* Floating Card 3: Sync */}
-            <div className="absolute left-4 -bottom-4 bg-white dark:bg-zinc-900 p-3.5 rounded-2xl shadow-xl border border-pink-50 dark:border-zinc-800/85 flex items-center gap-3.5 max-w-[210px]">
-              <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-500 shrink-0">
-                <RefreshCcw className="w-4 h-4" />
-              </div>
-              <div className="text-left">
-                <p className="text-[11px] font-extrabold text-zinc-900 dark:text-white">Auto Sync</p>
-                <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">Saves as you go</p>
+              {/* Floating Card 3: Sync */}
+              <div className="absolute left-4 -bottom-4 bg-white dark:bg-zinc-900 p-3.5 rounded-2xl shadow-xl border border-pink-50 dark:border-zinc-800/85 flex items-center gap-3.5 max-w-[210px]">
+                <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-500 shrink-0">
+                  <RefreshCcw className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <p className="text-[11px] font-extrabold text-zinc-900 dark:text-white">Auto Sync</p>
+                  <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">Saves as you go</p>
+                </div>
               </div>
             </div>
           </div>
@@ -395,11 +397,11 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
 
       {/* WHY CHOOSE FLOURA */}
       <section className="py-10 max-w-7xl mx-auto px-6 lg:px-10">
-        <div className="bg-gradient-to-br from-pink-700 via-pink-600 to-primary-brand dark:from-pink-950 dark:to-zinc-900 p-8 md:p-12 rounded-[2.5rem] shadow-xl text-center space-y-10 text-white relative overflow-hidden">
+        <div className="bg-gradient-to-br from-pink-900 via-pink-800 to-pink-900 dark:from-pink-950 dark:to-zinc-900 p-8 md:p-12 rounded-[2.5rem] shadow-xl text-center space-y-10 text-white relative overflow-hidden">
           <div className="space-y-3 max-w-xl mx-auto relative z-10">
             <span className="text-[10px] uppercase font-extrabold tracking-widest text-pink-100">Why Floura?</span>
             <h2 className="font-serif text-2xl md:text-3xl font-black leading-tight">
-              Privacy-First. Offline-Ready. Always Yours.
+              Privacy-First. Encrypted. Always Yours.
             </h2>
             <div className="flex justify-center pt-1">
               <div className="w-12 h-0.5 bg-pink-200/50 rounded-full" />
@@ -466,13 +468,13 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
               Your Bakery in Your Pocket
             </h2>
             <p className="text-zinc-500 dark:text-zinc-400 text-xs md:text-sm leading-relaxed max-w-md">
-              Floura is available as a web app and as a native iOS and Android app. Access your orders, recipes, inventory, and checklists from anywhere — even without internet.
+              Floura is available as a web app and as a native iOS and Android app. Access your orders, recipes, inventory, and checklists from anywhere, at any time.
             </p>
 
             <ul className="space-y-2.5">
               {[
-                "Works offline — no internet required",
                 "Native iOS & Android apps available",
+                "Secure cloud sync across all devices",
                 "Sign in securely with Google",
                 "Order history & records always accessible",
               ].map((pt, i) => (
@@ -484,14 +486,16 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
             </ul>
 
             <div className="flex flex-wrap gap-3 pt-2">
-              <a id="link-download-appstore" href="#" className="flex items-center gap-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 py-3 px-5 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm select-none">
+              {/* TODO: Replace href with your App Store URL when live */}
+              <a id="link-download-appstore" href="https://apps.apple.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 py-3 px-5 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm select-none" aria-label="Download Floura on the App Store">
                 <Smartphone className="w-5 h-5 shrink-0" />
                 <div className="text-left leading-tight">
                   <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Download on the</p>
                   <p className="text-xs font-black">App Store</p>
                 </div>
               </a>
-              <a id="link-download-googleplay" href="#" className="flex items-center gap-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 py-3 px-5 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm select-none">
+              {/* TODO: Replace href with your Google Play URL when live */}
+              <a id="link-download-googleplay" href="https://play.google.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 py-3 px-5 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm select-none" aria-label="Get Floura on Google Play">
                 <Play className="w-5 h-5 fill-current shrink-0" />
                 <div className="text-left leading-tight">
                   <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Get it on</p>
@@ -516,9 +520,9 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
                 desc: "Native apps built for speed. Take orders, check inventory, and view recipes on the go.",
               },
               {
-                icon: <WifiOff className="w-5 h-5" />,
-                title: "Works Offline",
-                desc: "No signal? No problem. Your data is always available — syncs automatically when back online.",
+                icon: <ShieldCheck className="w-5 h-5" />,
+                title: "Fully Encrypted",
+                desc: "Your data is encrypted end-to-end, keeping your orders, customers, and recipes completely private.",
               },
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-4">
@@ -542,7 +546,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
         <div className="max-w-md mx-auto px-6 text-center space-y-10">
           <div className="space-y-4">
             <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden shadow-md border border-zinc-150 dark:border-zinc-800 bg-pink-50 p-1 flex items-center justify-center">
-              <img src={flouraLogo} alt="Floura" className="w-full h-full object-cover rounded-xl" />
+              <img src={flouraLogo} alt="Floura" width={56} height={56} loading="lazy" className="w-full h-full object-cover rounded-xl" />
             </div>
             <h2 className="font-serif text-3xl font-black text-zinc-900 dark:text-white leading-tight">
               Start managing your<br />
@@ -642,7 +646,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
       <footer className="border-t border-zinc-150 dark:border-zinc-900 bg-white dark:bg-zinc-950 py-12 px-6 lg:px-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-zinc-400 dark:text-zinc-500 font-semibold">
           <div className="flex items-center gap-2.5 select-none">
-            <img src={flouraLogo} alt="Floura" className="w-6 h-6 rounded-lg" />
+            <img src={flouraLogo} alt="Floura" width={24} height={24} loading="lazy" className="w-6 h-6 rounded-lg" />
             <span className="font-serif font-black text-zinc-650 dark:text-zinc-400 italic">Floura</span>
             <span className="text-zinc-300 dark:text-zinc-700">·</span>
           </div>

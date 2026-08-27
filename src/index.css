@@ -87,9 +87,17 @@
   background: #475569;
 }
 
+/* Smooth scrolling for anchor navigation */
+html {
+  scroll-behavior: smooth;
+}
+
 /* Base custom classes to match the design */
 input, select, textarea {
   font-family: var(--font-sans);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
 }
 h1, h2, h3, h4, .font-serif-editor {
   font-family: var(--font-serif);

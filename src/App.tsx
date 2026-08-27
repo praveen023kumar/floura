@@ -28,7 +28,8 @@ import {
   Moon,
   Calendar,
   MessageSquare,
-  User
+  User,
+  Lock
 } from "lucide-react";
 
 declare global {
@@ -104,6 +105,7 @@ function MainAppContent() {
     setUser,
     initializing,
     isLoadingFromDb,
+    isDbLocked,
     profileChecked,
     darkMode,
     setDarkMode,
@@ -321,6 +323,46 @@ function MainAppContent() {
       onNavigate={navigate}
     />
   ), [user, navigate]);
+
+  if (isDbLocked) {
+    return (
+      <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 flex flex-col items-center justify-center p-6 text-center select-none">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="max-w-md bg-white dark:bg-zinc-900 rounded-3xl p-8 shadow-2xl border border-zinc-150 dark:border-zinc-800 flex flex-col items-center"
+        >
+          {/* Locked Icon Illustration */}
+          <div className="w-20 h-20 bg-amber-50 dark:bg-amber-950/30 rounded-full flex items-center justify-center border border-amber-200/50 dark:border-amber-900/30 mb-6 shrink-0">
+            <Lock className="w-10 h-10 text-amber-500 animate-bounce" />
+          </div>
+
+          <h2 className="text-2xl font-serif font-bold text-zinc-800 dark:text-zinc-100 mb-3">
+            Workspace Already Open
+          </h2>
+
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-6 font-sans">
+            Floura only supports one open tab at a time to prevent data corruption. 
+            This workspace is already active in another browser tab or window.
+          </p>
+
+          <div className="w-full flex flex-col gap-3">
+            <div className="p-4 bg-zinc-50 dark:bg-zinc-950/50 rounded-2xl border border-zinc-100 dark:border-zinc-850 text-xs text-zinc-500 dark:text-zinc-400 font-sans leading-relaxed">
+              Please <strong>close the other open tab(s)</strong> of Floura and click below to refresh and unlock this session.
+            </div>
+            
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full py-3.5 px-6 bg-primary-brand hover:bg-orange-600 dark:bg-orange-550 dark:hover:bg-orange-650 text-white font-sans font-semibold rounded-2xl shadow-lg shadow-orange-500/20 active:scale-98 transition-all cursor-pointer border-none outline-none"
+            >
+              Refresh and Continue
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (initializing || isLoadingFromDb) {
     return (

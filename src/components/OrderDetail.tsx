@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useOrders } from "../hooks/useOrders";
+import { CompleteOrderModal } from "./CompleteOrderModal";
 
 interface OrderDetailProps {
   onAddOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<any>;
@@ -108,14 +109,6 @@ function OrderDetail({
     };
   }, [selectedOrder, completingOrder]);
 
-  const getInventoryConversionFactor = (inventoryUnit: string): number => {
-    const unit = (inventoryUnit || "").toLowerCase().trim();
-    if (unit === "kg" || unit === "kilogram" || unit === "kilograms" || unit === "l" || unit === "liter" || unit === "liters" || unit === "litre" || unit === "litres") {
-      return 1000;
-    }
-    return 1;
-  };
-
   const calculateOrderIngredients = (order: Order) => {
     if (!order || !order.cakeFlavor) return { list: [], totalCost: 0, recipeFound: false };
     
@@ -145,8 +138,7 @@ function OrderDetail({
         invItemFound = true;
         costPrice = invItem.costPrice;
         unit = invItem.unit;
-        const conversion = getInventoryConversionFactor(invItem.unit);
-        quantityInInvUnits = ing.scaledQty / conversion;
+        quantityInInvUnits = ing.scaledQty;
       }
       
       const cost = quantityInInvUnits * costPrice;
@@ -154,7 +146,6 @@ function OrderDetail({
       
       return {
         name: ing.name,
-        gramsQty: ing.scaledQty,
         invQty: quantityInInvUnits,
         unit,
         costPrice,
@@ -621,7 +612,7 @@ function OrderDetail({
                       <div className="space-y-2 text-xs">
                         {ingDetails.list.map((ing, idx) => (
                           <div key={idx} className="flex justify-between text-zinc-650 dark:text-zinc-400">
-                            <span>{ing.name} ({ing.gramsQty}g)</span>
+                            <span>{ing.name} ({ing.invQty} {ing.unit})</span>
                             <div className="space-x-4 font-mono">
                               <span className="text-zinc-400">{ing.invQty.toFixed(2)} {ing.unit} @ {formatPrice(ing.costPrice)}/{ing.unit}</span>
                               <span className="font-bold text-zinc-700 dark:text-zinc-300">{formatPrice(ing.cost)}</span>
@@ -988,150 +979,17 @@ function OrderDetail({
       </AnimatePresence>
 
       {/* ----------------- ORDER COMPLETION & PROFIT ANALYTICS MODAL ----------------- */}
-      <AnimatePresence>
-        {completingOrder && (
-          <motion.div
-            key="profit-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="bg-white dark:bg-zinc-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-zinc-150 dark:border-zinc-700 max-h-[90vh] overflow-y-auto custom-scrollbar text-left space-y-4 font-sans"
-            >
-              <div className="flex justify-between items-center pb-2 border-b border-zinc-100 dark:border-zinc-700/60">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-emerald-500" />
-                  <h3 className="text-sm font-serif font-bold text-zinc-800 dark:text-zinc-100 uppercase tracking-wide">
-                    Capture Profit & Bake Details
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCompletingOrder(null)}
-                  className="p-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-400 dark:text-zinc-505 transition-colors cursor-pointer"
-                >
-                  <XCircle className="w-5 h-5" />
-                </button>
-              </div>
-
-              <p className="text-xs text-zinc-505 leading-relaxed font-sans">
-                Great job completing <strong className="text-zinc-700 dark:text-zinc-300">"{completingOrder.customerName}'s"</strong> cake order! To help floura analyze your business dashboard, please specify the final captured profit, difficulties faced, and where the costs were allocated.
-              </p>
-
-              <div className="space-y-4 pt-1 font-sans">
-                <div className="flex flex-col gap-1.5 font-sans">
-                  <div className="flex justify-between font-sans">
-                    <label className="text-xs font-bold text-zinc-655 dark:text-zinc-300">Net Profit Amount ({getCurrencySymbol()})</label>
-                    <span className="text-[10px] text-zinc-405">Total Billed: {formatPrice(completingOrder.totalAmount)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-750 rounded-xl px-3 py-2.5">
-                    <span className="text-zinc-400 text-xs font-bold">{getCurrencySymbol()}</span>
-                    <input
-                      required
-                      type="number"
-                      step="0.01"
-                      value={profitAmount}
-                      onChange={(e) => {
-                        let val = e.target.value;
-                        if (val === "") {
-                          setProfitAmount("");
-                        } else {
-                          if (/^0\d+/.test(val)) {
-                            val = val.replace(/^0+/, "");
-                          }
-                          setProfitAmount(val);
-                        }
-                      }}
-                      className="bg-transparent border-none outline-none text-xs w-full text-zinc-808 dark:text-zinc-105 font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5 font-sans">
-                  <label className="text-xs font-bold text-zinc-655 dark:text-zinc-300">Where did the cost go? (Cost Distribution)</label>
-                  <textarea
-                    required
-                    rows={2}
-                    value={costGoingText}
-                    onChange={(e) => setCostGoingText(e.target.value)}
-                    placeholder="e.g. Eggs and premium flour (40%), chocolate decoration toppings (25%), fuel log (15%)"
-                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-750 text-xs p-3 rounded-xl focus:ring-1 focus:ring-primary-brand text-zinc-800 dark:text-zinc-250 min-h-[50px] resize-none font-medium text-left"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5 font-sans">
-                  <label className="text-xs font-bold text-zinc-655 dark:text-zinc-300">Bakes & Decorative Difficulties Faced</label>
-                  <textarea
-                    required
-                    rows={2}
-                    value={difficultiesText}
-                    onChange={(e) => setDifficultiesText(e.target.value)}
-                    placeholder="e.g. Heavy structural dowel integration, fondant figurines took 4 hours, or temperature humidity issues"
-                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-750 text-xs p-3 rounded-xl focus:ring-1 focus:ring-primary-brand text-zinc-808 dark:text-zinc-250 min-h-[50px] resize-none font-medium text-left"
-                  />
-                </div>
-              </div>
-
-              {/* Ingredient Breakdown inside completion modal */}
-              {(() => {
-                const ingDetails = calculateOrderIngredients(completingOrder);
-                if (!ingDetails.recipeFound) {
-                  return (
-                    <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-2xl text-[11px] text-amber-700 dark:text-amber-400 text-left">
-                      No matching recipe found for flavor "{completingOrder.cakeFlavor}" to auto-calculate ingredient costs.
-                    </div>
-                  );
-                }
-                return (
-                  <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl space-y-2 text-xs">
-                    <div className="flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-1.5 text-left">
-                      <span className="font-bold text-zinc-700 dark:text-zinc-300">Ingredient Cost Summary</span>
-                      <span className="text-[10px] text-zinc-400">Recipe: {ingDetails.recipeName} ({completingOrder.cakeWeight})</span>
-                    </div>
-                    <div className="max-h-[120px] overflow-y-auto space-y-1.5 pr-1">
-                      {ingDetails.list.map((ing, idx) => (
-                        <div key={idx} className="flex justify-between text-[11px]">
-                          <span className="text-zinc-650 dark:text-zinc-400">{ing.name} ({ing.gramsQty}g)</span>
-                          <div className="space-x-2 font-mono">
-                            <span className="text-zinc-400">{ing.invQty.toFixed(2)} {ing.unit}</span>
-                            <span className="text-zinc-700 dark:text-zinc-300 font-bold">{formatPrice(ing.cost)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="border-t border-zinc-200 dark:border-zinc-800 pt-1.5 flex justify-between font-bold">
-                      <span className="text-zinc-700 dark:text-zinc-300">Total Ingredient Cost:</span>
-                      <span className="font-mono text-emerald-600 dark:text-emerald-450">{formatPrice(ingDetails.totalCost)}</span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="flex gap-3 pt-3 font-sans">
-                <button
-                  type="button"
-                  onClick={() => setCompletingOrder(null)}
-                  className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 rounded-xl text-xs font-bold cursor-pointer transition-colors text-center font-sans"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCompleteOrderSave}
-                  className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold cursor-pointer transition-transform active:scale-95 text-center shadow-md font-sans"
-                >
-                  Save & Complete Bake
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <CompleteOrderModal
+        completingOrder={completingOrder}
+        profitAmount={profitAmount}
+        setProfitAmount={setProfitAmount}
+        costGoingText={costGoingText}
+        setCostGoingText={setCostGoingText}
+        difficultiesText={difficultiesText}
+        setDifficultiesText={setDifficultiesText}
+        onSave={handleCompleteOrderSave}
+        onClose={() => setCompletingOrder(null)}
+      />
     </div>
   );
 }

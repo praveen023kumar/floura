@@ -200,10 +200,8 @@ export function useDebriefs() {
   }, [completedOrders, searchTerm, selectedFlavor, startDate, endDate, filterLogType, sortBy]);
 
   const availableFlavors = useMemo(() => {
-    const defaultFlavors = ["Belgian Chocolate", "French Vanilla", "Red Velvet", "Butterscotch", "Biscoff"];
-    const allUsedFlavors = allOrders.map((o) => o.cakeFlavor).filter(Boolean);
-    const combined = Array.from(new Set([...defaultFlavors, ...allUsedFlavors]));
-    return combined.sort();
+    const allUsedFlavors = allOrders.map((o) => o.cakeFlavor as string).filter(Boolean);
+    return Array.from(new Set(allUsedFlavors)).sort() as string[];
   }, [allOrders]);
 
 

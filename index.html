@@ -3,27 +3,43 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Floura | Event & Baking Management</title>
-    <meta name="description" content="Floura is an offline-first bakery command center designed to manage custom cake orders, track customer histories, monitor ingredient inventory, scale recipes, and analyze profits securely." />
-    <meta name="keywords" content="bakery management software, cake order tracker, recipe scaling tool, offline first bakery app, bakery inventory tracker, custom cake database" />
+    <title>Floura | Bakery &amp; Order Management App</title>
+    <meta name="description" content="Floura is a bakery management app to track custom cake orders, customer histories, ingredient inventory, recipe scaling, and profit analytics — fully encrypted and available on iOS, Android &amp; web." />
+    <meta name="keywords" content="bakery management software, cake order tracker, recipe scaling tool, bakery app iOS Android, bakery inventory tracker, custom cake database, pastry business app" />
     <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#be185d" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Floura" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://floura.app/" />
-    <meta property="og:title" content="Floura | Premium Event & Baking Management" />
-    <meta property="og:description" content="Manage your custom cake orders, recipes, inventory, and profits in one offline-ready, fully encrypted workspace." />
-    <meta property="og:image" content="https://floura.app/assets/images/chef_hero_photo.jpg" />
+    <meta property="og:title" content="Floura | Bakery &amp; Order Management App" />
+    <meta property="og:description" content="Manage your custom cake orders, recipes, inventory, and profits in one offline-ready, fully encrypted workspace. Available on iOS, Android &amp; web." />
+    <meta property="og:image" content="https://floura.app/assets/images/chef_hero_photo.webp" />
+    <meta property="og:image:alt" content="Floura bakery management app — baker managing custom cake orders" />
+    <meta property="og:site_name" content="Floura" />
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
     <meta property="twitter:url" content="https://floura.app/" />
-    <meta property="twitter:title" content="Floura | Premium Event & Baking Management" />
-    <meta property="twitter:description" content="Manage your custom cake orders, recipes, inventory, and profits in one offline-ready, fully encrypted workspace." />
-    <meta property="twitter:image" content="https://floura.app/assets/images/chef_hero_photo.jpg" />
+    <meta property="twitter:title" content="Floura | Bakery &amp; Order Management App" />
+    <meta property="twitter:description" content="Manage your custom cake orders, recipes, inventory, and profits in one offline-ready, fully encrypted workspace. Available on iOS, Android &amp; web." />
+    <meta property="twitter:image" content="https://floura.app/assets/images/chef_hero_photo.webp" />
+    <meta property="twitter:image:alt" content="Floura bakery management app — baker managing custom cake orders" />
 
     <!-- Canonical Link -->
     <link rel="canonical" href="https://floura.app/" />
+
+    <!-- Favicons & App Icons -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.png" />
+
+    <!-- Web App Manifest -->
+    <link rel="manifest" href="/manifest.json" />
 
     <!-- Schema.org JSON-LD structured data -->
     <script type="application/ld+json">
@@ -31,24 +47,35 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Floura",
-        "operatingSystem": "All",
+        "url": "https://floura.app/",
+        "operatingSystem": "iOS, Android, Web",
         "applicationCategory": "BusinessApplication",
         "offers": {
           "@type": "Offer",
           "price": "0.00",
           "priceCurrency": "USD"
         },
-        "description": "Offline-first bakery command center for managing custom cake orders, client databases, scaling recipes, and profit tracking.",
-        "featureList": "Offline-first support, Custom order management, Client records, Recipe scaling, Inventory alerts, Profit analytics, Encrypted database"
+        "description": "Bakery management app for tracking custom cake orders, client databases, recipe scaling, inventory alerts, and profit analytics — fully encrypted.",
+        "featureList": "Custom order management, Client records, Recipe scaling, Inventory alerts, Profit analytics, End-to-end encrypted database, iOS and Android support, Auto cloud sync"
       }
     </script>
 
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="shortcut icon" href="/favicon.ico" />
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet">
+    <!-- Critical resource hints -->
+    <!-- Preload hero image to improve LCP -->
+    <link rel="preload" as="image" href="/src/assets/images/chef_hero_photo.webp" fetchpriority="high" />
+
+    <!-- Non-blocking Google Fonts (eliminates render-blocking resource) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="style"
+          href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap"
+          onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript>
+      <link rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" />
+    </noscript>
+
+    <!-- Dark mode FOUC prevention (must run before first paint) -->
     <script>
       (function() {
         const savedDarkMode = localStorage.getItem("patisserie_dark_mode");

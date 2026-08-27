@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useOrders } from "../hooks/useOrders";
+import { CompleteOrderModal } from "./CompleteOrderModal";
 
 interface OrdersListProps {
   onAddOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<any>;
@@ -1182,128 +1183,17 @@ function OrdersList({
       </div>
 
       {/* ----------------- ORDER COMPLETION & PROFIT ANALYTICS MODAL ----------------- */}
-      <AnimatePresence>
-        {completingOrder && (
-          <motion.div
-            key="profit-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setCompletingOrder(null)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setCompletingOrder(null);
-            }}
-            className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="complete-order-heading"
-              className="bg-white dark:bg-zinc-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-zinc-200 dark:border-zinc-700 max-h-[90vh] overflow-y-auto custom-scrollbar text-left space-y-4"
-            >
-              <div className="flex justify-between items-center pb-2 border-b border-zinc-100 dark:border-zinc-700/60">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-emerald-500" />
-                  <h3 id="complete-order-heading" className="text-sm font-serif font-bold text-zinc-800 dark:text-zinc-100 uppercase tracking-wide">
-                    Capture Profit & Bake Details
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Close dialog"
-                  onClick={() => setCompletingOrder(null)}
-                  className="p-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-400 dark:text-zinc-500 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary-brand"
-                >
-                  <XCircle className="w-5 h-5" aria-hidden="true" />
-                </button>
-              </div>
-
-              <p className="text-xs text-zinc-500 leading-relaxed font-sans">
-                Great job completing <strong className="text-zinc-700 dark:text-zinc-300">"{completingOrder.customerName}'s"</strong> cake order! To help floura analyze your business dashboard, please specify the final captured profit, difficulties faced, and where the costs were allocated.
-              </p>
-
-              <div className="space-y-4 pt-1">
-                {/* Profit Amount input */}
-                <div className="flex flex-col gap-1.5 font-sans">
-                  <div className="flex justify-between">
-                    <label className="text-xs font-bold text-zinc-600 dark:text-zinc-300">Net Profit Amount ({getCurrencySymbol()})</label>
-                    <span className="text-[10px] text-zinc-400">Total Billed: {formatPrice(completingOrder.totalAmount)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5">
-                    <span className="text-zinc-400 text-xs font-bold">{getCurrencySymbol()}</span>
-                    <input
-                      required
-                      type="number"
-                      step="0.01"
-                      value={profitAmount}
-                      onChange={(e) => {
-                        let val = e.target.value;
-                        if (val === "") {
-                          setProfitAmount("");
-                        } else {
-                          if (/^0\d+/.test(val)) {
-                            val = val.replace(/^0+/, "");
-                          }
-                          setProfitAmount(val);
-                        }
-                      }}
-                      className="bg-transparent border-none outline-none text-xs w-full text-zinc-800 dark:text-zinc-100 font-bold"
-                    />
-                  </div>
-                </div>
-
-                {/* Where did costs go */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-zinc-600 dark:text-zinc-300">Where did the cost go? (Cost Distribution)</label>
-                  <textarea
-                    required
-                    rows={2}
-                    value={costGoingText}
-                    onChange={(e) => setCostGoingText(e.target.value)}
-                    placeholder="e.g. Eggs and premium flour (40%), chocolate decoration toppings (25%), fuel log (15%)"
-                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs p-3 rounded-xl focus:ring-1 focus:ring-primary-brand text-zinc-800 dark:text-zinc-200 min-h-[50px] resize-none font-medium"
-                  />
-                </div>
-
-                {/* Difficulties faced */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-zinc-600 dark:text-zinc-300">Bakes & Decorative Difficulties Faced</label>
-                  <textarea
-                    required
-                    rows={2}
-                    value={difficultiesText}
-                    onChange={(e) => setDifficultiesText(e.target.value)}
-                    placeholder="e.g. Heavy structural dowel integration, fondant figurines took 4 hours, or temperature humidity issues"
-                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs p-3 rounded-xl focus:ring-1 focus:ring-primary-brand text-zinc-800 dark:text-zinc-200 min-h-[50px] resize-none font-medium"
-                  />
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-3 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setCompletingOrder(null)}
-                  className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 rounded-xl text-xs font-bold cursor-pointer transition-colors text-center"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCompleteOrderSave}
-                  className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold cursor-pointer transition-transform active:scale-95 text-center shadow-md"
-                >
-                  Save & Complete Bake
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <CompleteOrderModal
+        completingOrder={completingOrder}
+        profitAmount={profitAmount}
+        setProfitAmount={setProfitAmount}
+        costGoingText={costGoingText}
+        setCostGoingText={setCostGoingText}
+        difficultiesText={difficultiesText}
+        setDifficultiesText={setDifficultiesText}
+        onSave={handleCompleteOrderSave}
+        onClose={() => setCompletingOrder(null)}
+      />
     </div>
   );
 }

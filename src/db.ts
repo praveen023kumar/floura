@@ -111,7 +111,7 @@ worker.onmessage = (e) => {
     }
     
     if (type === "DB_LOCKED" && typeof window !== "undefined") {
-      alert("Floura database is locked because it is open in another tab. Please close other tabs of Floura to continue.");
+      window.dispatchEvent(new window.CustomEvent("db-locked"));
     }
     return;
   }

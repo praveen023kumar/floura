@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 
 export interface UseChecklistProps {
   checkerList?: ChecklistItem[];
+  stableOrderList?: ChecklistItem[];
   onToggleChecklistItem: (id: string, checked: boolean, date?: string) => void;
   onAddChecklistItem?: (text: string, date?: string) => Promise<any>;
   onResetChecklist: (date?: string) => void;
@@ -12,6 +13,7 @@ export interface UseChecklistProps {
 
 export function useChecklist({
   checkerList: propCheckerList,
+  stableOrderList,
   onToggleChecklistItem,
   onAddChecklistItem,
   onResetChecklist,
@@ -59,14 +61,25 @@ export function useChecklist({
     prevTodayStrRef.current = todayStr;
   }, [todayStr, selectedDate]);
 
-  // (checkerList state variable removed, managed by useQuery instead)
+  // Reset stable order when date changes so the new date's items get a fresh order
+  useEffect(() => {
+    stableIdOrderRef.current = new Map();
+    stableIdSetRef.current = new Set();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]);
+
+  // Stable ID-order reference: captures the insertion order from the first fetch per date.
+  // This prevents items from jumping when toggled, because SQLite's INSERT OR REPLACE
+  // reassigns the rowid, making ORDER BY rowid unstable after an update.
+  const stableIdOrderRef = useRef<Map<string, number>>(new Map());
+  const stableIdSetRef = useRef<Set<string>>(new Set());
 
   // Load checklist items using useQuery
   const { data: checkerList = [] } = useQuery<ChecklistItem[]>({
     queryKey: ["checklist", "all", selectedDate],
     queryFn: async () => {
       return await localDb.checklist.query(
-        "SELECT * FROM checklist WHERE isDeleted = 0 AND (date IS NULL OR date = '' OR date <= ?)",
+        "SELECT id FROM checklist WHERE isDeleted = 0 AND (date IS NULL OR date = '' OR date <= ?)",
         [selectedDate]
       );
     }
@@ -215,7 +228,34 @@ export function useChecklist({
   const totalCount = listResult.totalCount;
   const completedCount = listResult.completedCount;
   const filteredCount = listResult.filteredCount;
-  const paginatedChecklist = listResult.paginatedChecklist;
+
+  // Update stableIdOrderRef whenever the set of checklist IDs changes (add/delete), but NOT on toggles.
+  // This gives a permanent, stable position for each item.
+  useEffect(() => {
+    const currentIds = checkerList.map((i: any) => i.id);
+    const currentSet = new Set(currentIds);
+    const prevSet = stableIdSetRef.current;
+    const sameIds = currentIds.every(id => prevSet.has(id)) && currentIds.length === prevSet.size;
+    if (!sameIds) {
+      // Items were added or deleted — rebuild the stable order map
+      const newMap = new Map<string, number>();
+      currentIds.forEach((id: string, idx: number) => newMap.set(id, idx));
+      stableIdOrderRef.current = newMap;
+      stableIdSetRef.current = currentSet;
+    }
+  }, [checkerList]);
+
+  // Sort paginatedChecklist using stable order to prevent reordering on toggle.
+  const paginatedChecklist = useMemo(() => {
+    const raw = listResult.paginatedChecklist;
+    const orderMap = stableIdOrderRef.current;
+    if (orderMap.size === 0) return raw;
+    return [...raw].sort((a, b) => {
+      const ia = orderMap.has(a.id) ? orderMap.get(a.id)! : 99999;
+      const ib = orderMap.has(b.id) ? orderMap.get(b.id)! : 99999;
+      return ia - ib;
+    });
+  }, [listResult.paginatedChecklist]);
 
   const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 

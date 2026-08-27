@@ -82,6 +82,152 @@ function decryptRow(row: any): any {
   return decrypted;
 }
 
+// ─── Default Seed Data (Tamil Nadu Bakery Style, 1 kg each) ───────────────────
+
+const DEFAULT_RECIPES = [
+  {
+    name: "White Forest Cake",
+    category: "Cakes",
+    stdYield: 1,
+    yieldUnit: "kg",
+    ingredients: [
+      { name: "Maida", qty: 200 },
+      { name: "Caster Sugar", qty: 180 },
+      { name: "Butter", qty: 120 },
+      { name: "Eggs", qty: 3 },
+      { name: "Milk", qty: 100 },
+      { name: "Baking Powder", qty: 5 },
+      { name: "Vanilla Essence", qty: 5 },
+      { name: "Whipping Cream", qty: 300 },
+      { name: "White Chocolate", qty: 100 },
+      { name: "Powdered Sugar", qty: 50 }
+    ]
+  },
+  {
+    name: "Black Forest Cake",
+    category: "Cakes",
+    stdYield: 1,
+    yieldUnit: "kg",
+    ingredients: [
+      { name: "Maida", qty: 175 },
+      { name: "Caster Sugar", qty: 200 },
+      { name: "Butter", qty: 130 },
+      { name: "Eggs", qty: 3 },
+      { name: "Milk", qty: 100 },
+      { name: "Cocoa Powder", qty: 40 },
+      { name: "Baking Powder", qty: 5 },
+      { name: "Whipping Cream", qty: 300 },
+      { name: "Cherries", qty: 100 },
+      { name: "Dark Chocolate", qty: 50 }
+    ]
+  },
+  {
+    name: "Brownie Cake",
+    category: "Cakes",
+    stdYield: 1,
+    yieldUnit: "kg",
+    ingredients: [
+      { name: "Dark Chocolate", qty: 200 },
+      { name: "Butter", qty: 150 },
+      { name: "Caster Sugar", qty: 200 },
+      { name: "Eggs", qty: 4 },
+      { name: "Maida", qty: 100 },
+      { name: "Cocoa Powder", qty: 25 },
+      { name: "Vanilla Essence", qty: 5 },
+      { name: "Baking Powder", qty: 3 },
+      { name: "Salt", qty: 2 }
+    ]
+  },
+  {
+    name: "Red Velvet Cake",
+    category: "Cakes",
+    stdYield: 1,
+    yieldUnit: "kg",
+    ingredients: [
+      { name: "Maida", qty: 200 },
+      { name: "Caster Sugar", qty: 180 },
+      { name: "Butter", qty: 120 },
+      { name: "Eggs", qty: 2 },
+      { name: "Buttermilk", qty: 150 },
+      { name: "Cocoa Powder", qty: 15 },
+      { name: "Red Food Color", qty: 10 },
+      { name: "Baking Powder", qty: 5 },
+      { name: "Baking Soda", qty: 3 },
+      { name: "Vanilla Essence", qty: 5 },
+      { name: "Cream Cheese", qty: 150 },
+      { name: "Powdered Sugar", qty: 80 }
+    ]
+  }
+];
+
+const DEFAULT_INVENTORY = [
+  { name: "Maida",          category: "Flour",     unit: "g",   minStockLevel: 0 },
+  { name: "Caster Sugar",   category: "Dry Goods", unit: "g",   minStockLevel: 0 },
+  { name: "Butter",         category: "Dairy",     unit: "g",   minStockLevel: 0 },
+  { name: "Eggs",           category: "Dairy",     unit: "nos", minStockLevel: 0 },
+  { name: "Milk",           category: "Dairy",     unit: "ml",  minStockLevel: 0 },
+  { name: "Baking Powder",  category: "Dry Goods", unit: "g",   minStockLevel: 0 },
+  { name: "Vanilla Essence",category: "Dry Goods", unit: "ml",  minStockLevel: 0 },
+  { name: "Whipping Cream", category: "Dairy",     unit: "ml",  minStockLevel: 0 },
+  { name: "White Chocolate",category: "Chocolate", unit: "g",   minStockLevel: 0 },
+  { name: "Powdered Sugar", category: "Dry Goods", unit: "g",   minStockLevel: 0 },
+  { name: "Cocoa Powder",   category: "Dry Goods", unit: "g",   minStockLevel: 0 },
+  { name: "Cherries",       category: "Produce",   unit: "g",   minStockLevel: 0 },
+  { name: "Dark Chocolate", category: "Chocolate", unit: "g",   minStockLevel: 0 },
+  { name: "Buttermilk",     category: "Dairy",     unit: "ml",  minStockLevel: 0 },
+  { name: "Red Food Color", category: "Dry Goods", unit: "ml",  minStockLevel: 0 },
+  { name: "Baking Soda",    category: "Dry Goods", unit: "g",   minStockLevel: 0 },
+  { name: "Cream Cheese",   category: "Dairy",     unit: "g",   minStockLevel: 0 },
+  { name: "Salt",           category: "Dry Goods", unit: "g",   minStockLevel: 0 }
+];
+
+/**
+ * Seeds 4 default Tamil Nadu bakery recipes (White Forest, Black Forest, Brownie,
+ * Red Velvet — all 1 kg) and their corresponding inventory items for a brand-new
+ * user. Uses MD5(email|type|name) for deterministic, per-user IDs so the operation
+ * is idempotent and safe to call multiple times (INSERT OR IGNORE).
+ */
+async function seedDefaultDataForNewUser(userEmail: string, db: any): Promise<void> {
+  const now = new Date().toISOString();
+
+  // Seed Recipes
+  for (const recipe of DEFAULT_RECIPES) {
+    const id = CryptoJS.MD5(userEmail + "|recipe|" + recipe.name).toString();
+    const rawForEncrypt = {
+      name: recipe.name,
+      ingredients: JSON.stringify(recipe.ingredients),
+      imageUrl: "",
+      imageBase64: ""
+    };
+    const enc = encryptRow(rawForEncrypt);
+
+    await runSql(db, `
+      INSERT OR IGNORE INTO recipes
+        (id, name, category, stdYield, yieldUnit, ingredients, imageUrl, imageBase64, updatedAt, user_email, isDeleted)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+    `, [id, enc.name, recipe.category, recipe.stdYield, recipe.yieldUnit,
+        enc.ingredients, enc.imageUrl, enc.imageBase64, now, userEmail]);
+  }
+
+  // Seed Inventory Items
+  for (const item of DEFAULT_INVENTORY) {
+    const id = CryptoJS.MD5(userEmail + "|inventory|" + item.name).toString();
+    const rawForEncrypt = { name: item.name, unit: item.unit, supplier: "" };
+    const enc = encryptRow(rawForEncrypt);
+
+    await runSql(db, `
+      INSERT OR IGNORE INTO inventory
+        (id, name, category, quantity, unit, minStockLevel, supplier, costPrice, updatedAt, user_email, isDeleted)
+      VALUES (?, ?, ?, 0, ?, ?, ?, 0, ?, ?, 0)
+    `, [id, enc.name, item.category, enc.unit, item.minStockLevel,
+        enc.supplier, now, userEmail]);
+  }
+
+  console.log(`[Seed] Default data seeded for new user: ${userEmail}`);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 export async function performBulkSync(userEmail: string, payload: any) {
   const {
     customers = [],
@@ -369,6 +515,14 @@ export async function fetchMasterData(userEmail: string, page: number, limit: nu
     allScheduledAlerts = await querySqlAll<any>(db, "SELECT * FROM scheduled_alerts WHERE user_email = ? ORDER BY createdAt DESC", [userEmail]);
     allBakeryProfile = await querySqlAll<any>(db, "SELECT * FROM bakery_profile WHERE user_email = ? ORDER BY updatedAt DESC", [userEmail]);
     allCategories = await querySqlAll<any>(db, "SELECT * FROM categories WHERE user_email = ?", [userEmail]);
+
+    // Auto-seed default Tamil Nadu recipes + inventory for brand-new users
+    if (allRecipes.length === 0 && allInventory.length === 0) {
+      await seedDefaultDataForNewUser(userEmail, db);
+      // Re-fetch so the seeded data is included in this very response
+      allInventory = await querySqlAll<any>(db, "SELECT * FROM inventory WHERE user_email = ? ORDER BY updatedAt DESC", [userEmail]);
+      allRecipes = await querySqlAll<any>(db, "SELECT * FROM recipes WHERE user_email = ?", [userEmail]);
+    }
   }
   db.close();
 

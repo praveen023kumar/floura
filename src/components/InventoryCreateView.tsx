@@ -1,11 +1,11 @@
 // File Path: /src/components/InventoryCreateView.tsx
-import React, { useState, useMemo, useEffect, memo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { memoWithData } from "../utils/memo";
 import CreatableSelect from "react-select/creatable";
 import { customSelectStyles } from "./customSelectStyles";
 import { type InventoryItem, type Category } from "../types";
 
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Calculator, ChevronDown, ChevronUp } from "lucide-react";
 import { motion } from "motion/react";
 import { localDb } from "../db";
 import { getCurrencySymbol } from "../utils/format";
@@ -33,6 +33,29 @@ function InventoryCreateView({
     supplier: "",
     costPrice: 0.00,
   });
+
+  // Cost calculator helper state
+  const [calcTotalAmount, setCalcTotalAmount] = useState<string>("");
+  const [calcPurchasedQty, setCalcPurchasedQty] = useState<string>("");
+  const [calcUnit, setCalcUnit] = useState<string>("g");
+  const [showCalc, setShowCalc] = useState<boolean>(false);
+
+  // Derived per-unit cost from calculator
+  const calcPerUnit = useMemo(() => {
+    const total = parseFloat(calcTotalAmount);
+    const qty = parseFloat(calcPurchasedQty);
+    if (!isNaN(total) && !isNaN(qty) && qty > 0 && total >= 0) {
+      return total / qty;
+    }
+    return null;
+  }, [calcTotalAmount, calcPurchasedQty]);
+
+  const applyCalcToForm = useCallback(() => {
+    if (calcPerUnit !== null) {
+      setFormInputs((prev: any) => ({ ...prev, costPrice: parseFloat(calcPerUnit.toFixed(4)) }));
+      window.showToast?.("Cost per unit applied!", "success");
+    }
+  }, [calcPerUnit]);
 
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -278,32 +301,146 @@ function InventoryCreateView({
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Cost Price Per Unit</label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-405 text-sm font-semibold select-none leading-none">
-                {getCurrencySymbol()}
-              </span>
-              <input
-                required
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={formInputs.costPrice}
-                onChange={(e) => {
-                  let val = e.target.value;
-                  if (val === "") {
-                    setFormInputs({ ...formInputs, costPrice: "" });
-                  } else {
-                    if (/^0\d+/.test(val)) {
-                      val = val.replace(/^0+/, "");
+          {/* Cost Price Section with Calculator */}
+          <div className="flex flex-col gap-2">
+            {/* Cost Price Per Unit Field */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Cost Price Per Unit</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-405 text-sm font-semibold select-none leading-none">
+                  {getCurrencySymbol()}
+                </span>
+                <input
+                  required
+                  type="number"
+                  step="0.0001"
+                  placeholder="0.00"
+                  value={formInputs.costPrice}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (val === "") {
+                      setFormInputs({ ...formInputs, costPrice: "" });
+                    } else {
+                      if (/^0\d+/.test(val)) {
+                        val = val.replace(/^0+/, "");
+                      }
+                      setFormInputs({ ...formInputs, costPrice: val });
                     }
-                    setFormInputs({ ...formInputs, costPrice: val });
-                  }
-                }}
-                className="w-full bg-zinc-50 dark:bg-zinc-800 text-sm p-3 pl-9 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand focus:outline-none dark:text-zinc-100"
-              />
+                  }}
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 text-sm p-3 pl-9 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand focus:outline-none dark:text-zinc-100"
+                />
+              </div>
+              <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                Enter cost per {formInputs.unit || "unit"} directly, or use the calculator below.
+              </p>
             </div>
+
+            {/* Calculator Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowCalc((v) => !v)}
+              className="flex items-center gap-2 text-xs font-semibold text-primary-brand dark:text-orange-400 hover:underline w-fit transition-colors"
+            >
+              <Calculator className="w-3.5 h-3.5" />
+              {showCalc ? "Hide" : "Use"} Cost Calculator
+              {showCalc ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Calculator Card */}
+            {showCalc && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="rounded-2xl border border-primary-brand/20 dark:border-orange-500/20 bg-orange-50/60 dark:bg-orange-950/20 p-4 space-y-3"
+              >
+                <div className="flex items-center gap-2">
+                  <Calculator className="w-4 h-4 text-primary-brand dark:text-orange-400" />
+                  <span className="text-xs font-bold text-primary-brand dark:text-orange-400 uppercase tracking-wide">Cost Calculator</span>
+                </div>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  Enter what you paid and how much you bought — we'll calculate the per-unit cost automatically.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Total Amount Paid */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Total Amount Paid</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs font-semibold select-none">
+                        {getCurrencySymbol()}
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="e.g. 35"
+                        value={calcTotalAmount}
+                        onChange={(e) => setCalcTotalAmount(e.target.value)}
+                        className="w-full bg-white dark:bg-zinc-800 text-sm p-2.5 pl-7 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand focus:outline-none dark:text-zinc-100"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Purchased Quantity */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Purchased Quantity</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        placeholder="e.g. 100"
+                        value={calcPurchasedQty}
+                        onChange={(e) => setCalcPurchasedQty(e.target.value)}
+                        className="w-full bg-white dark:bg-zinc-800 text-sm p-2.5 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand focus:outline-none dark:text-zinc-100"
+                      />
+                      <select
+                        value={calcUnit}
+                        onChange={(e) => setCalcUnit(e.target.value)}
+                        className="bg-white dark:bg-zinc-800 text-xs p-2 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand focus:outline-none dark:text-zinc-100 cursor-pointer"
+                      >
+                        <option value="g">g</option>
+                        <option value="kg">kg</option>
+                        <option value="ml">ml</option>
+                        <option value="L">L</option>
+                        <option value="pcs">pcs</option>
+                        <option value="unit">unit</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Result Preview */}
+                {calcPerUnit !== null && (
+                  <div className="flex items-center justify-between bg-white dark:bg-zinc-800 rounded-xl px-4 py-3 border border-primary-brand/20 dark:border-orange-500/20">
+                    <div>
+                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wide font-bold">Calculated Cost Per {calcUnit}</p>
+                      <p className="text-lg font-bold text-zinc-800 dark:text-zinc-100">
+                        {getCurrencySymbol()}{calcPerUnit < 0.01 ? calcPerUnit.toFixed(6) : calcPerUnit.toFixed(4)}
+                        <span className="text-xs text-zinc-400 ml-1">/ {calcUnit}</span>
+                      </p>
+                      <p className="text-[10px] text-zinc-400 mt-0.5">
+                        {getCurrencySymbol()}{parseFloat(calcTotalAmount).toFixed(2)} ÷ {calcPurchasedQty} {calcUnit}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={applyCalcToForm}
+                      className="px-4 py-2 bg-primary-brand dark:bg-orange-500 hover:bg-primary-brand-dark dark:hover:bg-orange-600 text-white text-xs font-bold rounded-full transition-all active:scale-95 shadow-sm"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
+
+                {calcTotalAmount !== "" && calcPurchasedQty !== "" && calcPerUnit === null && (
+                  <p className="text-[11px] text-red-400 dark:text-red-500">
+                    ⚠ Purchased quantity must be greater than 0.
+                  </p>
+                )}
+              </motion.div>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-6 border-t border-zinc-100 dark:border-zinc-800">

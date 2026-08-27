@@ -44,27 +44,27 @@ export default function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
         return (
           <div className="space-y-6 text-zinc-600 dark:text-zinc-300 text-xs sm:text-sm leading-relaxed">
             <p className="font-serif italic font-medium text-zinc-500 dark:text-zinc-400">
-              Last Updated: July 4, 2026
+              Last Updated: August 27, 2026
             </p>
             <p>
-              Welcome to <strong>Floura Bakery Pro</strong> ("Service", "Application"), a premium cloud-synchronized kitchen operations suite developed by Floura Co. By accessing or using our application, local database caches, formulation calculators, and services, you agree to be bound by these Terms & Conditions.
+              Welcome to <strong>Floura</strong> ("Service", "Application"), a cloud-synchronized bakery management suite. By accessing or using our application, you agree to be bound by these Terms &amp; Conditions.
             </p>
 
             <div className="space-y-2">
               <h4 className="font-serif font-bold text-zinc-800 dark:text-zinc-100 text-sm uppercase tracking-wide">
-                1. Scope of Service & License
+                1. Scope of Service &amp; License
               </h4>
               <p>
-                Floura Bakery Pro grants you a limited, non-exclusive, non-transferable, revocable license to use our bakery management tools, recipe scaling matrices, checklist dashboards, and inventory monitors for your business or personal baking operations.
+                Floura grants you a limited, non-exclusive, non-transferable, revocable license to use our bakery management tools — including order tracking, recipe scaling, inventory monitoring, and profit analytics — for your business or personal baking operations.
               </p>
             </div>
 
             <div className="space-y-2">
               <h4 className="font-serif font-bold text-zinc-800 dark:text-zinc-100 text-sm uppercase tracking-wide">
-                2. User Account & Security
+                2. User Account &amp; Security
               </h4>
               <p>
-                To utilize the full capabilities of our operational workspace, you must authenticate securely using a verified Google Account. You are entirely responsible for maintaining the privacy and security of your browser's local database session, credentials, and devices. Any unauthorized actions originating from your secure session must be reported immediately.
+                To use the full capabilities of Floura, you must authenticate securely using a verified Google Account. You are fully responsible for maintaining the confidentiality of your account session and devices. Any unauthorised access must be reported immediately.
               </p>
             </div>
 
@@ -73,16 +73,16 @@ export default function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
                 3. Intellectual Property Rights
               </h4>
               <p>
-                All proprietary formulation algorithms, baker's percentage calculators, user interface layouts, visual assets, icons, typography frameworks, and software codebases are the exclusive property of Floura Co. You may not copy, reverse-engineer, decompile, distribute, or modify any portion of the software without explicit written authorization.
+                All algorithms, calculators, interface layouts, visual assets, icons, and software codebases are the exclusive property of Floura. You may not copy, reverse-engineer, decompile, distribute, or modify any portion of the software without explicit written authorisation.
               </p>
             </div>
 
             <div className="space-y-2">
               <h4 className="font-serif font-bold text-zinc-800 dark:text-zinc-100 text-sm uppercase tracking-wide">
-                4. Operational Disclaimer & Safety
+                4. Operational Responsibility
               </h4>
               <p>
-                Floura is an assistive software tool. You assume full, independent responsibility for verifying all baked goods formulations, scaling outputs, ingredient conversions, and baking temperature controls. Floura Co. is not liable for kitchen operational failures, ruined inventory materials, spoiled dough batches, or oven malfunctions.
+                Floura is an assistive software tool. You assume full responsibility for verifying all formulations, scaling outputs, ingredient conversions, and baking controls. Floura is not liable for kitchen operational failures, spoiled inventory, or any losses arising from reliance on app-generated data.
               </p>
             </div>
 
@@ -91,7 +91,7 @@ export default function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
                 5. Limitation of Liability
               </h4>
               <p>
-                In no event shall Floura Co., its directors, employees, or partners, be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to loss of baking profits, operational data loss, client goodwill, or other intangible losses resulting from your use of or inability to use the Service.
+                In no event shall Floura, its directors, employees, or partners be liable for any indirect, incidental, special, consequential, or punitive damages — including loss of business profits, data loss, or client goodwill — resulting from your use of or inability to use the Service.
               </p>
             </div>
 
@@ -100,7 +100,7 @@ export default function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
                 6. Amendments to Terms
               </h4>
               <p>
-                We reserve the right to revise or replace these Terms at our sole discretion. Any changes will be published in this portal and will take effect immediately upon posting. Your continued use of the application following updates constitutes binding acceptance of the revised Terms.
+                We reserve the right to revise these Terms at our sole discretion. Changes will be published in this portal and take effect immediately upon posting. Continued use of the application following updates constitutes acceptance of the revised Terms.
               </p>
             </div>
           </div>
@@ -110,10 +110,10 @@ export default function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
         return (
           <div className="space-y-6 text-zinc-600 dark:text-zinc-300 text-xs sm:text-sm leading-relaxed">
             <p className="font-serif italic font-medium text-zinc-500 dark:text-zinc-400">
-              Last Updated: July 4, 2026
+              Last Updated: August 27, 2026
             </p>
             <p>
-              At <strong>Floura Bakery Pro</strong>, we believe in radical transparency, absolute digital security, and user data privacy. This Privacy Policy details how we handle, store, and safeguard your kitchen workspace profile and operational data.
+              At <strong>Floura</strong>, we believe in transparency and absolute security of your data. This Privacy Policy details how we collect, store, and protect your workspace profile and operational data.
             </p>
 
             <div className="space-y-2">
@@ -121,25 +121,25 @@ export default function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
                 1. Information We Collect
               </h4>
               <p>
-                We collect your basic Google Account details (verified email address, display name, and profile image URL) exclusively to establish your secure workspace profile. We do not gather secondary background profiles, tracking telemetry, or behavioral marketing metrics.
+                We collect your basic Google Account details — verified email address, display name, and profile image URL — solely to establish your secure workspace. We do not gather behavioral tracking data, advertising profiles, or third-party telemetry.
               </p>
             </div>
 
             <div className="space-y-2">
               <h4 className="font-serif font-bold text-zinc-800 dark:text-zinc-100 text-sm uppercase tracking-wide">
-                2. Operational Data Storage & Local Persistence
+                2. Operational Data Storage
               </h4>
               <p>
-                To provide a fast and reliable offline experience in high-heat kitchen environments, your primary operational data (including customer lists, custom order values, inventory volumes, checklist states, and recipes) is stored locally on your device using a high-performance offline database cache. This data is synchronized securely with our cloud service over Transport Layer Security (TLS) when your device is online.
+                Your operational data — including customer records, orders, inventory, and recipes — is stored securely in our cloud database and synchronized to your device for fast, reliable access. All data is encrypted in transit over Transport Layer Security (TLS) and at rest.
               </p>
             </div>
 
             <div className="space-y-2">
               <h4 className="font-serif font-bold text-zinc-800 dark:text-zinc-100 text-sm uppercase tracking-wide">
-                3. Cookies & Session Storage
+                3. Cookies &amp; Session Storage
               </h4>
               <p>
-                We use secure, functional local tokens and session cookies solely to preserve active kitchen sessions, prevent unauthorized spoofing, and persist system settings (such as dark mode and currency choices). We never use cookies for third-party advertising or cross-site telemetry trackers.
+                We use secure, functional session tokens and cookies solely to preserve your active session and persist settings such as dark mode and currency preferences. We never use cookies for third-party advertising or cross-site tracking.
               </p>
             </div>
 
@@ -148,16 +148,16 @@ export default function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
                 4. Data Security Standards
               </h4>
               <p>
-                All data transmissions between your browser and our cloud synchronization endpoints are protected using robust end-to-end encryption. Firebase authentication rules are continuously hardened to ensure that only authenticated owners of a bakery workspace can read or modify its specific database records.
+                All data transmissions are protected with end-to-end encryption. Firebase authentication rules ensure only authenticated workspace owners can read or modify their specific records. Sensitive fields are additionally encrypted at the application layer.
               </p>
             </div>
 
             <div className="space-y-2">
               <h4 className="font-serif font-bold text-zinc-800 dark:text-zinc-100 text-sm uppercase tracking-wide">
-                5. User Control & Data Deletion
+                5. Your Rights &amp; Data Deletion
               </h4>
               <p>
-                You retain complete ownership over your operational data. You have the right to request full deletion of your cloud records, export your databases, or clear your local browser database cache at any time. To purge your workspace completely, you may clean your browser's site data storage or contact Floura support.
+                You retain complete ownership of your data. You may request full deletion of your cloud records, export your data, or clear your local session at any time. To permanently remove your workspace, contact Floura support or clear site data from your browser settings.
               </p>
             </div>
           </div>
@@ -167,40 +167,49 @@ export default function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
         return (
           <div className="space-y-6 text-zinc-600 dark:text-zinc-300 text-xs sm:text-sm leading-relaxed">
             <p className="font-serif italic font-medium text-zinc-500 dark:text-zinc-400">
-              Last Updated: July 4, 2026
+              Last Updated: August 27, 2026
             </p>
             <div className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20 text-amber-800 dark:text-amber-300 flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
               <div>
                 <strong className="font-serif font-bold block mb-1">Attention Professional Bakers</strong>
-                The formulas, calculations, and materials logs within Floura are provided exclusively for planning and workflow optimization. Always exercise professional judgment.
+                The formulas, calculations, and data within Floura are provided for planning and workflow optimisation. Always exercise professional judgment before acting on app-generated outputs.
               </div>
             </div>
 
             <div className="space-y-2">
               <h4 className="font-serif font-bold text-zinc-800 dark:text-zinc-100 text-sm uppercase tracking-wide">
-                1. No Legal or Medical/Allergen Endorsement
+                1. No Legal, Medical, or Allergen Endorsement
               </h4>
               <p>
-                The information generated by Floura, including recipe scaling coefficients and ingredient metrics, is not intended as certified food-safety, medical, or dietary advice. Users are fully responsible for complying with municipal kitchen health codes, allergen disclosure regulations, and sanitation guidelines.
+                Information generated by Floura — including recipe scaling and ingredient metrics — is not certified food-safety, medical, or dietary advice. Users are fully responsible for complying with local health codes, allergen disclosure regulations, and sanitation guidelines.
               </p>
             </div>
 
             <div className="space-y-2">
               <h4 className="font-serif font-bold text-zinc-800 dark:text-zinc-100 text-sm uppercase tracking-wide">
-                2. Calculation & Scaling Accuracy
+                2. Calculation &amp; Scaling Accuracy
               </h4>
               <p>
-                While our baker's percentage algorithms and unit converters are designed to be extremely precise, mechanical scaling, humidity factors, and ingredient densities can vary widely in real-world environments. Check and physically weigh ingredients on certified baking scales before mixing large, commercial dough batches.
+                While our scaling algorithms are designed to be precise, real-world factors such as humidity, ingredient density variations, and mechanical tolerances can affect results. Always physically weigh ingredients on certified scales before mixing large commercial batches.
               </p>
             </div>
 
             <div className="space-y-2">
               <h4 className="font-serif font-bold text-zinc-800 dark:text-zinc-100 text-sm uppercase tracking-wide">
-                3. Offline Synchronization Notice
+                3. Data Sync &amp; Accuracy Notice
               </h4>
               <p>
-                Floura integrates a robust client-side offline database. However, data that has not been fully synced to the cloud is vulnerable to loss if your browser's application cache is force-cleared, the device is reset, or incognito/private windows are closed. Verify that your system displays "SYNCED LOCALLY" or "ONLINE" status regularly to guarantee cloud backups.
+                Floura syncs your data to the cloud automatically. However, changes made during brief periods of network unavailability will be queued and pushed once connectivity is restored. Always verify your sync status indicator to confirm the latest data has been saved to the cloud.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-serif font-bold text-zinc-800 dark:text-zinc-100 text-sm uppercase tracking-wide">
+                4. Third-Party Services
+              </h4>
+              <p>
+                Floura uses Google Authentication and Firebase cloud services. Your use of these third-party services is subject to their respective terms and privacy policies. Floura is not responsible for the availability or data practices of these external providers.
               </p>
             </div>
           </div>

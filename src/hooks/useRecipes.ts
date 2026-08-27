@@ -55,7 +55,8 @@ export function useRecipes({
         const found = await localDb.recipes.get(selectedRecipeId);
         if (found) return found;
       }
-      const first = await localDb.recipes.toCollection().first();
+      const results = await localDb.recipes.query("SELECT * FROM recipes WHERE isDeleted = 0 ORDER BY COALESCE(updatedAt, '') DESC LIMIT 1");
+      const first = results[0];
       return first || null;
     }
   });

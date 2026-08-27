@@ -581,42 +581,6 @@ function OrderCreate({
                       />
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-zinc-555">
-                        {recipeUnit === "Pieces" ? "Quantity" : "Weight"} {recipeUnit && `(${recipeUnit})`}
-                      </label>
-                      <Select
-                        styles={customSelectStyles}
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        isSearchable={false}
-                        value={
-                          isCustomWeight
-                            ? { value: "Custom", label: "Custom" }
-                            : { value: formData.cakeWeight, label: formData.cakeWeight }
-                        }
-                        options={getWeightOptions(recipeUnit)}
-                        onChange={(opt) => {
-                          if (opt?.value === "Custom") {
-                            setFormData({ ...formData, cakeWeight: "" });
-                          } else {
-                            setFormData({ ...formData, cakeWeight: opt?.value || "1.0 kg" });
-                          }
-                        }}
-                      />
-                      {isCustomWeight && (
-                        <div className="mt-1.5">
-                          <FastInput
-                            type="text"
-                            placeholder={recipeUnit === "Pieces" ? "e.g. 15 Pieces" : "e.g. 1.5 kg"}
-                            value={formData.cakeWeight}
-                            onChange={(val) => setFormData({ ...formData, cakeWeight: val })}
-                            className="bg-white dark:bg-zinc-800 text-xs p-2 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand text-zinc-850 dark:text-zinc-150 text-left w-full"
-                          />
-                        </div>
-                      )}
-                    </div>
-
                     <div className="flex flex-col gap-1.5 text-left">
                       <label className="text-xs font-bold text-zinc-555">Flavor</label>
                       <Select
@@ -659,6 +623,44 @@ function OrderCreate({
                         }}
                       />
                     </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-zinc-555">
+                        {recipeUnit === "Pieces" ? "Quantity" : "Weight"} {recipeUnit && `(${recipeUnit})`}
+                      </label>
+                      <Select
+                        styles={customSelectStyles}
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
+                        isSearchable={false}
+                        value={
+                          isCustomWeight
+                            ? { value: "Custom", label: "Custom" }
+                            : { value: formData.cakeWeight, label: formData.cakeWeight }
+                        }
+                        options={getWeightOptions(recipeUnit)}
+                        onChange={(opt) => {
+                          if (opt?.value === "Custom") {
+                            setFormData({ ...formData, cakeWeight: "" });
+                          } else {
+                            setFormData({ ...formData, cakeWeight: opt?.value || "1.0 kg" });
+                          }
+                        }}
+                      />
+                      {isCustomWeight && (
+                        <div className="mt-1.5">
+                          <FastInput
+                            type="text"
+                            placeholder={recipeUnit === "Pieces" ? "e.g. 15 Pieces" : "e.g. 1.5 kg"}
+                            value={formData.cakeWeight}
+                            onChange={(val) => setFormData({ ...formData, cakeWeight: val })}
+                            className="bg-white dark:bg-zinc-800 text-xs p-2 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand text-zinc-850 dark:text-zinc-150 text-left w-full"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    
 
                     {/* Egg / Eggless toggles */}
                     <div className="flex flex-col gap-1.5">

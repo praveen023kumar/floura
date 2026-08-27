@@ -985,7 +985,6 @@ export function useOrders({
       onUpdateOrderStatus(completingOrder.id, "Completed");
     }
     setCompletingOrder(null);
-    navigate("/");
   };
 
   return {

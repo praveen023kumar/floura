@@ -57,6 +57,7 @@ function ChecklistView({
     checklistTotalPages,
   } = useChecklist({
     checkerList,
+    stableOrderList: checkerList,
     onToggleChecklistItem,
     onAddChecklistItem,
     onResetChecklist,
