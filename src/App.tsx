@@ -77,11 +77,15 @@ const queryClient = new QueryClient({
   },
 });
 
-function MainAppContent() {
+function MainAppContent({ initialUser, onLogout }: {
+  initialUser: any;
+  onLogout: () => void;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
 
   const getScreenFromPath = (pathname: string): string => {
+    if (pathname.startsWith("/landing")) return "landing";
     if (pathname.startsWith("/orders/new")) return "orders-form";
     if (pathname.startsWith("/orders")) return "orders";
     if (pathname.startsWith("/customers/new")) return "customers-form";
@@ -139,7 +143,11 @@ function MainAppContent() {
     handleToggleChecklistItem,
     handleAddChecklistItem,
     handleResetChecklist,
-  } = useAppEngine();
+  } = useAppEngine(initialUser, onLogout);
+
+  if (!user) {
+    return null;
+  }
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
 
@@ -316,6 +324,16 @@ function MainAppContent() {
     />
   ), [user, darkMode, syncStatus, handleLogout, setDarkMode, triggerSync, navigate]);
 
+  const landingPageElement = useMemo(() => (
+    <LandingPage
+      user={user}
+      onLogin={handleLogin}
+      onLogout={handleLogout}
+      darkMode={darkMode}
+      setDarkMode={setDarkMode}
+    />
+  ), [user, handleLogin, handleLogout, darkMode, setDarkMode]);
+
   const debriefsViewElement = useMemo(() => <DebriefsView />, []);
 
   const feedbackViewElement = useMemo(() => (
@@ -415,63 +433,33 @@ function MainAppContent() {
     );
   }
 
-  // Gate check for separate Admin routes
-  const isAdminPath = location.pathname.startsWith("/admin");
 
-  if (isAdminPath) {
-    const isLoggedAdmin = user && ((user as any).role === "admin" || (user as any).role === "superadmin");
-    return (
-      <Suspense fallback={
-        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
-          <div className="w-10 h-10 rounded-full border-2 border-pink-750 border-t-transparent animate-spin mb-4" />
-          <p className="text-sm font-serif font-semibold text-zinc-650 dark:text-zinc-350">
-            Loading Admin Workspace...
-          </p>
-        </div>
-      }>
-        {!isLoggedAdmin ? (
-          <AdminLoginView onLogin={handleLogin} />
-        ) : (
-          <AdminDashboardView
-            user={user}
-            onLogout={handleLogout}
-            darkMode={darkMode}
-            setDarkMode={setDarkMode}
-          />
-        )}
-      </Suspense>
-    );
-  }
-
-  // Gate check for standard Chef paths
-  const isLandingPath = location.pathname === "/landing";
-  const showLanding = isLandingPath || (!isNativeApp() && (!user || (user as any).role === "admin" || (user as any).role === "superadmin"));
-
-  if (showLanding) {
-    return <LoginView user={user} onLogin={handleLogin} onLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} />;
-  }
-
-  if (!user || (user as any).role === "admin" || (user as any).role === "superadmin") {
-    return (
-      <Suspense fallback={
-        <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
-          <div className="w-10 h-10 rounded-full border-2 border-primary-brand border-t-transparent animate-spin mb-4" />
-          <p className="text-sm font-serif font-semibold text-zinc-650 dark:text-zinc-350">
-            Loading secure sign-in...
-          </p>
-        </div>
-      }>
-        <LoginView onLogin={handleLogin} />
-      </Suspense>
-    );
-  }
 
   // Force onboarding for new users who haven't completed bakery profile setup
   // Guard: only redirect after the first IndexedDB read has completed (profileChecked)
   // to avoid false redirects on page refresh before data loads
   const isGettingStarted = location.pathname === "/getting-started";
-  if (profileChecked && !bakeryProfile && !isGettingStarted) {
+  const isLanding = location.pathname === "/landing";
+  if (profileChecked && !bakeryProfile && !isGettingStarted && !isLanding) {
     return <Navigate to="/getting-started" replace />;
+  }
+
+  if (currentScreen === "landing") {
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
+          <div className="w-10 h-10 rounded-full border-2 border-primary-brand border-t-transparent animate-spin mb-4" />
+          <p className="text-sm font-serif font-semibold text-zinc-650 dark:text-zinc-350">
+            Freshly baking page view...
+          </p>
+        </div>
+      }>
+        <Routes>
+          <Route path="/landing" element={landingPageElement} />
+          <Route path="*" element={<Navigate to="/landing" replace />} />
+        </Routes>
+      </Suspense>
+    );
   }
 
   if (currentScreen === "getting-started") {
@@ -818,8 +806,149 @@ function MainAppContent() {
   );
 }
 
+function LoadingSignIn() {
+  return (
+    <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
+      <div className="w-10 h-10 rounded-full border-2 border-primary-brand border-t-transparent animate-spin mb-4" />
+      <p className="text-sm font-serif font-semibold text-zinc-650 dark:text-zinc-350">
+        Loading secure sign-in...
+      </p>
+    </div>
+  );
+}
+
+function AdminLoading() {
+  return (
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
+      <div className="w-10 h-10 rounded-full border-2 border-pink-750 border-t-transparent animate-spin mb-4" />
+      <p className="text-sm font-serif font-semibold text-zinc-650 dark:text-zinc-350">
+        Loading Admin Workspace...
+      </p>
+    </div>
+  );
+}
+
+function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode }: {
+  user: any;
+  onLogin: any;
+  onLogout: any;
+  darkMode: boolean;
+  setDarkMode: any;
+}) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isAdminPath = location.pathname.startsWith("/admin");
+
+  useEffect(() => {
+    if (!user) {
+      const isPublicPath = location.pathname === "/" || location.pathname === "/landing" || location.pathname.startsWith("/admin");
+      if (!isPublicPath) {
+        navigate("/", { replace: true });
+      }
+    }
+  }, [user, location.pathname, navigate]);
+
+  // 1. Admin paths (Public Login or Private Dashboard)
+  if (isAdminPath) {
+    const isLoggedAdmin = user && (user.role === "admin" || user.role === "superadmin");
+    return (
+      <Suspense fallback={<AdminLoading />}>
+        {!isLoggedAdmin ? (
+          <AdminLoginView onLogin={onLogin} />
+        ) : (
+          <AdminDashboardView
+            user={user}
+            onLogout={onLogout}
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
+          />
+        )}
+      </Suspense>
+    );
+  }
+
+  // 2. Unauthenticated user (LandingPage for web, LoginView for native mobile apps)
+  if (!user) {
+    if (isNativeApp()) {
+      return (
+        <Suspense fallback={<LoadingSignIn />}>
+          <LoginView onLogin={onLogin} />
+        </Suspense>
+      );
+    }
+    return (
+      <LandingPage
+        user={null}
+        onLogin={onLogin}
+        onLogout={onLogout}
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
+      />
+    );
+  }
+
+  // 3. User with incorrect permissions for Chef workspace
+  if (user.role === "admin" || user.role === "superadmin") {
+    return <Navigate to="/admin" replace />;
+  }
+
+  // 4. Authenticated Chef -> render private workspace
+  return (
+    <MainAppContent
+      initialUser={user}
+      onLogout={onLogout}
+    />
+  );
+}
+
 export default function App() {
   const Router = isNativeApp() ? HashRouter : BrowserRouter;
+
+  // Root state for Dark Mode
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem("patisserie_dark_mode") === "true";
+  });
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("patisserie_dark_mode", "true");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("patisserie_dark_mode", "false");
+    }
+  }, [darkMode]);
+
+  // Root state for authenticated Chef/User
+  const [user, setUser] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem("patisserie_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleLogin = async (authenticatedUser: any) => {
+    // Inject the isFreshLogin flag to distinguish logins from browser reloads
+    const freshUser = { ...authenticatedUser, isFreshLogin: true };
+    localStorage.setItem("patisserie_user", JSON.stringify(freshUser));
+    setUser(freshUser);
+  };
+
+  const handleLogout = async () => {
+    setUser(null);
+    localStorage.removeItem("patisserie_user");
+    localStorage.removeItem("patisserie_last_synced_email");
+    try {
+      const { closeDatabase, localDb } = await import("./db");
+      await localDb.delete();
+      await localDb.open();
+      closeDatabase();
+    } catch (e) {
+      console.error("Logout database cleanup failed:", e);
+    }
+  };
 
   useEffect(() => {
     const handleDbUpdate = (event: Event) => {
@@ -832,19 +961,16 @@ export default function App() {
           queryClient.invalidateQueries({ queryKey: [t], refetchType: "all" });
         }
         
-        // If orders, inventory, or checklist changes, invalidate dashboard
         const dashboardNeedsInvalidation = tables.some(t => 
           ["orders", "inventory", "checklist"].includes(t)
         );
         if (dashboardNeedsInvalidation) {
           queryClient.invalidateQueries({ queryKey: ["dashboard"], refetchType: "all" });
         }
-        // If orders change, also invalidate debriefs
         if (tables.includes("orders")) {
           queryClient.invalidateQueries({ queryKey: ["debriefs"], refetchType: "all" });
         }
       } else {
-        // If no table is specified (e.g. initial sync or pull), invalidate everything
         queryClient.invalidateQueries({ refetchType: "all" });
       }
     };
@@ -857,7 +983,13 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <MainAppContent />
+        <AppContentGate
+          user={user}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+        />
       </Router>
     </QueryClientProvider>
   );

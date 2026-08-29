@@ -87,95 +87,121 @@ const pendingRequests = new Map<number, { resolve: (val: any) => void; reject: (
 let dbReady = false;
 const requestQueue: Array<{ fn: () => Promise<any>; resolve: (val: any) => void; reject: (err: any) => void }> = [];
 
-// Web Worker instance
-const worker = new Worker(new URL("./db-worker.ts", import.meta.url), { type: "module" });
+// Lazy Web Worker reference
+let worker: Worker | null = null;
+
+function getWorker(): Worker {
+  if (typeof window === "undefined") {
+    throw new Error("Cannot access worker on server environment");
+  }
+  if (!worker) {
+    console.log("[DB] Lazily initializing SQLite database worker...");
+    worker = new Worker(new URL("./db-worker.ts", import.meta.url), { type: "module" });
+    setupWorkerListeners(worker);
+  }
+  return worker;
+}
+
+export function closeDatabase() {
+  if (worker) {
+    console.log("[DB] Terminating database worker and releasing OPFS file lock...");
+    worker.terminate();
+    worker = null;
+    dbReady = false;
+  }
+}
 
 // Clean up old worker on hot module replacement to release SQLite OPFS file lock
 if ((import.meta as any).hot) {
   (import.meta as any).hot.dispose(() => {
-    console.log("[DB] Terminating old database worker due to HMR...");
-    worker.terminate();
+    if (worker) {
+      console.log("[DB] Terminating old database worker due to HMR...");
+      worker.terminate();
+    }
   });
 }
 
-worker.onmessage = (e) => {
-  const { id, type, result, error } = e.data;
-  
-  if (type === "DB_LOCKED" || type === "DB_ERROR") {
-    const errMsg = error || (type === "DB_LOCKED" ? "Database is locked by another tab" : "Failed to initialize database");
-    console.error(`SQLite database error: ${type} - ${errMsg}`);
+function setupWorkerListeners(w: Worker) {
+  w.onmessage = (e) => {
+    const { id, type, result, error } = e.data;
     
-    while (requestQueue.length > 0) {
-      const { reject } = requestQueue.shift()!;
-      reject(new Error(errMsg));
-    }
-    
-    if (type === "DB_LOCKED" && typeof window !== "undefined") {
-      window.dispatchEvent(new window.CustomEvent("db-locked"));
-    }
-    return;
-  }
-  
-  if (type === "DB_READY") {
-    console.log("SQLite WASM + OPFS Worker is ready. Running migration check...");
-    
-    const initDb = async () => {
-      if (typeof window !== "undefined") {
-        try {
-          const savedUserStr = localStorage.getItem("patisserie_user");
-          if (savedUserStr) {
-            const userData = JSON.parse(savedUserStr);
-            if (userData && userData.email && userData.token) {
-              // Direct send to worker bypassing the dbReady check to avoid deadlock
-              await new Promise((resolve, reject) => {
-                const reqId = messageId++;
-                pendingRequests.set(reqId, { resolve, reject });
-                worker.postMessage({ id: reqId, type: "SET_KEY", payload: { email: userData.email, token: userData.token } });
-              });
-              console.log("[DB] Restored database encryption key successfully on startup.");
-            }
-          }
-        } catch (e) {
-          console.error("Failed to restore DB key from localStorage on startup:", e);
-        }
-      }
-
-      dbReady = true;
-
+    if (type === "DB_LOCKED" || type === "DB_ERROR") {
+      const errMsg = error || (type === "DB_LOCKED" ? "Database is locked by another tab" : "Failed to initialize database");
+      console.error(`SQLite database error: ${type} - ${errMsg}`);
+      
       while (requestQueue.length > 0) {
-        const { fn, resolve, reject } = requestQueue.shift()!;
-        fn().then(resolve).catch(reject);
+        const { reject } = requestQueue.shift()!;
+        reject(new Error(errMsg));
       }
       
-      triggerMigration();
-    };
-
-    initDb().catch((err) => {
-      console.error("Error during database initialization sequence:", err);
-      // Fallback to prevent app freeze
-      dbReady = true;
-      while (requestQueue.length > 0) {
-        const { fn, resolve, reject } = requestQueue.shift()!;
-        fn().then(resolve).catch(reject);
+      if (type === "DB_LOCKED" && typeof window !== "undefined") {
+        window.dispatchEvent(new window.CustomEvent("db-locked"));
       }
-    });
-    return;
-  }
-  
-  if (pendingRequests.has(id)) {
-    const { resolve, reject } = pendingRequests.get(id)!;
-    pendingRequests.delete(id);
-    if (error) reject(new Error(error));
-    else resolve(result);
-  }
-};
+      return;
+    }
+    
+    if (type === "DB_READY") {
+      console.log("SQLite WASM + OPFS Worker is ready. Running migration check...");
+      
+      const initDb = async () => {
+        if (typeof window !== "undefined") {
+          try {
+            const savedUserStr = localStorage.getItem("patisserie_user");
+            if (savedUserStr) {
+              const userData = JSON.parse(savedUserStr);
+              if (userData && userData.email && userData.token) {
+                // Direct send to worker bypassing the dbReady check to avoid deadlock
+                await new Promise((resolve, reject) => {
+                  const reqId = messageId++;
+                  pendingRequests.set(reqId, { resolve, reject });
+                  w.postMessage({ id: reqId, type: "SET_KEY", payload: { email: userData.email, token: userData.token } });
+                });
+                console.log("[DB] Restored database encryption key successfully on startup.");
+              }
+            }
+          } catch (e) {
+            console.error("Failed to restore DB key from localStorage on startup:", e);
+          }
+        }
+
+        dbReady = true;
+
+        while (requestQueue.length > 0) {
+          const { fn, resolve, reject } = requestQueue.shift()!;
+          fn().then(resolve).catch(reject);
+        }
+        
+        triggerMigration();
+      };
+
+      initDb().catch((err) => {
+        console.error("Error during database initialization sequence:", err);
+        // Fallback to prevent app freeze
+        dbReady = true;
+        while (requestQueue.length > 0) {
+          const { fn, resolve, reject } = requestQueue.shift()!;
+          fn().then(resolve).catch(reject);
+        }
+      });
+      return;
+    }
+    
+    if (pendingRequests.has(id)) {
+      const { resolve, reject } = pendingRequests.get(id)!;
+      pendingRequests.delete(id);
+      if (error) reject(new Error(error));
+      else resolve(result);
+    }
+  };
+}
 
 export function sendToWorker(type: string, payload: any): Promise<any> {
+  const w = getWorker();
   const execute = () => {
     return new Promise((resolve, reject) => {
       const id = messageId++;
       pendingRequests.set(id, { resolve, reject });
-      worker.postMessage({ id, type, payload });
+      w.postMessage({ id, type, payload });
     });
   };
 
@@ -189,8 +215,27 @@ export function sendToWorker(type: string, payload: any): Promise<any> {
 }
 
 export async function setDatabaseEncryptionKey(email: string, token: string) {
+  // Triggers worker boot and sets encryption key
+  getWorker();
   await sendToWorker("SET_KEY", { email, token });
 }
+
+// Early boot SQLite worker on startup only if user session exists
+if (typeof window !== "undefined") {
+  try {
+    const savedUserStr = localStorage.getItem("patisserie_user");
+    if (savedUserStr) {
+      const userData = JSON.parse(savedUserStr);
+      if (userData && userData.email && userData.token) {
+        console.log("[DB] Logged-in session detected on startup. Booting SQLite worker...");
+        getWorker();
+      }
+    }
+  } catch (e) {
+    console.error("Failed to parse user session for early SQLite boot:", e);
+  }
+}
+
 
 class SQLiteTable<T> {
   tableName: string;

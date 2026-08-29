@@ -97,6 +97,7 @@ function DashboardView({
   onNavigate,
   checklist,
   onToggleChecklistItem,
+  onAlertClick,
   user,
 }: DashboardViewProps) {
   const {
@@ -317,7 +318,13 @@ function DashboardView({
                     return (
                       <div
                         key={order.id}
-                        onClick={() => onNavigate("orders")}
+                        onClick={() => {
+                          if (onAlertClick) {
+                            onAlertClick(order.id);
+                          } else {
+                            onNavigate("orders");
+                          }
+                        }}
                         className="group bg-zinc-50/50 dark:bg-zinc-900/30 border border-zinc-150 dark:border-zinc-800/80 rounded-2xl p-4 flex flex-col justify-between hover:border-zinc-350 dark:hover:border-zinc-700/80 hover:shadow-xs active:scale-98 transition-all cursor-pointer relative overflow-hidden text-left"
                       >
                         {/* Status Accent Left Border Line */}
@@ -574,7 +581,13 @@ function DashboardView({
                       </span>
 
                       <button 
-                        onClick={() => onNavigate("orders")}
+                        onClick={() => {
+                          if (onAlertClick) {
+                            onAlertClick(order.id);
+                          } else {
+                            onNavigate("orders");
+                          }
+                        }}
                         className="flex items-center justify-center px-2 py-1.5 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300 font-bold text-[9px] rounded-lg hover:bg-zinc-50 active:scale-95 transition-all cursor-pointer shadow-xs"
                       >
                         Details

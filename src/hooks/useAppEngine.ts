@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { localDb, seedLocalDbFromPayload, getPreference, setPreference, removePreference } from "../db";
+import { localDb, seedLocalDbFromPayload, getPreference, setPreference, removePreference, closeDatabase } from "../db";
 import { getApiUrl } from "../utils/api";
 import { setFormatConfig } from "../utils/format";
 import {
@@ -14,12 +14,21 @@ import {
 import { scaleRecipeIngredients, parseWeightToGrams } from "../../shared/calculations";
 
 
-export function useAppEngine() {
+export function useAppEngine(
+  initialUser: { name: string; email: string; avatar: string; token?: string; role?: string } | null = null,
+  onLogoutCallback?: () => void
+) {
   const navigate = useNavigate();
   const location = useLocation();
 
   // User Authenticated State
-  const [user, setUser] = useState<{ name: string; email: string; avatar: string; token?: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; email: string; avatar: string; token?: string; role?: string } | null>(initialUser);
+
+  // Sync user changes from props
+  useEffect(() => {
+    setUser(initialUser);
+  }, [initialUser]);
+
   const [initializing, setInitializing] = useState<boolean>(true);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState<boolean>(true);
   const [profileChecked, setProfileChecked] = useState<boolean>(false);
@@ -67,18 +76,38 @@ export function useAppEngine() {
       try {
         const savedUser = await getPreference("patisserie_user");
         const savedDarkMode = localStorage.getItem("patisserie_dark_mode") === "true";
-        const currency = await getPreference("floura_currency") || "$";
-        const dateFormat = await getPreference("floura_date_format") || "YYYY-MM-DD";
         
-        setFormatConfig(currency, dateFormat);
+        let currency = "$";
+        let dateFormat = "YYYY-MM-DD";
         
         if (savedUser) {
           setUser(savedUser);
+          if (savedUser.isFreshLogin) {
+            // Remove isFreshLogin flag from local storage/state
+            const cleanUser = { ...savedUser };
+            delete cleanUser.isFreshLogin;
+            localStorage.setItem("patisserie_user", JSON.stringify(cleanUser));
+            setUser(cleanUser);
+            
+            // Trigger fresh database sync
+            await runFreshLoginSync(savedUser);
+          } else {
+            // Normal startup session recovery
+            currency = await getPreference("floura_currency") || "$";
+            dateFormat = await getPreference("floura_date_format") || "YYYY-MM-DD";
+            setIsLoadingFromDb(false);
+            setInitializing(false);
+          }
+        } else {
+          setIsLoadingFromDb(false);
+          setInitializing(false);
         }
+        
+        setFormatConfig(currency, dateFormat);
         setDarkMode(savedDarkMode);
       } catch (err) {
-        console.error("Failed to load user preferences from IndexedDB:", err);
-      } finally {
+        console.error("Failed to load user preferences on startup:", err);
+        setIsLoadingFromDb(false);
         setInitializing(false);
       }
     }
@@ -106,6 +135,7 @@ export function useAppEngine() {
 
   // Load data slice for react states (counts and active small tables) to prevent memory leak
   async function refreshReactStates(skipNotify = false, table?: string | string[], isRouteTransition = false, isFromBroadcast = false) {
+    if (!user) return; // Skip database queries entirely if user is not authenticated
     try {
       let p = window.location.hash ? window.location.hash.substring(1) : window.location.pathname;
       if (p.startsWith("/")) p = p.substring(1);
@@ -544,27 +574,7 @@ export function useAppEngine() {
     }
   }
 
-  const handleLogin = async (authenticatedUser: { name: string; email: string; avatar: string; token?: string; isNew?: boolean; role?: string }) => {
-    isLoggingOutRef.current = false;
-    console.log("[Auth Debug] handleLogin received authenticatedUser:", authenticatedUser);
-    if (authenticatedUser.role === "admin" || authenticatedUser.role === "superadmin") {
-      setUser({
-        name: authenticatedUser.name,
-        email: authenticatedUser.email,
-        avatar: authenticatedUser.avatar,
-        token: authenticatedUser.token,
-        role: authenticatedUser.role
-      } as any);
-      await setPreference("patisserie_user", {
-        name: authenticatedUser.name,
-        email: authenticatedUser.email,
-        avatar: authenticatedUser.avatar,
-        token: authenticatedUser.token,
-        role: authenticatedUser.role
-      });
-      return;
-    }
-
+  async function runFreshLoginSync(authenticatedUser: { name: string; email: string; avatar: string; token?: string; isNew?: boolean; role?: string }) {
     setIsSyncingInitialData(true);
     setPullingStep("Preparing local workspace partition...");
     setPullingProgress(5);
@@ -580,7 +590,8 @@ export function useAppEngine() {
         localDb.customEvents.clear(),
         localDb.dispatchedNotifications.clear(),
         localDb.scheduledAlerts.clear(),
-        localDb.bakeryProfile.clear()
+        localDb.bakeryProfile.clear(),
+        localDb.categories.clear()
       ]);
     } catch (err) {
       console.warn("Could not wipe existing local db on new device/user login:", err);
@@ -628,6 +639,8 @@ export function useAppEngine() {
       });
 
       setIsSyncingInitialData(false);
+      setIsLoadingFromDb(false);
+      setInitializing(false);
 
       if (authenticatedUser.isNew) {
         navigate("/getting-started");
@@ -638,42 +651,37 @@ export function useAppEngine() {
       console.error("Initial data pull failed:", err);
       window.showToast("Failed to restore cloud database backup. Please try again.", "error");
       setIsSyncingInitialData(false);
-      handleLogout();
+      setIsLoadingFromDb(false);
+      setInitializing(false);
     }
+  }
+
+  const handleLogin = async (authenticatedUser: { name: string; email: string; avatar: string; token?: string; isNew?: boolean; role?: string }) => {
+    isLoggingOutRef.current = false;
+    console.log("[Auth Debug] handleLogin received authenticatedUser:", authenticatedUser);
+    if (authenticatedUser.role === "admin" || authenticatedUser.role === "superadmin") {
+      setUser({
+        name: authenticatedUser.name,
+        email: authenticatedUser.email,
+        avatar: authenticatedUser.avatar,
+        token: authenticatedUser.token,
+        role: authenticatedUser.role
+      } as any);
+      await setPreference("patisserie_user", {
+        name: authenticatedUser.name,
+        email: authenticatedUser.email,
+        avatar: authenticatedUser.avatar,
+        token: authenticatedUser.token,
+        role: authenticatedUser.role
+      });
+      return;
+    }
+    await runFreshLoginSync(authenticatedUser);
   };
 
   async function handleLogout(isFromBroadcast = false) {
     if (isLoggingOutRef.current) return;
     isLoggingOutRef.current = true;
-
-    // 1. Immediately nullify React user state to unmount protected views & stop background checks
-    setUser(null);
-
-    // 2. Immediately clear localStorage to prevent session resurrection
-    try {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("patisserie_user");
-        localStorage.removeItem("patisserie_last_synced_email");
-      }
-    } catch (e) {
-      console.warn("Could not remove session from localStorage on logout:", e);
-    }
-
-    // Reset local memory states to prevent UI remnants
-    setCheckerList([]);
-    setBakeryProfile(null);
-
-    try {
-      // Delete local SQLite tables & open a fresh schema instance
-      await localDb.delete();
-      await localDb.open();
-    } catch (e) {
-      console.warn("Could not delete IndexedDB database on logout:", e);
-    }
-
-    // Clear preferences/session in database
-    await removePreference("patisserie_user");
-    await removePreference("patisserie_last_synced_email");
 
     // Broadcast logout to other tabs if this logout action was triggered locally on this tab
     if (!isFromBroadcast && typeof window !== "undefined" && "BroadcastChannel" in window) {
@@ -687,7 +695,34 @@ export function useAppEngine() {
     }
 
     isLoggingOutRef.current = false;
-    navigate("/");
+
+    // Reset local memory states to prevent UI remnants before unmount
+    setCheckerList([]);
+    setBakeryProfile(null);
+
+    if (onLogoutCallback) {
+      // Call parent logout callback first to unmount PrivateAppContent/MainAppContent synchronously
+      onLogoutCallback();
+    } else {
+      // Fallback if no callback is supplied
+      setUser(null);
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("patisserie_user");
+          localStorage.removeItem("patisserie_last_synced_email");
+        }
+      } catch (e) {
+        console.warn("Could not remove session from localStorage on logout:", e);
+      }
+      try {
+        await localDb.delete();
+        await localDb.open();
+        closeDatabase();
+      } catch (e) {
+        console.warn("Could not clean database on fallback logout:", e);
+      }
+      navigate("/");
+    }
   }
 
   // Security token check on window focus — verify this session hasn't been displaced
