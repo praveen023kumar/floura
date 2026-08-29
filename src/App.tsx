@@ -48,6 +48,7 @@ import InitialSyncLoader from "./components/InitialSyncLoader";
 // Lazy loaded page components for optimal app bundles and load performance
 const AdminDashboardView = lazy(() => import("./components/AdminDashboardView"));
 const AdminLoginView = lazy(() => import("./components/AdminLoginView"));
+const LoginView = lazy(() => import("./components/LoginView"));
 const DashboardView = lazy(() => import("./components/DashboardView"));
 const OrdersList = lazy(() => import("./components/OrdersList"));
 const OrderCreate = lazy(() => import("./components/OrderCreate"));
@@ -444,8 +445,25 @@ function MainAppContent() {
 
   // Gate check for standard Chef paths
   const isLandingPath = location.pathname === "/landing";
-  if (!user || (user as any).role === "admin" || (user as any).role === "superadmin" || isLandingPath) {
-    return <LandingPage user={user} onLogin={handleLogin} onLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} />;
+  const showLanding = isLandingPath || (!isNativeApp() && (!user || (user as any).role === "admin" || (user as any).role === "superadmin"));
+
+  if (showLanding) {
+    return <LoginView user={user} onLogin={handleLogin} onLogout={handleLogout} darkMode={darkMode} setDarkMode={setDarkMode} />;
+  }
+
+  if (!user || (user as any).role === "admin" || (user as any).role === "superadmin") {
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
+          <div className="w-10 h-10 rounded-full border-2 border-primary-brand border-t-transparent animate-spin mb-4" />
+          <p className="text-sm font-serif font-semibold text-zinc-650 dark:text-zinc-350">
+            Loading secure sign-in...
+          </p>
+        </div>
+      }>
+        <LoginView onLogin={handleLogin} />
+      </Suspense>
+    );
   }
 
   // Force onboarding for new users who haven't completed bakery profile setup

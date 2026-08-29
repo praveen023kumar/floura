@@ -211,18 +211,44 @@ const TRUSTED_ORIGINS = [
   "http://localhost"
 ];
 
+function isPrivateNetworkOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") return true;
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+    if (/^172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+  } catch {
+    // Ignore invalid origin URLs
+  }
+  return false;
+}
+
 export function corsMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const origin = req.headers.origin;
   
   if (origin) {
-    const isLocalhost = origin.startsWith("http://localhost:") || 
-                        origin === "http://localhost" ||
-                        origin.startsWith("http://127.0.0.1:") ||
-                        origin === "http://127.0.0.1" ||
-                        origin === "https://localhost" ||
-                        origin.startsWith("tauri://");
+    const configuredOrigins = process.env.ALLOWED_ORIGINS 
+      ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim()) 
+      : [];
 
-    if (isLocalhost || TRUSTED_ORIGINS.includes(origin)) {
+    const isLocalhostOrApp = origin.startsWith("http://localhost:") || 
+                            origin === "http://localhost" ||
+                            origin.startsWith("http://127.0.0.1:") ||
+                            origin === "http://127.0.0.1" ||
+                            origin === "https://localhost" ||
+                            origin.startsWith("tauri://") ||
+                            origin.startsWith("capacitor://") ||
+                            origin.startsWith("ionic://") ||
+                            origin === "file://";
+
+    const isTrusted = isLocalhostOrApp || 
+                      TRUSTED_ORIGINS.includes(origin) || 
+                      configuredOrigins.includes(origin) || 
+                      isPrivateNetworkOrigin(origin);
+
+    if (isTrusted) {
       res.header("Access-Control-Allow-Origin", origin);
     } else {
       console.warn(`[CORS Reject] Blocked access from untrusted origin: ${origin}`);

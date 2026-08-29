@@ -12,9 +12,10 @@
     "cordova:create": "npx cordova create cordova com.floura.app Floura",
     "cordova:platform-add": "cd cordova && npx cordova platform add ios android",
     "cordova:copy-assets": "node scripts/copy-to-cordova.cjs",
-    "cordova:build": "npm run build && npm run cordova:copy-assets && cd cordova && npx cordova build",
-    "cordova:run-android": "cd cordova && npx cordova run android",
-    "cordova:run-ios": "cd cordova && npx cordova run ios"
+    "cordova:generate-icons": "node scripts/generate-cordova-icons.cjs",
+    "cordova:build": "npm run cordova:generate-icons && npm run build && npm run cordova:copy-assets && cd cordova && npx cordova build",
+    "cordova:run-android": "npm run cordova:generate-icons && npm run build && cd cordova && npx cordova run android",
+    "cordova:run-ios": "npm run cordova:generate-icons && npm run build && cd cordova && npx cordova run ios"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

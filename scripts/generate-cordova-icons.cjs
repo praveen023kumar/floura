@@ -6,7 +6,7 @@ console.log('=== Floura Cordova Mobile Icon Generator ===');
 
 const rootDir = path.join(__dirname, '..');
 const cordovaDir = path.join(rootDir, 'cordova');
-const sourceImage = path.join(rootDir, 'src/assets/images/floura_logo.jpg');
+const sourceImage = path.join(rootDir, 'src/assets/images/floura_logo_original.png');
 
 if (!fs.existsSync(sourceImage)) {
   console.error(`\n❌ Error: Source image not found at ${sourceImage}`);
@@ -18,9 +18,11 @@ console.log(`Using source image: ${path.relative(rootDir, sourceImage)}`);
 // Define target directories
 const iosResDir = path.join(cordovaDir, 'res/icon/ios');
 const androidResDir = path.join(cordovaDir, 'res/icon/android');
+const androidScreenDir = path.join(cordovaDir, 'res/screen/android');
 
 fs.mkdirSync(iosResDir, { recursive: true });
 fs.mkdirSync(androidResDir, { recursive: true });
+fs.mkdirSync(androidScreenDir, { recursive: true });
 
 // Helper to write a 1x1 white pixel PNG hex buffer
 const white1x1Png = Buffer.from(
@@ -93,6 +95,11 @@ try {
     console.log(` -> Generated Android: ${filename} (${size}x${size})`);
   }
 
+  console.log('\nGenerating Android splash screen icon...');
+  const splashDest = path.join(androidScreenDir, 'splashscreen.png');
+  execSync(`sips -z 960 960 -s format png "${sourceImage}" --out "${splashDest}"`, { stdio: 'ignore' });
+  console.log(` -> Generated Android Splash Icon: splashscreen.png (960x960)`);
+
   // Overwriting active platform directories directly to guarantee success
   console.log('\nOverwriting iOS Platform Icons directly...');
   const iosPlatformIconDir = path.join(cordovaDir, 'platforms/ios/App/Assets.xcassets/AppIcon.appiconset');
@@ -140,6 +147,19 @@ try {
         execSync(`sips -z ${config.adaptive} ${config.adaptive} -s format png "${tempWhitePng}" --out "${backPath}"`, { stdio: 'ignore' });
         console.log(` -> Overwrote Android adaptive icons in mipmap-${density}-v26`);
       }
+    }
+
+    // Overwrite native splash screen icon in drawable folder if it exists
+    const drawableFolder = path.join(androidResPlatformDir, 'drawable');
+    if (fs.existsSync(drawableFolder)) {
+      const xmlSplash = path.join(drawableFolder, 'ic_cdv_splashscreen.xml');
+      if (fs.existsSync(xmlSplash)) {
+        fs.unlinkSync(xmlSplash);
+        console.log(' -> Removed default vector splashscreen drawable XML');
+      }
+      const pngSplash = path.join(drawableFolder, 'ic_cdv_splashscreen.png');
+      execSync(`sips -z 960 960 -s format png "${sourceImage}" --out "${pngSplash}"`, { stdio: 'ignore' });
+      console.log(' -> Overwrote Android platform splash screen icon directly with PNG');
     }
   } else {
     console.log(' ⚠️ Android platform res directory not found. Will rely on config.xml build.');

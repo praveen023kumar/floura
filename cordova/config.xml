@@ -21,6 +21,8 @@
     <platform name="android">
         <preference name="scheme" value="http" />
         <preference name="hostname" value="localhost" />
+        <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/screen/android/splashscreen.png" />
+        <preference name="AndroidWindowSplashScreenBackground" value="#FAF8FF" />
         <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">
             <application android:usesCleartextTraffic="true" />
         </edit-config>
