@@ -133,6 +133,15 @@ export async function initDb() {
       stdYield REAL NOT NULL,
       yieldUnit TEXT NOT NULL,
       ingredients TEXT NOT NULL, -- JSON string array
+      instructions TEXT, -- JSON string array
+      prepTimeMinutes INTEGER DEFAULT 15,
+      cookTimeMinutes INTEGER DEFAULT 20,
+      slug TEXT UNIQUE,
+      metaTitle TEXT,
+      metaDescription TEXT,
+      ogImage TEXT,
+      keywords TEXT,
+      isPublic INTEGER DEFAULT 0,
       imageUrl TEXT,
       imageBase64 TEXT,
       updatedAt TEXT NOT NULL,
@@ -140,16 +149,132 @@ export async function initDb() {
     )
   `);
 
-  // Ensure imageBase64 column exists in recipes table
+  // Ensure missing columns exist in recipes table (Migration check)
   try {
     const columns = await querySqlAll<any>(db, "PRAGMA table_info(recipes)");
-    const hasImageBase64 = columns.some((col: any) => col.name === "imageBase64");
-    if (!hasImageBase64) {
+    const colNames = columns.map((col: any) => col.name);
+
+    if (!colNames.includes("imageBase64")) {
       await runSql(db, "ALTER TABLE recipes ADD COLUMN imageBase64 TEXT");
-      console.log("Migrated recipes table: Added imageBase64 column");
+    }
+    if (!colNames.includes("instructions")) {
+      await runSql(db, "ALTER TABLE recipes ADD COLUMN instructions TEXT");
+    }
+    if (!colNames.includes("prepTimeMinutes")) {
+      await runSql(db, "ALTER TABLE recipes ADD COLUMN prepTimeMinutes INTEGER DEFAULT 15");
+    }
+    if (!colNames.includes("cookTimeMinutes")) {
+      await runSql(db, "ALTER TABLE recipes ADD COLUMN cookTimeMinutes INTEGER DEFAULT 20");
+    }
+    if (!colNames.includes("slug")) {
+      await runSql(db, "ALTER TABLE recipes ADD COLUMN slug TEXT");
+    }
+    if (!colNames.includes("metaTitle")) {
+      await runSql(db, "ALTER TABLE recipes ADD COLUMN metaTitle TEXT");
+    }
+    if (!colNames.includes("metaDescription")) {
+      await runSql(db, "ALTER TABLE recipes ADD COLUMN metaDescription TEXT");
+    }
+    if (!colNames.includes("ogImage")) {
+      await runSql(db, "ALTER TABLE recipes ADD COLUMN ogImage TEXT");
+    }
+    if (!colNames.includes("keywords")) {
+      await runSql(db, "ALTER TABLE recipes ADD COLUMN keywords TEXT");
+    }
+    if (!colNames.includes("isPublic")) {
+      await runSql(db, "ALTER TABLE recipes ADD COLUMN isPublic INTEGER DEFAULT 0");
     }
   } catch (e) {
-    console.error("Migration check for recipes imageBase64 column failed:", e);
+    console.error("Migration check for recipes columns failed:", e);
+  }
+
+  // Seed sample public SEO recipes if none exist
+  try {
+    const publicCountRows = await querySqlAll<any>(db, "SELECT COUNT(*) as count FROM recipes WHERE isPublic = 1");
+    if (publicCountRows && publicCountRows[0] && publicCountRows[0].count === 0) {
+      const now = new Date().toISOString();
+      const sampleRecipes = [
+        {
+          id: "pub-recipe-macarons",
+          name: "French Macaron Shells",
+          category: "Macarons",
+          stdYield: 24,
+          yieldUnit: "shells",
+          ingredients: JSON.stringify([
+            { name: "Almond Flour", qty: 100 },
+            { name: "Powdered Sugar", qty: 100 },
+            { name: "Egg Whites", qty: 75 },
+            { name: "Granulated Sugar", qty: 75 }
+          ]),
+          instructions: JSON.stringify([
+            { stepNumber: 1, text: "Sift almond flour and powdered sugar twice through a fine-mesh sieve into a bowl." },
+            { stepNumber: 2, text: "Whip egg whites to soft peaks, then gradually add granulated sugar while whipping to stiff french meringue." },
+            { stepNumber: 3, text: "Fold dry ingredients into meringue using macaronage technique until batter flows like lava." },
+            { stepNumber: 4, text: "Pipe 1.5-inch rounds on baking sheets lined with silicone mats. Rest until skin forms (20-30 mins)." },
+            { stepNumber: 5, text: "Bake at 150°C (300°F) for 14-16 minutes until feet are solid and shells do not wobble." }
+          ]),
+          prepTimeMinutes: 25,
+          cookTimeMinutes: 15,
+          slug: "french-macaron-shells-calculator",
+          metaTitle: "French Macaron Shells Recipe & Batch Ratio Calculator | Floura",
+          metaDescription: "Calculate exact ingredient weights for French Macaron shells based on desired yield or batch size. Interactive baker's ratio calculator with step-by-step instructions.",
+          keywords: "macaron calculator, french macaron recipe, baker percentage, macaron batch scale",
+          isPublic: 1,
+          updatedAt: now
+        },
+        {
+          id: "pub-recipe-vanilla-sponge",
+          name: "Classic Vanilla Bakery Sponge Cake",
+          category: "Cakes",
+          stdYield: 1,
+          yieldUnit: "8-inch cake",
+          ingredients: JSON.stringify([
+            { name: "Cake Flour", qty: 250 },
+            { name: "Caster Sugar", qty: 250 },
+            { name: "Unsalted Butter", qty: 250 },
+            { name: "Whole Eggs", qty: 250 },
+            { name: "Baking Powder", qty: 8 },
+            { name: "Vanilla Extract", qty: 10 }
+          ]),
+          instructions: JSON.stringify([
+            { stepNumber: 1, text: "Preheat oven to 175°C (350°F) and grease two 8-inch round cake pans." },
+            { stepNumber: 2, text: "Cream room temperature butter and caster sugar together until pale and fluffy (approx 5 minutes)." },
+            { stepNumber: 3, text: "Add eggs one at a time, beating thoroughly after each addition along with vanilla extract." },
+            { stepNumber: 4, text: "Sift flour and baking powder together, then gently fold into wet mixture until smooth batter forms." },
+            { stepNumber: 5, text: "Divide batter evenly between prepared pans and bake for 25-30 minutes until toothpick comes out clean." }
+          ]),
+          prepTimeMinutes: 20,
+          cookTimeMinutes: 30,
+          slug: "classic-vanilla-sponge-cake-calculator",
+          metaTitle: "Classic Vanilla Sponge Cake Recipe & Yield Scale Calculator | Floura",
+          metaDescription: "Free bakery sponge cake recipe yield calculator. Scale ingredients for any cake size or tin diameter instantly with step-by-step baking guide.",
+          keywords: "sponge cake calculator, cake scaling formula, vanilla cake recipe",
+          isPublic: 1,
+          updatedAt: now
+        }
+      ];
+
+      for (const r of sampleRecipes) {
+        await runSql(db, `
+          INSERT INTO recipes (
+            id, name, category, stdYield, yieldUnit, ingredients, instructions,
+            prepTimeMinutes, cookTimeMinutes, slug, metaTitle, metaDescription,
+            keywords, isPublic, updatedAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          r.id, r.name, r.category, r.stdYield, r.yieldUnit, r.ingredients, r.instructions,
+          r.prepTimeMinutes, r.cookTimeMinutes, r.slug, r.metaTitle, r.metaDescription,
+          r.keywords, r.isPublic, r.updatedAt
+        ]);
+      }
+      console.log("Seeded default public SEO recipes in SQLite database.");
+    }
+
+    // Seed Tamil Nadu Public SEO recipes dataset
+    const { seedTop50TamilNaduRecipes } = await import("../seedTamilNaduRecipes");
+    await seedTop50TamilNaduRecipes();
+  } catch (seedErr) {
+    console.error("Seeding public recipes failed:", seedErr);
   }
 
   // Create Checklist Table

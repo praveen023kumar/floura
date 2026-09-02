@@ -38,6 +38,8 @@ declare global {
   }
 }
 
+import { HelmetProvider } from "react-helmet-async";
+
 // Components
 import Header from "./components/Header";
 import flouraLogo from "./assets/images/floura_logo.webp";
@@ -67,6 +69,9 @@ const GettingStartedView = lazy(() => import("./components/GettingStartedView"))
 const MoreView = lazy(() => import("./components/MoreView"));
 const DebriefsView = lazy(() => import("./components/DebriefsView"));
 const FeedbackView = lazy(() => import("./components/FeedbackView"));
+const PublicRecipesListView = lazy(() => import("./components/PublicRecipesListView"));
+const PublicRecipeDetailView = lazy(() => import("./components/PublicRecipeDetailView"));
+const AdminPublicRecipeCreateView = lazy(() => import("./components/AdminPublicRecipeCreateView"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -839,16 +844,61 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode }: {
   const navigate = useNavigate();
   const isAdminPath = location.pathname.startsWith("/admin");
 
+  // Auto scroll to top on path/link changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
   useEffect(() => {
     if (!user) {
-      const isPublicPath = location.pathname === "/" || location.pathname === "/landing" || location.pathname.startsWith("/admin");
+      const isPublicPath = location.pathname === "/" || 
+                           location.pathname === "/landing" || 
+                           location.pathname === "/login" ||
+                           location.pathname.startsWith("/calculator") ||
+                           location.pathname.startsWith("/admin");
       if (!isPublicPath) {
         navigate("/", { replace: true });
       }
     }
   }, [user, location.pathname, navigate]);
 
-  // 1. Admin paths (Public Login or Private Dashboard)
+  // Dedicated /login route
+  if (location.pathname === "/login") {
+    if (user) {
+      return <Navigate to="/" replace />;
+    }
+    return (
+      <Suspense fallback={<LoadingSignIn />}>
+        <LoginView onLogin={onLogin} />
+      </Suspense>
+    );
+  }
+
+  // 0. Public Calculator Pages (/calculator or /calculator/:slug) - No authentication required
+  if (location.pathname.startsWith("/calculator")) {
+    return (
+      <Suspense fallback={<LoadingSignIn />}>
+        <Routes>
+          <Route path="/calculator" element={<PublicRecipesListView />} />
+          <Route path="/calculator/:slug" element={<PublicRecipeDetailView />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  // 1. Admin Public Recipe Builder (/admin/public-recipes)
+  if (location.pathname.startsWith("/admin/public-recipes")) {
+    return (
+      <Suspense fallback={<AdminLoading />}>
+        <Routes>
+          <Route path="/admin/public-recipes" element={<AdminPublicRecipeCreateView />} />
+          <Route path="/admin/public-recipes/:id" element={<AdminPublicRecipeCreateView />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  // 2. Admin paths (Public Login or Private Dashboard)
   if (isAdminPath) {
     const isLoggedAdmin = user && (user.role === "admin" || user.role === "superadmin");
     return (
@@ -981,16 +1031,18 @@ export default function App() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Router>
-        <AppContentGate
-          user={user}
-          onLogin={handleLogin}
-          onLogout={handleLogout}
-          darkMode={darkMode}
-          setDarkMode={setDarkMode}
-        />
-      </Router>
-    </QueryClientProvider>
+    <HelmetProvider>
+      <QueryClientProvider client={queryClient}>
+        <Router>
+          <AppContentGate
+            user={user}
+            onLogin={handleLogin}
+            onLogout={handleLogout}
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
+          />
+        </Router>
+      </QueryClientProvider>
+    </HelmetProvider>
   );
 }

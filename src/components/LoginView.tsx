@@ -1,11 +1,12 @@
 // File Path: /src/components/LoginView.tsx
 import { useState } from "react";
-import { RefreshCw, XCircle, X, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
+import { RefreshCw, XCircle, X, Sparkles, ArrowLeft } from "lucide-react";
 import { motion } from "motion/react";
 import bakeryLoginBanner from "../assets/images/bakery_login_banner_1783080828078.webp";
 import LegalModal from "./LegalModal";
 import flouraLogo from "../assets/images/floura_logo.png";
-import { getApiUrl } from "../utils/api";
+import { getApiUrl, isCordova, isElectron } from "../utils/api";
 import { useLogin } from "../hooks/useLogin";
 
 interface LoginViewProps {
@@ -13,6 +14,7 @@ interface LoginViewProps {
 }
 
 export default function LoginView({ onLogin }: LoginViewProps) {
+  const showBackButton = !isCordova() && !isElectron();
   const {
     authenticating,
     toastMessage,
@@ -64,6 +66,17 @@ export default function LoginView({ onLogin }: LoginViewProps) {
 
       {/* RIGHT SECTION (Clean login form panel) */}
       <div id="login-form-container" className="w-full md:w-[50%] lg:w-[45%] xl:w-[40%] flex-grow relative bg-white dark:bg-zinc-900 rounded-t-[40px] md:rounded-t-none -mt-10 md:mt-0 px-6 pt-12 pb-10 md:py-16 md:px-12 lg:px-16 shadow-2xl md:shadow-none border-t md:border-t-0 md:border-l border-zinc-100/50 dark:border-zinc-850 flex flex-col justify-center items-center z-10">
+        
+        {/* Top Home link */}
+        {showBackButton && (
+          <Link
+            to="/"
+            className="absolute top-6 left-6 flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-primary-brand dark:hover:text-pink-400 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Home</span>
+          </Link>
+        )}
         
         {/* Rounded Brand Badge */}
         <div 

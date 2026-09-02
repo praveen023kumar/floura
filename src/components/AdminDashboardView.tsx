@@ -506,6 +506,12 @@ export default function AdminDashboardView({ user, onLogout, darkMode, setDarkMo
                   Admin Accounts ({adminUsers.length})
                 </button>
               )}
+              <a
+                href="/admin/public-recipes"
+                className="px-5 py-2.5 rounded-xl font-sans text-xs font-bold transition-all duration-200 cursor-pointer bg-orange-500 hover:bg-orange-600 text-white shadow-xs flex items-center gap-1.5"
+              >
+                <span>+ Public SEO Recipes</span>
+              </a>
             </div>
 
             {/* TAB CONTENT: Overview */}

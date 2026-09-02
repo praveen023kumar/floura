@@ -75,12 +75,17 @@ async function startServer() {
   // ----- MVC API ROUTER -----
   app.use("/api", apiRouter);
 
+  // SEO Server-Side Dynamic Meta Tag & JSON-LD Injection for Public Recipe Pages (/calculator/:slug)
+  const { seoServerSideInjectionMiddleware } = await import("./server/middleware/seo.middleware");
+  app.use(seoServerSideInjectionMiddleware);
+
   // Serve Frontend with Vite Middleware in Development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
+    app.set("vite", vite);
     app.use(vite.middlewares);
   } else {
     // Production statics serving

@@ -71,6 +71,12 @@ export interface RecipeIngredient {
   qty: number; // base qty for standard yield
 }
 
+export interface RecipeInstructionStep {
+  stepNumber: number;
+  text: string;
+  note?: string;
+}
+
 export interface Recipe {
   id: string;
   name: string;
@@ -78,6 +84,15 @@ export interface Recipe {
   stdYield: number; // standard yield in grams/kg
   yieldUnit: string;
   ingredients: RecipeIngredient[];
+  instructions?: RecipeInstructionStep[];
+  prepTimeMinutes?: number;
+  cookTimeMinutes?: number;
+  slug?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  ogImage?: string;
+  keywords?: string;
+  isPublic?: number;
   imageUrl?: string;
   imageBase64?: string;
   updatedAt: string; // ISO string

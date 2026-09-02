@@ -1,6 +1,6 @@
 // File Path: /src/components/LandingPage.tsx
 import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   Sparkles,
   ArrowRight,
@@ -27,10 +27,13 @@ import {
   FileText,
   PieChart,
   Globe,
+  ChevronDown,
+  Menu,
 } from "lucide-react";
 import flouraLogo from "../assets/images/floura_logo.webp";
 import chefHeroPhoto from "../assets/images/chef_hero_photo.webp";
 import LegalModal from "./LegalModal";
+import Footer from "./Footer";
 import { useLogin } from "../hooks/useLogin";
 
 
@@ -55,6 +58,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
   } = useLogin({ onLogin });
 
   const loginSectionRef = useRef<HTMLDivElement>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const featuresSectionRef = useRef<HTMLDivElement>(null);
   const howItWorksSectionRef = useRef<HTMLDivElement>(null);
   const demoSectionRef = useRef<HTMLDivElement>(null);
@@ -175,45 +179,180 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
     <div className="min-h-screen w-full bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 transition-colors duration-300 font-sans">
 
       {/* NAVBAR */}
-      <nav className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/85 dark:bg-zinc-950/85 border-b border-zinc-100 dark:border-zinc-800/60 px-6 lg:px-10 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-3 select-none">
-          <div className="w-9 h-9 rounded-xl overflow-hidden border border-zinc-100 dark:border-zinc-800 shadow-sm flex items-center justify-center bg-pink-50">
-            <img src={flouraLogo} alt="Floura" width={36} height={36} loading="lazy" className="w-full h-full object-cover" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-serif text-xl font-black tracking-tight text-primary-brand dark:text-pink-400 italic">Floura</span>
-          </div>
-        </div>
-
-        <div className="hidden lg:flex items-center gap-8 text-[13px] font-semibold text-zinc-500 dark:text-zinc-400">
-          <a id="nav-link-features" href="#features" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">Features</a>
-          <a id="nav-link-how-it-works" href="#how-it-works" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">How It Works</a>
-          <a id="nav-link-modules" href="#modules" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">Modules</a>
-          <a id="nav-link-signin" href="#login-section" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">Sign In</a>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <button id="btn-toggle-dark-mode" onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all text-zinc-500 dark:text-zinc-400 cursor-pointer mr-1" aria-label="Toggle dark mode" aria-pressed={darkMode}>
-            {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-zinc-600" />}
-          </button>
-
-          {user ? (
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-pink-50 dark:bg-zinc-900 border border-pink-100 dark:border-zinc-800 py-1.5 px-3 rounded-xl">
-                <img src={user.avatar} alt={user.name} className="w-6 h-6 rounded-full border border-pink-200 object-cover" referrerPolicy="no-referrer" />
-                <span className="hidden sm:inline text-xs font-bold text-zinc-750 dark:text-zinc-200 truncate max-w-[100px]">{user.name.split(" ")[0]}</span>
-              </div>
-              <button id="btn-nav-dashboard" onClick={() => navigate("/dashboard")} className="flex items-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-2.5 px-4 rounded-xl shadow-sm transition-all active:scale-[0.97] cursor-pointer">
-                <span>Dashboard</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+      <nav className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/95 dark:bg-zinc-950/95 border-b border-zinc-100 dark:border-zinc-800/60 transition-colors shadow-xs">
+        <div className="px-6 lg:px-10 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-3 select-none">
+            <div className="w-9 h-9 rounded-xl overflow-hidden border border-zinc-100 dark:border-zinc-800 shadow-sm flex items-center justify-center bg-pink-50">
+              <img src={flouraLogo} alt="Floura" width={36} height={36} loading="lazy" className="w-full h-full object-cover" />
             </div>
-          ) : (
-            <button id="btn-nav-get-started" onClick={() => scrollToSection(loginSectionRef)} className="flex items-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-[0.97] cursor-pointer">
-              <span>Get Started</span>
+            <div className="flex items-baseline gap-2">
+              <span className="font-serif text-xl font-black tracking-tight text-primary-brand dark:text-pink-400 italic">Floura</span>
+            </div>
+          </div>
+
+          <div className="hidden lg:flex items-center gap-8 text-[13px] font-semibold text-zinc-500 dark:text-zinc-400">
+            <a id="nav-link-features" href="#features" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">Features</a>
+            <a id="nav-link-how-it-works" href="#how-it-works" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">How It Works</a>
+            <a id="nav-link-modules" href="#modules" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">Modules</a>
+
+            {/* Tools Dropdown */}
+            <div className="relative group">
+              <button id="nav-link-tools" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors flex items-center gap-1 cursor-pointer py-1">
+                <span>Tools</span>
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              <div className="absolute left-0 top-full pt-2 w-60 hidden group-hover:block z-50">
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl shadow-xl p-2 space-y-1">
+                  <Link
+                    id="nav-link-recipe-calculator"
+                    to="/calculator"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-pink-50 dark:hover:bg-zinc-800/80 text-left transition-colors group/item block"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-pink-100 dark:bg-pink-950/60 text-primary-brand dark:text-pink-400 flex items-center justify-center shrink-0">
+                      <Utensils className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover/item:text-primary-brand dark:group-hover/item:text-pink-400 transition-colors">
+                        Recipe Calculator
+                      </div>
+                      <div className="text-[10px] text-zinc-400 font-normal">
+                        Batch yield & baker's ratio
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden lg:flex items-center gap-2.5">
+            <button id="btn-toggle-dark-mode" onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all text-zinc-500 dark:text-zinc-400 cursor-pointer mr-1" aria-label="Toggle dark mode" aria-pressed={darkMode}>
+              {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-zinc-600" />}
             </button>
-          )}
+
+            {user ? (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 bg-pink-50 dark:bg-zinc-900 border border-pink-100 dark:border-zinc-800 py-1.5 px-3 rounded-xl">
+                  <img src={user.avatar} alt={user.name} className="w-6 h-6 rounded-full border border-pink-200 object-cover" referrerPolicy="no-referrer" />
+                  <span className="hidden sm:inline text-xs font-bold text-zinc-750 dark:text-zinc-200 truncate max-w-[100px]">{user.name.split(" ")[0]}</span>
+                </div>
+                <button id="btn-nav-dashboard" onClick={() => navigate("/dashboard")} className="flex items-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-2.5 px-4 rounded-xl shadow-sm transition-all active:scale-[0.97] cursor-pointer">
+                  <span>Dashboard</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <Link id="btn-nav-get-started" to="/login" className="flex items-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-[0.97]">
+                <span>Get Started</span>
+              </Link>
+            )}
+          </div>
+
+          {/* Mobile Toggle Button */}
+          <button
+            id="btn-toggle-mobile-menu"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all text-zinc-600 dark:text-zinc-300 cursor-pointer lg:hidden"
+            aria-label="Toggle navigation menu"
+            aria-expanded={mobileMenuOpen}
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
+
+        {/* Mobile Menu Drawer (Inside Sticky Nav Container) */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-zinc-100 dark:border-zinc-800/80 px-6 py-5 space-y-4 transition-all animate-in slide-in-from-top-2">
+            {/* Main Action inside Mobile Menu */}
+            {user ? (
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+                <div className="flex items-center gap-2.5">
+                  <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full border border-pink-200 object-cover" referrerPolicy="no-referrer" />
+                  <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{user.name}</span>
+                </div>
+                <button
+                  onClick={() => { setMobileMenuOpen(false); navigate("/dashboard"); }}
+                  className="flex items-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-wider py-2 px-3.5 rounded-xl shadow-sm cursor-pointer"
+                >
+                  <span>Dashboard</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full flex items-center justify-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-3 px-5 rounded-xl shadow-sm text-center block"
+              >
+                <span>Get Started</span>
+              </Link>
+            )}
+
+            {/* Dark Mode Switcher inside Mobile Menu */}
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 cursor-pointer"
+            >
+              <span>Appearance Theme</span>
+              <div className="flex items-center gap-1.5">
+                {darkMode ? (
+                  <>
+                    <Sun className="w-4 h-4 text-amber-400" />
+                    <span>Dark</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-4 h-4 text-zinc-600" />
+                    <span>Light</span>
+                  </>
+                )}
+              </div>
+            </button>
+
+            {/* Navigation Links inside Mobile Menu */}
+            <div className="space-y-1 pt-1">
+              <a
+                href="#features"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block text-sm font-bold text-zinc-700 dark:text-zinc-300 hover:text-primary-brand dark:hover:text-pink-400 transition-colors py-2 border-b border-zinc-100 dark:border-zinc-900"
+              >
+                Features
+              </a>
+              <a
+                href="#how-it-works"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block text-sm font-bold text-zinc-700 dark:text-zinc-300 hover:text-primary-brand dark:hover:text-pink-400 transition-colors py-2 border-b border-zinc-100 dark:border-zinc-900"
+              >
+                How It Works
+              </a>
+              <a
+                href="#modules"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block text-sm font-bold text-zinc-700 dark:text-zinc-300 hover:text-primary-brand dark:hover:text-pink-400 transition-colors py-2 border-b border-zinc-100 dark:border-zinc-900"
+              >
+                Modules
+              </a>
+            </div>
+
+            <Link
+              to="/calculator"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 p-3 rounded-xl bg-pink-50 dark:bg-zinc-900 border border-pink-100 dark:border-zinc-800"
+            >
+              <div className="w-8 h-8 rounded-lg bg-primary-brand text-white flex items-center justify-center shrink-0">
+                <Utensils className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-primary-brand dark:text-pink-400">
+                  Recipe Calculator
+                </div>
+                <div className="text-[10px] text-zinc-400">
+                  Batch yield & baker's ratio
+                </div>
+              </div>
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* HERO */}
@@ -224,8 +363,8 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
           <div className="lg:col-span-7 space-y-8 text-left">
             <div className="inline-flex">
               <div className={`${pill} bg-pink-50/80 dark:bg-pink-950/40 border-pink-200/50 dark:border-pink-850/30 text-primary-brand dark:text-pink-400`}>
-                <Sparkles className="w-3.5 h-3.5 text-primary-brand dark:text-pink-400" />
-                <span>Smart Bakery Management</span>
+                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                <span>Modern Bakery Management Platform</span>
               </div>
             </div>
 
@@ -245,10 +384,10 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               ) : (
-                <button id="btn-hero-start-free" onClick={() => scrollToSection(loginSectionRef)} className="group inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-sm py-4 px-8 rounded-2xl shadow-lg shadow-pink-200 dark:shadow-none transition-all active:scale-[0.97] cursor-pointer">
-                  <span>Start for Free</span>
+                <Link id="btn-hero-start-free" to="/login" className="group inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-sm py-4 px-8 rounded-2xl shadow-lg shadow-pink-200 dark:shadow-none transition-all active:scale-[0.97]">
+                  <span>Start Now</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </button>
+                </Link>
               )}
               <button id="btn-hero-how-it-works" onClick={() => scrollToSection(howItWorksSectionRef)} className="inline-flex items-center justify-center gap-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-755 font-bold text-sm py-4 px-8 rounded-2xl transition-all active:scale-[0.97] cursor-pointer">
                 How It Works
@@ -643,21 +782,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
       </section>
 
       {/* FOOTER */}
-      <footer className="border-t border-zinc-150 dark:border-zinc-900 bg-white dark:bg-zinc-950 py-12 px-6 lg:px-10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-zinc-400 dark:text-zinc-500 font-semibold">
-          <div className="flex items-center gap-2.5 select-none">
-            <img src={flouraLogo} alt="Floura" width={24} height={24} loading="lazy" className="w-6 h-6 rounded-lg" />
-            <span className="font-serif font-black text-zinc-650 dark:text-zinc-400 italic">Floura</span>
-            <span className="text-zinc-300 dark:text-zinc-700">·</span>
-          </div>
-          <div>© {new Date().getFullYear()} Floura. All Rights Reserved.</div>
-          <div className="flex items-center gap-5">
-            <button id="btn-terms-modal-footer" onClick={() => setActiveModal("terms")} className="hover:text-zinc-750 dark:hover:text-zinc-350 transition-colors cursor-pointer">Terms</button>
-            <button id="btn-privacy-modal-footer" onClick={() => setActiveModal("privacy")} className="hover:text-zinc-750 dark:hover:text-zinc-350 transition-colors cursor-pointer">Privacy</button>
-            <button id="btn-disclaimer-modal-footer" onClick={() => setActiveModal("disclaimer")} className="hover:text-zinc-750 dark:hover:text-zinc-300 transition-colors cursor-pointer">Disclaimer</button>
-          </div>
-        </div>
-      </footer>
+      <Footer onOpenLegalModal={setActiveModal} />
 
       {/* Toasts */}
       {toastMessage && (

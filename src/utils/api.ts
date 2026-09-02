@@ -5,12 +5,29 @@
 
 import { PRODUCTION_URL } from "../../shared/api-config";
 
+export const isCordova = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return (
+    (window as any).cordova !== undefined ||
+    window.location.protocol === "file:"
+  );
+};
+
+export const isElectron = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return (
+    (window as any).electron !== undefined ||
+    Boolean((window as any).process?.versions?.electron) ||
+    (typeof navigator !== "undefined" && navigator.userAgent.toLowerCase().includes("electron"))
+  );
+};
+
 export const isNativeApp = (): boolean => {
   return (
     typeof window !== "undefined" &&
     ((window as any).ReactNativeWebView !== undefined ||
-      (window as any).cordova !== undefined ||
-      window.location.protocol === "file:")
+      isCordova() ||
+      isElectron())
   );
 };
 
