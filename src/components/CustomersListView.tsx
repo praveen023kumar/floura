@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
-  X
+  X,
+  UserPlus
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Avatar from "./Avatar";
@@ -161,6 +162,15 @@ function CustomersListView({ locationState, onNavigate }: CustomersListViewProps
                 {activeFilterCount}
               </span>
             )}
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate?.("/leads")}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-pink-200 dark:border-pink-900/40 bg-pink-50 dark:bg-pink-950/40 hover:bg-pink-100 text-primary-brand dark:text-pink-400 text-xs font-bold cursor-pointer transition-all active:scale-95 shrink-0"
+            title="Lead Management (CRM)"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Leads & Inquiries</span>
           </button>
           <button
             type="button"

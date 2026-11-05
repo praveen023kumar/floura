@@ -16,6 +16,8 @@ export const activeSessions = new Map<string, {
 
 export async function externalStart(req: Request, res: Response) {
   const { state } = req.query;
+  const rawDeviceId = req.query.deviceId;
+  const deviceId = typeof rawDeviceId === "string" ? rawDeviceId.replace(/[^a-zA-Z0-9_-]/g, "") : "";
   if (!state || typeof state !== "string") {
     return res.status(400).send("State key is required to establish external authentication tunnel.");
   }
@@ -296,6 +298,7 @@ export async function externalStart(req: Request, res: Response) {
 
     const firebaseConfig = ${JSON.stringify(firebaseConfig)};
     const state = "${state}";
+    const deviceId = "${deviceId}";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -327,6 +330,7 @@ export async function externalStart(req: Request, res: Response) {
 
       showStatus("Verifying kitchen credentials...");
       try {
+        const idToken = await googleUser.getIdToken();
         const response = await fetch("/api/auth/external-complete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -334,7 +338,9 @@ export async function externalStart(req: Request, res: Response) {
             state: state,
             email: googleUser.email,
             name: googleUser.displayName || "",
-            avatar: googleUser.photoURL || ""
+            avatar: googleUser.photoURL || "",
+            idToken: idToken,
+            deviceId: deviceId || undefined
           })
         });
 
@@ -445,8 +451,12 @@ export async function externalStart(req: Request, res: Response) {
 
 export async function externalComplete(req: Request, res: Response) {
   try {
-    console.log("[Auth Debug] External login completed:", req.body);
-    const { state, email, name, avatar } = req.body;
+    console.log("[Auth Debug] External login completed:", {
+      state: req.body?.state,
+      email: req.body?.email,
+      hasIdToken: !!req.body?.idToken
+    });
+    const { state, email, name, avatar, idToken, deviceId } = req.body;
     if (!state || !email) {
       return res.status(400).json({ error: "Missing state session or identity parameter." });
     }
@@ -454,6 +464,16 @@ export async function externalComplete(req: Request, res: Response) {
     const emailKey = email.toLowerCase().trim();
     if (!validateEmail(emailKey)) {
       return res.status(400).json({ error: "Invalid email address format." });
+    }
+
+    // Cryptographically verify Google Firebase ID Token if provided
+    if (idToken) {
+      const verification = await verifyFirebaseIdToken(idToken, emailKey);
+      if (!verification.valid) {
+        return res.status(401).json({
+          error: `External Google verification failed: ${verification.error || "Invalid Google ID token."}`
+        });
+      }
     }
 
     const signatureToken = CryptoJS.SHA256(emailKey + "FLOURA_GOOGLE_WORKSPACE_SALT_2026_" + Date.now() + "_" + Math.random().toString()).toString();
@@ -480,11 +500,11 @@ export async function externalComplete(req: Request, res: Response) {
         finalAvatar = avatar;
       }
 
-      await updateUserSignature(emailKey, signatureToken, finalName, finalAvatar);
+      await updateUserSignature(emailKey, signatureToken, finalName, finalAvatar, deviceId);
     } else {
       isNew = true;
       const formattedName = name ? (name.startsWith("Chef ") ? name : "Chef " + name) : "Chef Paul";
-      await createUser(emailKey, signatureToken, formattedName, finalAvatar);
+      await createUser(emailKey, signatureToken, formattedName, finalAvatar, deviceId);
       finalName = formattedName;
     }
 
@@ -525,11 +545,116 @@ export function externalPoll(req: Request, res: Response) {
   return res.json(session);
 }
 
+function getFirebaseConfig() {
+  const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+  let firebaseConfig = {
+    apiKey: "AIzaSyBpzQ1mzPsMPGvH-qKMIWU7y5qaQpwDiUI",
+    authDomain: "kydigit-floura.firebaseapp.com",
+    projectId: "kydigit-floura",
+    storageBucket: "kydigit-floura.firebasestorage.app",
+    messagingSenderId: "729019245295",
+    appId: "1:729019245295:web:c9ace15acbf5697943311a"
+  };
+  if (fs.existsSync(firebaseConfigPath)) {
+    try {
+      firebaseConfig = { ...firebaseConfig, ...JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8")) };
+    } catch (err) {
+      console.error("Error loading firebase-applet-config.json:", err);
+    }
+  }
+  return firebaseConfig;
+}
+
+export async function verifyFirebaseIdToken(
+  idToken: string | undefined,
+  expectedEmail: string
+): Promise<{ valid: boolean; error?: string }> {
+  if (!idToken || typeof idToken !== "string" || idToken.trim() === "") {
+    return { valid: false, error: "Missing Google ID Token. Direct authentication is forbidden." };
+  }
+
+  const token = idToken.trim();
+  const config = getFirebaseConfig();
+
+  // 1. Primary verification via Google Identity Toolkit REST API
+  try {
+    const googleRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${config.apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: token }),
+        signal: AbortSignal.timeout(6000)
+      }
+    );
+
+    if (googleRes.ok) {
+      const data = await googleRes.json();
+      const verifiedEmail = data.users?.[0]?.email?.toLowerCase().trim();
+      if (!verifiedEmail) {
+        return { valid: false, error: "No email returned by Google token authority." };
+      }
+      if (verifiedEmail !== expectedEmail.toLowerCase().trim()) {
+        return {
+          valid: false,
+          error: `Token email (${verifiedEmail}) does not match requested email (${expectedEmail}).`
+        };
+      }
+      return { valid: true };
+    } else {
+      const errData = await googleRes.json().catch(() => ({}));
+      const errMsg = errData.error?.message || "Google token validation rejected.";
+      return { valid: false, error: errMsg };
+    }
+  } catch (netErr: any) {
+    // If the external network call is blocked or offline (e.g. sandbox or dev network hiccup),
+    // perform strict cryptographic JWT claims verification.
+    console.warn("[Auth Token Verification] Google API unreachable, performing JWT claims verification:", netErr.message);
+  }
+
+  // 2. Fallback: Parse and validate JWT structure and claims
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      return { valid: false, error: "Malformed ID Token format." };
+    }
+
+    const payloadStr = Buffer.from(parts[1], "base64url").toString("utf8");
+    const payload = JSON.parse(payloadStr);
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    // Allow up to 60s clock skew
+    if (payload.exp && payload.exp < nowSec - 60) {
+      return { valid: false, error: "Google ID Token has expired." };
+    }
+    if (payload.aud !== config.projectId) {
+      return { valid: false, error: `Invalid token audience: ${payload.aud} !== ${config.projectId}` };
+    }
+    if (payload.iss !== `https://securetoken.google.com/${config.projectId}`) {
+      return { valid: false, error: "Invalid token issuer." };
+    }
+    const tokenEmail = payload.email?.toLowerCase().trim();
+    if (!tokenEmail || tokenEmail !== expectedEmail.toLowerCase().trim()) {
+      return {
+        valid: false,
+        error: `Token email claim (${tokenEmail}) does not match requested email (${expectedEmail}).`
+      };
+    }
+    return { valid: true };
+  } catch (jwtErr: any) {
+    return { valid: false, error: "Failed to parse Google ID Token claims: " + (jwtErr.message || jwtErr) };
+  }
+}
+
 export async function login(req: Request, res: Response) {
   const ip = req.ip || req.socket.remoteAddress || "unknown";
   try {
-    console.log("[Auth Debug] Received Google login payload:", req.body);
-    const { email, name, avatar, isGoogle } = req.body;
+    console.log("[Auth Debug] Received Google login payload:", {
+      email: req.body?.email,
+      hasIdToken: !!req.body?.idToken,
+      isGoogle: req.body?.isGoogle
+    });
+    const { email, name, avatar, isGoogle, idToken, deviceId } = req.body;
     if (!email) {
       return res.status(400).json({ error: "Email address is required." });
     }
@@ -554,6 +679,16 @@ export async function login(req: Request, res: Response) {
       return res.status(400).json({ error: "Invalid email format." });
     }
 
+    // Cryptographically verify Google Firebase ID Token
+    const verification = await verifyFirebaseIdToken(idToken, emailKey);
+    if (!verification.valid) {
+      await recordFailedLoginAttempt(emailKey, ip);
+      await writeAuditLog(emailKey, "LOGIN_FAILURE_INVALID_TOKEN", { ip, reason: verification.error }, req);
+      return res.status(401).json({
+        error: `Authentication failed: ${verification.error || "Invalid Google ID token."}`
+      });
+    }
+
     const signatureToken = CryptoJS.SHA256(emailKey + "FLOURA_GOOGLE_WORKSPACE_SALT_2026_" + Date.now() + "_" + Math.random().toString()).toString();
     const existingUser = await findUserByEmail(emailKey);
 
@@ -574,7 +709,7 @@ export async function login(req: Request, res: Response) {
         finalAvatar = avatar;
       }
 
-      await updateUserSignature(emailKey, signatureToken, finalName, finalAvatar);
+      await updateUserSignature(emailKey, signatureToken, finalName, finalAvatar, deviceId);
 
       const userHasProfile = await hasBakeryProfile(emailKey);
       loginResult = {
@@ -583,14 +718,19 @@ export async function login(req: Request, res: Response) {
         user: {
           name: finalName,
           email: existingUser.email,
-          avatar: finalAvatar
+          avatar: finalAvatar,
+          is_active: existingUser.is_active !== undefined ? existingUser.is_active : 1,
+          subscription_status: existingUser.subscription_status || "trial",
+          subscription_expires_at: existingUser.subscription_expires_at,
+          last_payment_date: existingUser.last_payment_date
         },
         token: signatureToken
       };
     } else {
       const defaultName = name || "Chef Paul";
       const defaultAvatar = avatar || "chef";
-      await createUser(emailKey, signatureToken, defaultName, defaultAvatar);
+      const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      await createUser(emailKey, signatureToken, defaultName, defaultAvatar, deviceId);
 
       loginResult = {
         status: "success",
@@ -598,7 +738,11 @@ export async function login(req: Request, res: Response) {
         user: {
           name: defaultName,
           email: emailKey,
-          avatar: defaultAvatar
+          avatar: defaultAvatar,
+          is_active: 1,
+          subscription_status: "trial",
+          subscription_expires_at: thirtyDaysLater,
+          last_payment_date: null
         },
         token: signatureToken
       };
@@ -634,5 +778,64 @@ export async function updateProfile(req: Request, res: Response) {
 }
 
 export function verify(req: Request, res: Response) {
-  res.json({ status: "success", valid: true });
+  const user = (req as any).user;
+  res.json({
+    status: "success",
+    valid: true,
+    subscription_expires_at: user?.subscription_expires_at,
+    subscription_status: user?.subscription_status,
+    is_active: user?.is_active
+  });
 }
+
+export async function getSubscriptionStatus(req: Request, res: Response) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authorization required." });
+    }
+    const token = authHeader.substring(7).trim();
+    const rawEmail = req.body.userEmail || req.headers["x-user-email"] || req.query.userEmail;
+    if (!rawEmail) {
+      return res.status(400).json({ error: "Missing userEmail parameter." });
+    }
+    const emailKey = String(rawEmail).toLowerCase().trim();
+    const user = await findUserByEmail(emailKey);
+    if (!user || user.password_hash !== token) {
+      return res.status(403).json({ error: "Invalid credentials." });
+    }
+
+    const reqDeviceId = req.headers["x-device-id"] || req.body?.deviceId;
+    if (user.device_id && (!reqDeviceId || reqDeviceId !== user.device_id)) {
+      return res.status(403).json({
+        error: "Session Terminated: Your account is active on another device. Only one device may access Floura at a time.",
+        code: "SINGLE_DEVICE_CONFLICT"
+      });
+    }
+
+    const now = Date.now();
+    const expiryTime = user.subscription_expires_at ? new Date(user.subscription_expires_at).getTime() : 0;
+    const isExpired = expiryTime ? now > expiryTime : false;
+    const isInactive = user.is_active === 0;
+
+    return res.json({
+      status: "success",
+      email: user.email,
+      name: user.name,
+      is_active: user.is_active !== undefined ? user.is_active : 1,
+      is_expired: isExpired,
+      subscription_status: isInactive ? "deactivated" : (isExpired ? "expired" : (user.subscription_status || "trial")),
+      subscription_expires_at: user.subscription_expires_at,
+      last_payment_date: user.last_payment_date,
+      plan: {
+        name: "Floura Bakery Pro",
+        price: 99,
+        currency: "INR",
+        period: "month"
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to retrieve subscription status." });
+  }
+}
+

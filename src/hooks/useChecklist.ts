@@ -25,6 +25,20 @@ export function useChecklist({
 
   const [checklistCurrentPage, setChecklistCurrentPage] = useState<number>(1);
   const [checklistItemsPerPage, setChecklistItemsPerPage] = useState<number>(10);
+
+  // Move to top on pagination change
+  const isFirstPageMountRef = useRef(true);
+  useEffect(() => {
+    if (isFirstPageMountRef.current) {
+      isFirstPageMountRef.current = false;
+      return;
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+      document.body.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [checklistCurrentPage, checklistItemsPerPage]);
   const [todayStr, setTodayStr] = useState(() => new Date().toISOString().split("T")[0]);
 
   useEffect(() => {

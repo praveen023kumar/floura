@@ -115,14 +115,14 @@ export async function savePublicRecipe(req: Request, res: Response) {
         `INSERT INTO recipes (
           id, name, category, stdYield, yieldUnit, ingredients, instructions,
           prepTimeMinutes, cookTimeMinutes, slug, metaTitle, metaDescription,
-          ogImage, keywords, isPublic, updatedAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ogImage, keywords, isPublic, updatedAt, user_email
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           recipeId, name, category, Number(stdYield), yieldUnit, ingredientsJson,
           instructionsJson, prepMins, cookMins, cleanSlug,
           metaTitle || `${name} Recipe & Ratio Calculator`,
           metaDescription || `Calculate exact ingredient weights for ${name}. Step-by-step baking formulation and batch scaler.`,
-          ogImage || "", keywords || "", publicFlag, now
+          ogImage || "", keywords || "", publicFlag, now, "public@floura.app"
         ]
       );
     }

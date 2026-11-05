@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { setPreference, removePreference } from "../db";
-import { setFormatConfig } from "../utils/format";
-import { getApiUrl } from "../utils/api";
+import { setFormatConfig, normalizeCurrency } from "../utils/format";
+import { getApiUrl, getDeviceId } from "../utils/api";
+import { isAuthSignatureError, triggerReauth } from "../utils/auth";
 
 export interface UseGettingStartedProps {
   user: { name: string; email: string; avatar: string; token?: string } | null;
@@ -25,8 +26,13 @@ export function useGettingStarted({
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [role, setRole] = useState("");
-  const [currency, setCurrency] = useState("$");
-  const [dateFormat, setDateFormat] = useState("YYYY-MM-DD");
+  const [currency, setCurrency] = useState(() => {
+    const init = (typeof window !== "undefined" && window.localStorage?.getItem("floura_currency")) || "₹";
+    return normalizeCurrency(init);
+  });
+  const [dateFormat, setDateFormat] = useState(() => {
+    return (typeof window !== "undefined" && window.localStorage?.getItem("floura_date_format")) || "YYYY-MM-DD";
+  });
   
   const [saving, setSaving] = useState(false);
 
@@ -35,12 +41,13 @@ export function useGettingStarted({
     setSaving(true);
     try {
       if (user?.token) {
-        await fetch(getApiUrl("/api/auth/profile"), {
+        const response = await fetch(getApiUrl("/api/auth/profile"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": "Bearer " + user.token,
-            "x-user-email": user.email
+            "x-user-email": user.email,
+            "x-device-id": getDeviceId()
           },
           body: JSON.stringify({
             userEmail: user.email,
@@ -49,10 +56,20 @@ export function useGettingStarted({
             avatar: "chef"
           })
         });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          if (isAuthSignatureError(response.status, errData)) {
+            triggerReauth("/getting-started", errData.error);
+            return;
+          }
+        }
       }
 
       onUpdateProfile({ name: chefName, email: user?.email || "", avatar: "chef", token: user?.token });
       
+      const normalizedCurrency = normalizeCurrency(currency);
+
       if (onUpdateBakeryProfile) {
         await onUpdateBakeryProfile({
           id: "active-profile",
@@ -61,20 +78,26 @@ export function useGettingStarted({
           phone,
           address,
           role,
-          currency,
+          currency: normalizedCurrency,
           dateFormat,
           isDeleted: 0
         });
       }
 
-      setFormatConfig(currency, dateFormat);
+      setFormatConfig(normalizedCurrency, dateFormat);
+      if (typeof window !== "undefined" && window.localStorage) {
+        try {
+          window.localStorage.setItem("floura_currency", normalizedCurrency);
+          window.localStorage.setItem("floura_date_format", dateFormat);
+        } catch {}
+      }
 
       await setPreference("patisserie_bakery_name", bakeryName);
       await setPreference("patisserie_bakery_email", email);
       await setPreference("patisserie_bakery_phone", phone);
       await setPreference("patisserie_bakery_address", address);
       await setPreference("patisserie_bakery_role", role);
-      await setPreference("floura_currency", currency);
+      await setPreference("floura_currency", normalizedCurrency);
       await setPreference("floura_date_format", dateFormat);
       
       await removePreference("patisserie_is_new_user");
@@ -105,12 +128,13 @@ export function useGettingStarted({
       const finalDateFormat = "YYYY-MM-DD";
 
       if (user?.token) {
-        await fetch(getApiUrl("/api/auth/profile"), {
+        const response = await fetch(getApiUrl("/api/auth/profile"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": "Bearer " + user.token,
-            "x-user-email": user.email
+            "x-user-email": user.email,
+            "x-device-id": getDeviceId()
           },
           body: JSON.stringify({
             userEmail: user.email,
@@ -119,6 +143,14 @@ export function useGettingStarted({
             avatar: "chef"
           })
         });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          if (isAuthSignatureError(response.status, errData)) {
+            triggerReauth("/getting-started", errData.error);
+            return;
+          }
+        }
       }
 
       onUpdateProfile({ name: finalChef, email: user?.email || "", avatar: "chef", token: user?.token });
@@ -138,6 +170,12 @@ export function useGettingStarted({
       }
 
       setFormatConfig(finalCurrency, finalDateFormat);
+      if (typeof window !== "undefined" && window.localStorage) {
+        try {
+          window.localStorage.setItem("floura_currency", finalCurrency);
+          window.localStorage.setItem("floura_date_format", finalDateFormat);
+        } catch {}
+      }
 
       await setPreference("patisserie_bakery_name", finalBakery);
       await setPreference("patisserie_bakery_email", finalEmail);

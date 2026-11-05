@@ -38,4 +38,16 @@ console.log('Cleaning cordova/www...');
 cleanDir(destDir);
 console.log('Copying build assets from dist/ to cordova/www...');
 copyDir(srcDir, destDir);
+
+// Inject cordova.js into cordova/www/index.html for native mobile builds
+const cordovaHtmlPath = path.join(destDir, 'index.html');
+if (fs.existsSync(cordovaHtmlPath)) {
+  let html = fs.readFileSync(cordovaHtmlPath, 'utf8');
+  if (!html.includes('cordova.js')) {
+    html = html.replace('<div id="root"></div>', '<div id="root"></div>\n    <script src="cordova.js"></script>');
+    fs.writeFileSync(cordovaHtmlPath, html, 'utf8');
+    console.log('Injected <script src="cordova.js"></script> into cordova/www/index.html');
+  }
+}
+
 console.log('Successfully copied assets to cordova/www!');

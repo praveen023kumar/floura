@@ -243,13 +243,30 @@ export function corsMiddleware(req: express.Request, res: express.Response, next
                             origin.startsWith("ionic://") ||
                             origin === "file://";
 
+    const host = req.headers.host;
+    const isSameHost = Boolean(host && (origin === `http://${host}` || origin === `https://${host}`));
+    let isAppUrl = false;
+    if (process.env.APP_URL) {
+      try {
+        isAppUrl = new URL(process.env.APP_URL).origin === origin;
+      } catch {
+        isAppUrl = process.env.APP_URL.replace(/\/+$/, "") === origin;
+      }
+    }
+
     const isTrusted = isLocalhostOrApp || 
+                      isSameHost ||
+                      isAppUrl ||
                       TRUSTED_ORIGINS.includes(origin) || 
                       configuredOrigins.includes(origin) || 
                       isPrivateNetworkOrigin(origin);
 
     if (isTrusted) {
       res.header("Access-Control-Allow-Origin", origin);
+    } else if (!req.path.startsWith("/api")) {
+      // Don't block static assets (JS/CSS/images) via CORS 403
+      next();
+      return;
     } else {
       console.warn(`[CORS Reject] Blocked access from untrusted origin: ${origin}`);
       return res.status(403).json({ error: "Access Denied: CORS origin not trusted." });
@@ -278,11 +295,11 @@ export function securityHeadersMiddleware(req: express.Request, res: express.Res
   // CSP Config supporting development servers, Firebase Auth, Google APIs, and Tauri
   const csp = [
     "default-src 'self' tauri://localhost http://localhost:*",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* https://www.gstatic.com https://apis.google.com https://*.firebaseapp.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* https://*.gstatic.com https://www.gstatic.com https://apis.google.com https://*.firebaseapp.com",
     "style-src 'self' 'unsafe-inline' http://localhost:* https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: http://localhost:* https: https://images.unsplash.com https://*.googleusercontent.com",
-    "connect-src 'self' http://localhost:* ws://localhost:* https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: blob: http://localhost:* https: https://images.unsplash.com https://*.googleusercontent.com https://*.google.com",
+    "connect-src 'self' http://localhost:* ws://localhost:* https://*.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.googleusercontent.com https://*.google.com",
     "frame-src 'self' https://*.firebaseapp.com https://apis.google.com"
   ].join("; ");
   res.setHeader("Content-Security-Policy", csp);

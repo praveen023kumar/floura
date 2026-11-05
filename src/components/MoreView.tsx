@@ -1,5 +1,5 @@
 // /src/components/MoreView.tsx
-import React, { memo } from "react";
+import React, { memo, useState, useEffect } from "react";
 import { memoWithData } from "../utils/memo";
 
 import {
@@ -20,11 +20,18 @@ import {
   Moon,
   RefreshCw,
   UserCog,
-  Users
+  Users,
+  Calendar,
+  Clock,
+  HelpCircle,
+  Download,
+  UserPlus
 } from "lucide-react";
 import LegalModal from "./LegalModal";
 import { useMore } from "../hooks/useMore";
 import Avatar from "./Avatar";
+import { getApiUrl, getDeviceId } from "../utils/api";
+import { usePWAInstall } from "../hooks/usePWAInstall";
 
 interface MoreViewProps {
   initialMoreTab?: string;
@@ -34,6 +41,12 @@ interface MoreViewProps {
     email: string;
     avatar: string;
     token?: string;
+    role?: string;
+    is_active?: number;
+    subscription_status?: string;
+    subscription_expires_at?: string;
+    last_payment_date?: string | null;
+    [key: string]: any;
   } | null;
   darkMode?: boolean;
   setDarkMode?: (dark: boolean) => void;
@@ -65,6 +78,106 @@ function MoreView({
   onNavigate,
 }: MoreViewProps) {
   const { activeModal, setActiveModal } = useMore({ onLogout });
+  const { isInstalled, installApp } = usePWAInstall();
+
+  const [subscriptionExpiry, setSubscriptionExpiry] = useState<string | null>(
+    user?.subscription_expires_at || null
+  );
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(
+    user?.subscription_status || null
+  );
+
+  useEffect(() => {
+    if (user?.subscription_expires_at) {
+      setSubscriptionExpiry(user.subscription_expires_at);
+    }
+    if (user?.subscription_status) {
+      setSubscriptionStatus(user.subscription_status);
+    }
+
+    if (user?.email) {
+      fetch(`${getApiUrl()}/api/auth/subscription-status?userEmail=${encodeURIComponent(user.email)}`, {
+        headers: {
+          "Authorization": `Bearer ${user.token || ""}`,
+          "x-device-id": getDeviceId()
+        }
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && data.status === "success" && data.subscription_expires_at) {
+            setSubscriptionExpiry(data.subscription_expires_at);
+            if (data.subscription_status) {
+              setSubscriptionStatus(data.subscription_status);
+            }
+            try {
+              const saved = localStorage.getItem("patisserie_user");
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                localStorage.setItem(
+                  "patisserie_user",
+                  JSON.stringify({
+                    ...parsed,
+                    subscription_expires_at: data.subscription_expires_at,
+                    subscription_status: data.subscription_status,
+                    is_active: data.is_active,
+                    last_payment_date: data.last_payment_date
+                  })
+                );
+              }
+            } catch {
+              // ignore
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user?.email, user?.subscription_expires_at, user?.subscription_status, user?.token]);
+
+  const now = Date.now();
+  const expiryTime = subscriptionExpiry ? new Date(subscriptionExpiry).getTime() : 0;
+  const isExpired = expiryTime ? now > expiryTime : false;
+  const daysLeft = expiryTime ? Math.ceil((expiryTime - now) / (1000 * 60 * 60 * 24)) : null;
+
+  const formattedExpiry = subscriptionExpiry
+    ? new Date(subscriptionExpiry).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric"
+      })
+    : null;
+
+  const renderDaysBadge = () => {
+    if (!subscriptionExpiry) return null;
+    if (isExpired || (daysLeft !== null && daysLeft <= 0)) {
+      return (
+        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40">
+          Expired
+        </span>
+      );
+    }
+    if (daysLeft !== null && daysLeft <= 3) {
+      return (
+        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40">
+          {daysLeft === 1 ? "1 day left" : `${daysLeft} days left`}
+        </span>
+      );
+    }
+    if (daysLeft !== null && daysLeft <= 7) {
+      return (
+        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40">
+          {daysLeft} days left
+        </span>
+      );
+    }
+    if (daysLeft !== null) {
+      return (
+        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30">
+          {daysLeft} days left
+        </span>
+      );
+    }
+    return null;
+  };
 
   const handleLogout = () => {
     if (confirm("Are you sure you want to sign out?")) {
@@ -262,6 +375,55 @@ function MoreView({
                   Edit Profile
                 </button>
               </div>
+
+              {/* SUBSCRIPTION EXPIRY STRIP */}
+              <div className="mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100/80 dark:border-amber-900/30 shadow-2xs">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block">
+                      Subscription Expiry
+                    </span>
+                    <span className="text-xs sm:text-[13px] font-extrabold text-zinc-900 dark:text-zinc-100">
+                      {formattedExpiry || (user?.email ? "Active Trial / Unlimited" : "Not Logged In")}
+                    </span>
+                  </div>
+                </div>
+
+                {renderDaysBadge() && (
+                  <div className="self-start sm:self-center">
+                    {renderDaysBadge()}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* HOW FLOURA WORKS BANNER */}
+            <div 
+              onClick={() => onNavigate?.("/help")}
+              className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-pink-500/10 dark:from-amber-500/15 dark:via-orange-500/15 dark:to-pink-500/15 border border-amber-200/80 dark:border-amber-800/60 rounded-3xl p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer hover:border-amber-300 dark:hover:border-amber-700 transition-all text-left group shadow-2xs"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                      Bakery Workflow & Profit Guide
+                    </h3>
+                    <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                      New Guide
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Stocks → Ingredients Mapping → Order Flavours → Exact Order Profit
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-amber-500 group-hover:translate-x-1 transition-transform shrink-0" />
             </div>
 
             {/* BAKERY & OPERATIONS SECTION */}
@@ -317,6 +479,14 @@ function MoreView({
                       onClick={() => onNavigate?.("/customers")}
                     />
                   </div>
+                  <div className="bg-white dark:bg-zinc-900">
+                    <MenuItem
+                      icon={UserPlus}
+                      title="Lead Management (CRM)"
+                      description="Track Instagram & WhatsApp inquiries, quotes, and follow-ups"
+                      onClick={() => onNavigate?.("/leads")}
+                    />
+                  </div>
                 </div>
               </MenuSection>
             </div>
@@ -328,6 +498,26 @@ function MoreView({
             
             {/* SYSTEM PREFERENCES */}
             <MenuSection title="Preferences & System">
+              {/* Subscription Expiry */}
+              <div className="flex items-center justify-between px-4 py-3.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                <div className="flex items-center gap-3.5 text-left">
+                  <div className="w-8 h-8 flex items-center justify-center rounded-lg text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-400 shrink-0">
+                    <Calendar className="w-[17px] h-[17px]" strokeWidth={1.7} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-bold text-zinc-800 dark:text-zinc-100">Subscription Expiry</p>
+                    <p className="mt-0.5 text-[9px] text-zinc-400 dark:text-zinc-500 truncate">
+                      {formattedExpiry ? `Valid until ${formattedExpiry}` : (user?.email ? "Active Trial / Unlimited" : "Not logged in")}
+                    </p>
+                  </div>
+                </div>
+                {renderDaysBadge() && (
+                  <div className="shrink-0">
+                    {renderDaysBadge()}
+                  </div>
+                )}
+              </div>
+
               {/* Dark Mode switcher */}
               <div className="flex items-center justify-between px-4 py-3.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                 <div className="flex items-center gap-3.5 text-left">
@@ -372,6 +562,20 @@ function MoreView({
 
             {/* SUPPORT & INFORMATION */}
             <MenuSection title="Support & Information">
+              <MenuItem
+                icon={HelpCircle}
+                title="Bakery Workflow & Profit Guide"
+                description="Stocks → Ingredients → Orders → Exact Profit"
+                onClick={() => onNavigate?.("/help")}
+              />
+              {!isInstalled && (
+                <MenuItem
+                  icon={Download}
+                  title="Install Floura App"
+                  description="Add to your Home Screen for full-screen offline access"
+                  onClick={installApp}
+                />
+              )}
               <MenuItem
                 icon={MessageSquare}
                 title="Share Feedback"

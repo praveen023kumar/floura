@@ -7,25 +7,37 @@ export async function findUserByEmail(email: string) {
   return results.length > 0 ? results[0] : null;
 }
 
-export async function updateUserSignature(email: string, signatureToken: string, name: string, avatar: string) {
+export async function updateUserSignature(email: string, signatureToken: string, name: string, avatar: string, deviceId?: string) {
   const db = await getDb();
   const emailKey = email.toLowerCase().trim();
-  await runSql(db, "UPDATE users SET password_hash = ?, name = ?, avatar = ? WHERE email = ?", [
-    signatureToken,
-    name,
-    avatar,
-    emailKey
-  ]);
+  if (deviceId) {
+    await runSql(db, "UPDATE users SET password_hash = ?, name = ?, avatar = ?, device_id = ? WHERE email = ?", [
+      signatureToken,
+      name,
+      avatar,
+      deviceId,
+      emailKey
+    ]);
+  } else {
+    await runSql(db, "UPDATE users SET password_hash = ?, name = ?, avatar = ? WHERE email = ?", [
+      signatureToken,
+      name,
+      avatar,
+      emailKey
+    ]);
+  }
   db.close();
 }
 
-export async function createUser(email: string, signatureToken: string, name: string, avatar: string) {
+export async function createUser(email: string, signatureToken: string, name: string, avatar: string, deviceId?: string) {
   const db = await getDb();
   const emailKey = email.toLowerCase().trim();
+  const now = new Date();
+  const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
   await runSql(db, `
-    INSERT INTO users (email, password_hash, name, avatar, createdAt)
-    VALUES (?, ?, ?, ?, ?)
-  `, [emailKey, signatureToken, name, avatar, new Date().toISOString()]);
+    INSERT INTO users (email, password_hash, name, avatar, createdAt, is_active, subscription_status, subscription_expires_at, device_id)
+    VALUES (?, ?, ?, ?, ?, 1, 'trial', ?, ?)
+  `, [emailKey, signatureToken, name, avatar, now.toISOString(), thirtyDaysLater, deviceId || null]);
   db.close();
 }
 

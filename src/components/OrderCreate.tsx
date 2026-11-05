@@ -6,6 +6,7 @@ import AsyncSelect from "react-select/async";
 import CreatableSelect from "react-select/creatable";
 import { customSelectStyles } from "./customSelectStyles";
 import { type Order } from "../types";
+import { useNavigate } from "react-router-dom";
 
 import { formatDate, getCurrencySymbol } from "../utils/format";
 import {
@@ -25,6 +26,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useOrders } from "../hooks/useOrders";
+import { compressImage, getBase64ByteSize } from "../utils/imageCompressor";
 
 // Fast input elements to avoid lagging when typing in complex form components
 const FastInput = React.memo(({
@@ -109,6 +111,15 @@ function OrderCreate({
   onUpdateOrderStatus,
   onNavigate,
 }: OrderCreateProps) {
+  const routerNavigate = useNavigate();
+  const handleNavigate = (path: string) => {
+    if (onNavigate) {
+      onNavigate(path);
+    } else {
+      routerNavigate(path);
+    }
+  };
+
   const {
     viewMode,
     recipes,
@@ -562,9 +573,11 @@ function OrderCreate({
                     </h3>
                   </div>
 
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-start">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-zinc-550">Shape</label>
+                      <div className="flex items-center justify-between min-h-[22px]">
+                        <label className="text-xs font-bold text-zinc-550">Shape</label>
+                      </div>
                       <Select
                         styles={customSelectStyles}
                         menuPortalTarget={document.body}
@@ -582,7 +595,18 @@ function OrderCreate({
                     </div>
 
                     <div className="flex flex-col gap-1.5 text-left">
-                      <label className="text-xs font-bold text-zinc-555">Flavor</label>
+                      <div className="flex items-center justify-between min-h-[22px]">
+                        <label className="text-xs font-bold text-zinc-555">Flavor</label>
+                        <button 
+                          type="button"
+                          onClick={() => handleNavigate("/recipes")}
+                          className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-1.5 py-0.5 rounded border border-amber-200/50 dark:border-amber-800/40 cursor-pointer active:scale-95 transition-all flex items-center gap-1 group"
+                          title="Open Recipes catalog to add or edit flavors"
+                        >
+                          <span>From Recipes</span>
+                          <span className="text-[9px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform">↗</span>
+                        </button>
+                      </div>
                       <Select
                         styles={customSelectStyles}
                         menuPortalTarget={document.body}
@@ -622,12 +646,46 @@ function OrderCreate({
                           });
                         }}
                       />
+                      <div className="min-h-[16px] text-[10px] text-zinc-400 dark:text-zinc-500 leading-tight">
+                        {formData.cakeFlavor && recipes.some((r: any) => r.name.trim().toLowerCase() === formData.cakeFlavor.trim().toLowerCase()) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const match = recipes.find(
+                                (r: any) => r.name.trim().toLowerCase() === formData.cakeFlavor.trim().toLowerCase()
+                              );
+                              if (match?.id) {
+                                handleNavigate(`/recipes/${match.id}`);
+                              } else {
+                                handleNavigate("/recipes");
+                              }
+                            }}
+                            className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline cursor-pointer active:scale-95 transition-all text-left flex items-center gap-1 group"
+                            title="View recipe details and ingredients"
+                          >
+                            <span>✓ Linked to Recipe for exact profit</span>
+                            <span className="text-[9px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform">↗</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleNavigate("/recipes")}
+                            className="text-zinc-500 hover:text-primary-brand dark:hover:text-amber-400 hover:underline cursor-pointer active:scale-95 transition-all text-left flex items-center gap-1 group"
+                            title="Open Recipes catalog"
+                          >
+                            <span>Mapped to your Recipes catalog</span>
+                            <span className="text-[9px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform">↗</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-zinc-555">
-                        {recipeUnit === "Pieces" ? "Quantity" : "Weight"} {recipeUnit && `(${recipeUnit})`}
-                      </label>
+                      <div className="flex items-center justify-between min-h-[22px]">
+                        <label className="text-xs font-bold text-zinc-555 truncate">
+                          {recipeUnit === "Pieces" ? "Quantity" : "Weight"} {recipeUnit && `(${recipeUnit})`}
+                        </label>
+                      </div>
                       <Select
                         styles={customSelectStyles}
                         menuPortalTarget={document.body}
@@ -660,31 +718,31 @@ function OrderCreate({
                       )}
                     </div>
 
-                    
-
                     {/* Egg / Eggless toggles */}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-zinc-555">Preference</label>
-                      <div className="flex gap-2 items-center h-full pt-1">
-                        <label className="flex items-center gap-1 cursor-pointer select-none">
+                      <div className="flex items-center justify-between min-h-[22px]">
+                        <label className="text-xs font-bold text-zinc-555">Preference</label>
+                      </div>
+                      <div className="flex items-center gap-3 h-[42px]">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
                           <input
                             type="radio"
                             name="preference"
                             value="Egg"
                             checked={formData.preference === "Egg"}
                             onChange={() => setFormData({ ...formData, preference: "Egg" })}
-                            className="text-primary-brand focus:ring-primary-brand border-zinc-305 accent-primary-brand"
+                            className="text-primary-brand focus:ring-primary-brand border-zinc-305 accent-primary-brand cursor-pointer"
                           />
                           <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Egg</span>
                         </label>
-                        <label className="flex items-center gap-1 cursor-pointer select-none ml-2">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
                           <input
                             type="radio"
                             name="preference"
                             value="Eggless"
                             checked={formData.preference === "Eggless"}
                             onChange={() => setFormData({ ...formData, preference: "Eggless" })}
-                            className="text-primary-brand focus:ring-primary-brand border-zinc-305 accent-primary-brand"
+                            className="text-primary-brand focus:ring-primary-brand border-zinc-305 accent-primary-brand cursor-pointer"
                           />
                           <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Eggless</span>
                         </label>
@@ -754,33 +812,31 @@ function OrderCreate({
                         <div 
                           className="border-2 border-dashed border-zinc-250 dark:border-zinc-700 hover:border-primary-brand dark:hover:border-orange-400 rounded-2xl p-4 text-center cursor-pointer transition-colors relative flex flex-col justify-center items-center select-none min-h-[150px]"
                           onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => {
+                          onDrop={async (e) => {
                             e.preventDefault();
                             const file = e.dataTransfer.files?.[0];
                             if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                if (typeof reader.result === "string") {
-                                  setFormData({ ...formData, referenceImage: reader.result });
-                                }
-                              };
-                              reader.readAsDataURL(file);
+                              try {
+                                const compressed = await compressImage(file, 800, 800, 50);
+                                setFormData((prev) => ({ ...prev, referenceImage: compressed }));
+                              } catch (err) {
+                                console.error("Error compressing dropped image:", err);
+                              }
                             }
                           }}
                         >
                           <input 
                             type="file" 
                             accept="image/*"
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  if (typeof reader.result === "string") {
-                                    setFormData({ ...formData, referenceImage: reader.result });
-                                  }
-                                };
-                                reader.readAsDataURL(file);
+                                try {
+                                  const compressed = await compressImage(file, 800, 800, 50);
+                                  setFormData((prev) => ({ ...prev, referenceImage: compressed }));
+                                } catch (err) {
+                                  console.error("Error compressing image file:", err);
+                                }
                               }
                             }}
                             className="absolute inset-0 opacity-0 cursor-pointer"
@@ -791,7 +847,7 @@ function OrderCreate({
                             Upload Reference Pic
                           </p>
                           <p className="text-[10px] text-zinc-450 mt-1">
-                            Drag file here or click to browse
+                            Drag file here or click to browse (auto-compressed &lt;50KB)
                           </p>
                         </div>
 
@@ -800,10 +856,13 @@ function OrderCreate({
                           {formData.referenceImage ? (
                             <div className="absolute inset-0 bg-white dark:bg-zinc-800 z-10 flex flex-col p-2">
                               <img src={formData.referenceImage} alt="Captured Reference preview" className="w-full h-full object-contain rounded-xl" />
+                              <span className="absolute bottom-2 left-2 text-[10px] bg-zinc-900/80 text-white px-2 py-0.5 rounded-full font-medium shadow backdrop-blur-xs">
+                                {Math.round(getBase64ByteSize(formData.referenceImage) / 1024)} KB
+                              </span>
                               <button
                                 type="button"
                                 onClick={() => setFormData({ ...formData, referenceImage: "" })}
-                                className="absolute top-2 right-2 p-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full transition-transform active:scale-95 shadow"
+                                className="absolute top-2 right-2 p-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full transition-transform active:scale-95 shadow cursor-pointer"
                                 title="Delete Design Image"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />

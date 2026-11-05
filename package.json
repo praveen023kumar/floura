@@ -5,17 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --target=node18 --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build:cpanel": "npm run build && zip -r cpanel-deploy.zip dist package.json package-lock.json app.cjs -x \"*.DS_Store\"",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "pwa:icons": "node scripts/generate-pwa-icons.cjs",
     "cordova:create": "npx cordova create cordova com.floura.app Floura",
     "cordova:platform-add": "cd cordova && npx cordova platform add ios android",
     "cordova:copy-assets": "node scripts/copy-to-cordova.cjs",
     "cordova:generate-icons": "node scripts/generate-cordova-icons.cjs",
-    "cordova:build": "npm run cordova:generate-icons && npm run build && npm run cordova:copy-assets && cd cordova && npx cordova build",
-    "cordova:run-android": "npm run cordova:generate-icons && npm run build && cd cordova && npx cordova run android",
-    "cordova:run-ios": "npm run cordova:generate-icons && npm run build && cd cordova && npx cordova run ios"
+    "cordova:build": "npm run cordova:generate-icons && CORDOVA_BUILD=true npm run build && npm run cordova:copy-assets && cd cordova && npx cordova build",
+    "cordova:run-android": "npm run cordova:generate-icons && CORDOVA_BUILD=true npm run build && cd cordova && npx cordova run android",
+    "cordova:run-ios": "npm run cordova:generate-icons && CORDOVA_BUILD=true npm run build && cd cordova && npx cordova run ios"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

@@ -280,17 +280,12 @@ h1, h2, h3, h4, .font-serif-editor {
   scrollbar-width: none;  /* Firefox */
 }
 
-/* Height-responsive styling for desktop sidebar to prevent overflow on low screens */
+/* Height-responsive styling for desktop sidebar */
 @media (max-height: 720px) {
   .desktop-sidebar {
     padding-top: 1rem !important; /* py-4 equivalent */
     padding-bottom: 1rem !important;
-    overflow-y: auto !important;
-    -ms-overflow-style: none !important; /* IE and Edge */
-    scrollbar-width: none !important; /* Firefox */
-  }
-  .desktop-sidebar::-webkit-scrollbar {
-    display: none !important; /* Chrome, Safari, Opera */
+    overflow: visible !important;
   }
   .desktop-sidebar .sidebar-logo-container {
     margin-bottom: 1.5rem !important; /* mb-6 equivalent */
@@ -316,12 +311,7 @@ h1, h2, h3, h4, .font-serif-editor {
   .desktop-sidebar {
     padding-top: 0.5rem !important; /* py-2 equivalent */
     padding-bottom: 0.5rem !important;
-    overflow-y: auto !important;
-    -ms-overflow-style: none !important; /* IE and Edge */
-    scrollbar-width: none !important; /* Firefox */
-  }
-  .desktop-sidebar::-webkit-scrollbar {
-    display: none !important; /* Chrome, Safari, Opera */
+    overflow: visible !important;
   }
   .desktop-sidebar .sidebar-logo-container {
     margin-bottom: 0.75rem !important; /* mb-3 equivalent */
@@ -340,6 +330,63 @@ h1, h2, h3, h4, .font-serif-editor {
   .desktop-sidebar .sidebar-bottom {
     gap: 0.25rem !important;
   }
+}
+
+/* Dedicated Sidebar Tooltip Component */
+.sidebar-btn {
+  position: relative;
+}
+
+.sidebar-tooltip {
+  position: absolute;
+  left: calc(100% + 0.85rem);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  background-color: #0f172a;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1), transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.15s;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  z-index: 99999;
+}
+
+:is(.dark, .dark *) .sidebar-tooltip {
+  background-color: #1e293b;
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar-btn:hover .sidebar-tooltip,
+.sidebar-btn:focus-visible .sidebar-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* Tooltip Caret Pointer */
+.sidebar-tooltip::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent #0f172a transparent transparent;
+}
+
+:is(.dark, .dark *) .sidebar-tooltip::before {
+  border-right-color: #1e293b;
 }
 
 

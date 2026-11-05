@@ -385,13 +385,13 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
                 </button>
               ) : (
                 <Link id="btn-hero-start-free" to="/login" className="group inline-flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-sm py-4 px-8 rounded-2xl shadow-lg shadow-pink-200 dark:shadow-none transition-all active:scale-[0.97]">
-                  <span>Start Now</span>
+                  <span>Start 30-Day Free Trial</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </Link>
               )}
-              <button id="btn-hero-how-it-works" onClick={() => scrollToSection(howItWorksSectionRef)} className="inline-flex items-center justify-center gap-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-755 font-bold text-sm py-4 px-8 rounded-2xl transition-all active:scale-[0.97] cursor-pointer">
-                How It Works
-              </button>
+              <a href="#pricing-section" className="inline-flex items-center justify-center gap-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-755 font-bold text-sm py-4 px-8 rounded-2xl transition-all active:scale-[0.97] cursor-pointer">
+                <span>Plan: ₹99 / month</span>
+              </a>
             </div>
 
             <div className="grid grid-cols-3 gap-4 pt-4 border-t border-zinc-100 dark:border-zinc-900 max-w-lg">
@@ -679,6 +679,76 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
       </section>
 
 
+
+      {/* PRICING SECTION - ₹99/month INR with 30-Day Free Trial */}
+      <section id="pricing-section" className="py-20 md:py-28 bg-gradient-to-b from-zinc-50 to-white dark:from-zinc-900/40 dark:to-zinc-950 border-t border-b border-zinc-100 dark:border-zinc-800">
+        <div className="max-w-4xl mx-auto px-6 text-center space-y-12">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold bg-pink-100 text-pink-700 dark:bg-pink-950/60 dark:text-pink-300">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Simple, Transparent Pricing</span>
+            </div>
+            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-black text-zinc-900 dark:text-white leading-tight">
+              One Plan. <span className="text-primary-brand dark:text-pink-400">Everything Included.</span>
+            </h2>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm md:text-base max-w-xl mx-auto leading-relaxed">
+              Experience the complete power of Floura free for 30 days. No credit card required to start. Only ₹99/month thereafter.
+            </p>
+          </div>
+
+          <div className="max-w-md mx-auto rounded-3xl p-8 bg-white dark:bg-zinc-900 border-2 border-primary-brand/30 dark:border-pink-500/30 shadow-2xl shadow-pink-500/10 text-left relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-primary-brand text-white text-[10px] font-bold uppercase tracking-wider py-1.5 px-4 rounded-bl-2xl">
+              30-Day Free Trial Included
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-serif text-2xl font-black text-zinc-900 dark:text-white">Bakery Pro</h3>
+              <p className="text-xs text-zinc-400">Full access for home bakers & commercial bakeries</p>
+            </div>
+
+            <div className="my-6 flex items-baseline gap-2">
+              <span className="font-sans text-5xl font-black text-zinc-900 dark:text-white tracking-tight">₹99</span>
+              <span className="text-zinc-400 text-sm font-semibold">/ month INR</span>
+            </div>
+
+            <ul className="space-y-3 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-300">
+              <li className="flex items-center gap-2.5">
+                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>Unlimited custom orders with tier specs & inscriptions</span>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>Recipe formula formulation with dynamic batch scaler</span>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>Ingredient inventory tracking & low-stock alerts</span>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>Complete customer database & lifetime order history</span>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>End-to-end encrypted SQLite database & offline mobile sync</span>
+              </li>
+            </ul>
+
+            <div className="mt-8">
+              <Link
+                to="/login"
+                className="w-full py-4 px-6 rounded-2xl bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-pink-200 dark:shadow-none transition active:scale-[0.98]"
+              >
+                <span>Start 30-Day Free Trial</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <p className="mt-2.5 text-[11px] text-center text-zinc-400">
+                Cancel anytime • No auto-debit surprise • Easy manual renewal
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* SIGN IN SECTION */}
       <section id="login-section" ref={loginSectionRef} className="py-20 md:py-28 bg-white dark:bg-zinc-950">

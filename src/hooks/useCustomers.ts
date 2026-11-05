@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { type Customer, type Order } from "../types";
 import { localDb } from "../db";
@@ -36,6 +36,20 @@ export function useCustomers({
 
   const [customersCurrentPage, setCustomersCurrentPage] = useState<number>(1);
   const [customersItemsPerPage, setCustomersItemsPerPage] = useState<number>(10);
+
+  // Move to top on pagination change
+  const isFirstPageMountRef = useRef(true);
+  useEffect(() => {
+    if (isFirstPageMountRef.current) {
+      isFirstPageMountRef.current = false;
+      return;
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+      document.body.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [customersCurrentPage, customersItemsPerPage]);
 
   // Auto-select or search based on router state
   useEffect(() => {
@@ -300,13 +314,20 @@ export function useCustomers({
       window.showToast?.("No phone number available for this customer.", "error");
       return;
     }
-    const cleanNum = num.replace(/\D/g, "");
+    let cleanNum = num.replace(/\D/g, "");
     if (!cleanNum) {
       window.showToast?.("Invalid phone number format for WhatsApp.", "error");
       return;
     }
+    if (cleanNum.length === 10) {
+      cleanNum = `91${cleanNum}`;
+    }
     window.showToast?.(`Opening WhatsApp chat with ${name}...`, "success");
-    window.open(`https://wa.me/${cleanNum}`, "_blank");
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const whatsappUrl = isMobile
+      ? `https://wa.me/${cleanNum}`
+      : `https://web.whatsapp.com/send?phone=${cleanNum}`;
+    window.open(whatsappUrl, "floura_whatsapp_window");
   };
 
   return {

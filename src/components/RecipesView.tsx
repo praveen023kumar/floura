@@ -38,7 +38,6 @@ function RecipesView({ onNavigate }: RecipesViewProps) {
     initialViewMode: "list",
   });
 
-  console.log("paginatedRecipes", paginatedRecipes)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const activeFilterCount = (selectedCategory !== "All" ? 1 : 0) + (searchTerm.trim() ? 1 : 0);

@@ -1,4 +1,26 @@
 // File Path: /shared/types.ts
+export type LeadChannel = 'Instagram' | 'WhatsApp' | 'Phone Call' | 'Walk-in' | 'Facebook' | 'Website' | 'Other';
+export type LeadStatus = 'New Inquiry' | 'In Discussion' | 'Quotation Sent' | 'Converted' | 'Lost';
+
+export interface Lead {
+  id: string; // uuid or client-generated unique id
+  name: string;
+  channel: LeadChannel;
+  instagramHandle?: string;
+  whatsappNumber?: string;
+  phone?: string;
+  lastSpokeDate?: string; // YYYY-MM-DD
+  nextContactDate?: string; // YYYY-MM-DD
+  status: LeadStatus;
+  notes?: string;
+  estimatedBudget?: number;
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
+  localChange?: number;
+  isDeleted?: number;
+  user_email?: string;
+}
+
 export interface Customer {
   id: string; // uuid or client-generated unique id
   name: string;

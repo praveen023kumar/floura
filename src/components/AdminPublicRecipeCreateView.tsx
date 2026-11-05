@@ -8,11 +8,14 @@ import { type Recipe, type RecipeInstructionStep } from "../types";
 
 interface AdminPublicRecipeCreateViewProps {
   onNavigate?: (path: string) => void;
+  editRecipeId?: string | null;
+  onBack?: () => void;
 }
 
-export default function AdminPublicRecipeCreateView({ onNavigate }: AdminPublicRecipeCreateViewProps) {
+export default function AdminPublicRecipeCreateView({ onNavigate, editRecipeId, onBack }: AdminPublicRecipeCreateViewProps) {
   const navigate = useNavigate();
-  const { id } = useParams<{ id?: string }>();
+  const { id: routeId } = useParams<{ id?: string }>();
+  const activeId = editRecipeId !== undefined ? editRecipeId : routeId;
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -53,10 +56,10 @@ export default function AdminPublicRecipeCreateView({ onNavigate }: AdminPublicR
   // Load recipe if editing
   useEffect(() => {
     async function loadRecipeForEdit() {
-      if (!id) return;
+      if (!activeId) return;
       try {
         setLoading(true);
-        const res = await fetch(getApiUrl(`/api/public/recipes/${id}`));
+        const res = await fetch(getApiUrl(`/api/public/recipes/${activeId}`));
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.recipe) {
@@ -85,7 +88,7 @@ export default function AdminPublicRecipeCreateView({ onNavigate }: AdminPublicR
       }
     }
     loadRecipeForEdit();
-  }, [id]);
+  }, [activeId]);
 
   const handleAddIngredient = () => {
     setIngredients([...ingredients, { name: "", qty: "" }]);
@@ -126,7 +129,7 @@ export default function AdminPublicRecipeCreateView({ onNavigate }: AdminPublicR
     const cleanSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
     const payload = {
-      id: id || undefined,
+      id: activeId || undefined,
       name,
       category,
       stdYield: Number(stdYield),
@@ -145,8 +148,8 @@ export default function AdminPublicRecipeCreateView({ onNavigate }: AdminPublicR
 
     try {
       setSaving(true);
-      const url = id ? getApiUrl(`/api/admin/public-recipes/${id}`) : getApiUrl("/api/admin/public-recipes");
-      const method = id ? "PUT" : "POST";
+      const url = activeId ? getApiUrl(`/api/admin/public-recipes/${activeId}`) : getApiUrl("/api/admin/public-recipes");
+      const method = activeId ? "PUT" : "POST";
 
       const res = await fetch(url, {
         method,
@@ -157,11 +160,15 @@ export default function AdminPublicRecipeCreateView({ onNavigate }: AdminPublicR
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          if (onNavigate) {
-            onNavigate("/calculator");
+          if (onBack) {
+            onBack();
+          } else if (onNavigate) {
+            onNavigate("/admin/public-recipes");
           } else {
-            navigate("/calculator");
+            navigate("/admin/public-recipes");
           }
+        } else {
+          alert(data.error || "Failed to save public recipe.");
         }
       } else {
         alert("Failed to save public recipe.");
@@ -171,6 +178,16 @@ export default function AdminPublicRecipeCreateView({ onNavigate }: AdminPublicR
       alert("An error occurred while saving.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else if (onNavigate) {
+      onNavigate("/admin/public-recipes");
+    } else {
+      navigate("/admin/public-recipes");
     }
   };
 
@@ -186,21 +203,21 @@ export default function AdminPublicRecipeCreateView({ onNavigate }: AdminPublicR
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6 text-left max-w-5xl mx-auto pb-16 font-sans"
+      className="space-y-6 text-left pb-16 font-sans"
     >
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white dark:bg-zinc-800 p-5 rounded-3xl border border-zinc-200/80 dark:border-zinc-700/60 shadow-sm">
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => onNavigate ? onNavigate("/calculator") : navigate("/calculator")}
+            onClick={handleBack}
             className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-500 transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
             <h2 className="text-xl font-bold font-serif text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-              <span>{id ? "Edit Public SEO Recipe" : "Create New Public SEO Recipe"}</span>
+              <span>{activeId ? "Edit Public SEO Recipe" : "Create New Public SEO Recipe"}</span>
               <Globe className="w-5 h-5 text-orange-500" />
             </h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -212,8 +229,8 @@ export default function AdminPublicRecipeCreateView({ onNavigate }: AdminPublicR
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onNavigate ? onNavigate("/calculator") : navigate("/calculator")}
-            className="px-4 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+            onClick={handleBack}
+            className="px-4 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
           >
             Cancel
           </button>

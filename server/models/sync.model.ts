@@ -35,7 +35,9 @@ const KEYS_TO_ENCRYPT = [
   "address",
   "role",
   "currency",
-  "dateFormat"
+  "dateFormat",
+  "instagramHandle",
+  "whatsappNumber"
 ];
 
 function encryptRow(row: any): any {
@@ -239,7 +241,8 @@ export async function performBulkSync(userEmail: string, payload: any) {
     dispatchedNotifications = [],
     scheduledAlerts = [],
     bakeryProfile = [],
-    categories = []
+    categories = [],
+    leads = []
   } = payload;
 
   const db = await getDb();
@@ -473,6 +476,32 @@ export async function performBulkSync(userEmail: string, payload: any) {
       `, [cat.id, cat.name, cat.type, cat.updatedAt, userEmail, cat.isDeleted !== undefined ? cat.isDeleted : 0]);
     }
 
+    // Sync Leads
+    for (const rawL of leads as any[]) {
+      const l = encryptRow(rawL);
+      await runSql(db, `
+        INSERT INTO leads (id, name, channel, instagramHandle, whatsappNumber, phone, lastSpokeDate, nextContactDate, status, notes, estimatedBudget, createdAt, updatedAt, user_email, isDeleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          name=excluded.name,
+          channel=excluded.channel,
+          instagramHandle=excluded.instagramHandle,
+          whatsappNumber=excluded.whatsappNumber,
+          phone=excluded.phone,
+          lastSpokeDate=excluded.lastSpokeDate,
+          nextContactDate=excluded.nextContactDate,
+          status=excluded.status,
+          notes=excluded.notes,
+          estimatedBudget=excluded.estimatedBudget,
+          createdAt=excluded.createdAt,
+          updatedAt=excluded.updatedAt,
+          user_email=excluded.user_email,
+          isDeleted=excluded.isDeleted
+        WHERE (excluded.updatedAt > leads.updatedAt OR leads.updatedAt IS NULL)
+          AND leads.user_email = excluded.user_email
+      `, [l.id, l.name, l.channel || 'Instagram', l.instagramHandle, l.whatsappNumber, l.phone, l.lastSpokeDate, l.nextContactDate, l.status || 'New Inquiry', l.notes, l.estimatedBudget, l.createdAt, l.updatedAt, userEmail, l.isDeleted !== undefined ? l.isDeleted : 0]);
+    }
+
     await runSql(db, "COMMIT");
   } catch (err) {
     await runSql(db, "ROLLBACK");
@@ -505,6 +534,7 @@ export async function fetchMasterData(userEmail: string, page: number, limit: nu
   let allScheduledAlerts: any[] = [];
   let allBakeryProfile: any[] = [];
   let allCategories: any[] = [];
+  let allLeads: any[] = [];
 
   if (page === 1) {
     allInventory = await querySqlAll<any>(db, "SELECT * FROM inventory WHERE user_email = ? ORDER BY updatedAt DESC", [userEmail]);
@@ -515,6 +545,7 @@ export async function fetchMasterData(userEmail: string, page: number, limit: nu
     allScheduledAlerts = await querySqlAll<any>(db, "SELECT * FROM scheduled_alerts WHERE user_email = ? ORDER BY createdAt DESC", [userEmail]);
     allBakeryProfile = await querySqlAll<any>(db, "SELECT * FROM bakery_profile WHERE user_email = ? ORDER BY updatedAt DESC", [userEmail]);
     allCategories = await querySqlAll<any>(db, "SELECT * FROM categories WHERE user_email = ?", [userEmail]);
+    allLeads = await querySqlAll<any>(db, "SELECT * FROM leads WHERE user_email = ? ORDER BY updatedAt DESC", [userEmail]);
 
     // Auto-seed default Tamil Nadu recipes + inventory for brand-new users
     if (allRecipes.length === 0 && allInventory.length === 0) {
@@ -535,6 +566,7 @@ export async function fetchMasterData(userEmail: string, page: number, limit: nu
   const decryptedDispatchedNotifications = allDispatchedNotifications.map(decryptRow);
   const decryptedScheduledAlerts = allScheduledAlerts.map(decryptRow);
   const decryptedBakeryProfile = allBakeryProfile.map(decryptRow);
+  const decryptedLeads = allLeads.map(decryptRow);
 
   // Format orders on response to deserialize JSON string fields
   const formattedOrders = decryptedOrders.map((o) => {
@@ -582,7 +614,8 @@ export async function fetchMasterData(userEmail: string, page: number, limit: nu
     dispatchedNotifications: decryptedDispatchedNotifications,
     scheduledAlerts: decryptedScheduledAlerts,
     bakeryProfile: decryptedBakeryProfile,
-    categories: allCategories
+    categories: allCategories,
+    leads: decryptedLeads
   };
 }
 

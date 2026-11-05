@@ -4,6 +4,7 @@ import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { localDb } from "../db";
 import { formatPrice } from "../utils/format";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { compressImage } from "../utils/imageCompressor";
 
 export interface UseOrdersProps {
   onAddOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<any>;
@@ -101,6 +102,20 @@ export function useOrders({
   // Pagination states
   const [ordersCurrentPage, setOrdersCurrentPage] = useState<number>(1);
   const [ordersItemsPerPage, setOrdersItemsPerPage] = useState<number>(10);
+
+  // Move to top on pagination change
+  const isFirstPageMountRef = useRef(true);
+  useEffect(() => {
+    if (isFirstPageMountRef.current) {
+      isFirstPageMountRef.current = false;
+      return;
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+      document.body.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [ordersCurrentPage, ordersItemsPerPage]);
 
 
 
@@ -352,6 +367,7 @@ export function useOrders({
     async function handleRoutingState() {
       if (location.state && (location.state as any).editOrder) {
         const o = (location.state as any).editOrder as Order;
+        isPrepopulatingEditOrder.current = true;
         setEditingOrderId(o.id);
         const firstPayment = o.paymentHistory && o.paymentHistory.length > 0 ? o.paymentHistory[0] : null;
         setFormData({
@@ -377,15 +393,20 @@ export function useOrders({
           paymentMethod: firstPayment?.method || "UPI",
           paymentNotes: firstPayment?.notes || "Initial Deposit",
         });
-        setOverrideBasePrice(String(o.basePrice));
-        setOverrideDecorationCharge(String(o.decorationCharge));
-        setOverrideDeliveryFee(String(o.deliveryFee));
-        setOverrideTotalAmount(String(o.totalAmount));
+        const basePriceStr = o.basePrice !== undefined && o.basePrice !== null ? String(o.basePrice) : "";
+        const decChargeStr = o.decorationCharge !== undefined && o.decorationCharge !== null ? String(o.decorationCharge) : "";
+        const deliveryFeeStr = o.deliveryFee !== undefined && o.deliveryFee !== null ? String(o.deliveryFee) : "";
+        const totalAmountStr = o.totalAmount !== undefined && o.totalAmount !== null ? String(o.totalAmount) : "";
+
+        setOverrideBasePrice(basePriceStr);
+        setOverrideDecorationCharge(decChargeStr);
+        setOverrideDeliveryFee(deliveryFeeStr);
+        setOverrideTotalAmount(totalAmountStr);
 
         // Update refs to prevent initial sync override
-        lastBasePrice.current = String(o.basePrice);
-        lastDecorationCharge.current = String(o.decorationCharge);
-        lastDeliveryFee.current = String(o.deliveryFee);
+        lastBasePrice.current = basePriceStr;
+        lastDecorationCharge.current = decChargeStr;
+        lastDeliveryFee.current = deliveryFeeStr;
         prevCakeAttrs.current = {
           cakeWeight: o.cakeWeight || "2.0 kg",
           cakeShape: o.cakeShape || "Round",
@@ -536,6 +557,7 @@ export function useOrders({
   const lastBasePrice = useRef("");
   const lastDecorationCharge = useRef("");
   const lastDeliveryFee = useRef("");
+  const isPrepopulatingEditOrder = useRef(false);
 
   // Ref to track cake attributes in order to clear price overrides when they change
   const prevCakeAttrs = useRef({
@@ -547,31 +569,59 @@ export function useOrders({
 
   // Automatically recalculate overrideTotalAmount when the component overrides change
   useEffect(() => {
+    // If we are currently populating an order for edit, preserve all saved amounts and do not recalculate!
+    if (isPrepopulatingEditOrder.current) {
+      isPrepopulatingEditOrder.current = false;
+      lastBasePrice.current = overrideBasePrice;
+      lastDecorationCharge.current = overrideDecorationCharge;
+      lastDeliveryFee.current = overrideDeliveryFee;
+      return;
+    }
+
     const hasBaseChanged = overrideBasePrice !== lastBasePrice.current;
     const hasDecorationChanged = overrideDecorationCharge !== lastDecorationCharge.current;
     const hasDeliveryChanged = overrideDeliveryFee !== lastDeliveryFee.current;
 
     if (hasBaseChanged || hasDecorationChanged || hasDeliveryChanged) {
-      const base = overrideBasePrice ? parseFloat(overrideBasePrice) || 0 : priceCalculation.basePrice;
-      const dec = overrideDecorationCharge ? parseFloat(overrideDecorationCharge) || 0 : priceCalculation.decorationCharge;
-      const del = overrideDeliveryFee ? parseFloat(overrideDeliveryFee) || 0 : priceCalculation.deliveryFee;
-
-      if (overrideBasePrice === "" && overrideDecorationCharge === "" && overrideDeliveryFee === "") {
-        setOverrideTotalAmount("");
-      } else {
-        const newTotal = (base + dec + del).toFixed(2);
-        setOverrideTotalAmount(newTotal);
-      }
+      const prevBase = lastBasePrice.current;
+      const prevDec = lastDecorationCharge.current;
+      const prevDel = lastDeliveryFee.current;
 
       // Update refs to current values
       lastBasePrice.current = overrideBasePrice;
       lastDecorationCharge.current = overrideDecorationCharge;
       lastDeliveryFee.current = overrideDeliveryFee;
+
+      // When editing an order, if the overrides were initialized from the saved order, do not recalculate total on initial transition
+      if (editingOrderId && prevBase === "" && prevDec === "" && prevDel === "") {
+        return;
+      }
+
+      if (overrideBasePrice === "" && overrideDecorationCharge === "" && overrideDeliveryFee === "") {
+        setOverrideTotalAmount("");
+      } else {
+        const base = overrideBasePrice ? parseFloat(overrideBasePrice) || 0 : priceCalculation.basePrice;
+        const dec = overrideDecorationCharge ? parseFloat(overrideDecorationCharge) || 0 : priceCalculation.decorationCharge;
+        const del = overrideDeliveryFee ? parseFloat(overrideDeliveryFee) || 0 : priceCalculation.deliveryFee;
+        const newTotal = (base + dec + del).toFixed(2);
+        setOverrideTotalAmount(newTotal);
+      }
     }
-  }, [overrideBasePrice, overrideDecorationCharge, overrideDeliveryFee, priceCalculation]);
+  }, [overrideBasePrice, overrideDecorationCharge, overrideDeliveryFee, priceCalculation, editingOrderId]);
 
   // Clear component price overrides and total override when cake composition attributes change
   useEffect(() => {
+    // If editing an existing order, NEVER auto-clear the price overrides!
+    if (editingOrderId || (location.state && (location.state as any).editOrder)) {
+      prevCakeAttrs.current = {
+        cakeWeight: formData.cakeWeight,
+        cakeShape: formData.cakeShape,
+        layers: formData.layers,
+        preference: formData.preference,
+      };
+      return;
+    }
+
     const hasWeightChanged = formData.cakeWeight !== prevCakeAttrs.current.cakeWeight;
     const hasShapeChanged = formData.cakeShape !== prevCakeAttrs.current.cakeShape;
     const hasLayersChanged = formData.layers !== prevCakeAttrs.current.layers;
@@ -588,12 +638,13 @@ export function useOrders({
         preference: formData.preference,
       };
     }
-  }, [formData.cakeWeight, formData.cakeShape, formData.layers, formData.preference]);
+  }, [formData.cakeWeight, formData.cakeShape, formData.layers, formData.preference, editingOrderId, location.state]);
 
   const handleStartEdit = (o: Order) => {
     if (onViewModeChange) {
       navigate("/orders/new", { state: { editOrder: o } });
     } else {
+      isPrepopulatingEditOrder.current = true;
       setEditingOrderId(o.id);
       const firstPayment = o.paymentHistory && o.paymentHistory.length > 0 ? o.paymentHistory[0] : null;
       setFormData({
@@ -619,15 +670,20 @@ export function useOrders({
         paymentMethod: firstPayment?.method || "UPI",
         paymentNotes: firstPayment?.notes || "Initial Deposit",
       });
-      setOverrideBasePrice(String(o.basePrice));
-      setOverrideDecorationCharge(String(o.decorationCharge));
-      setOverrideDeliveryFee(String(o.deliveryFee));
-      setOverrideTotalAmount(String(o.totalAmount));
+      const basePriceStr = o.basePrice !== undefined && o.basePrice !== null ? String(o.basePrice) : "";
+      const decChargeStr = o.decorationCharge !== undefined && o.decorationCharge !== null ? String(o.decorationCharge) : "";
+      const deliveryFeeStr = o.deliveryFee !== undefined && o.deliveryFee !== null ? String(o.deliveryFee) : "";
+      const totalAmountStr = o.totalAmount !== undefined && o.totalAmount !== null ? String(o.totalAmount) : "";
+
+      setOverrideBasePrice(basePriceStr);
+      setOverrideDecorationCharge(decChargeStr);
+      setOverrideDeliveryFee(deliveryFeeStr);
+      setOverrideTotalAmount(totalAmountStr);
       
       // Update refs to prevent initial sync override
-      lastBasePrice.current = String(o.basePrice);
-      lastDecorationCharge.current = String(o.decorationCharge);
-      lastDeliveryFee.current = String(o.deliveryFee);
+      lastBasePrice.current = basePriceStr;
+      lastDecorationCharge.current = decChargeStr;
+      lastDeliveryFee.current = deliveryFeeStr;
       prevCakeAttrs.current = {
         cakeWeight: o.cakeWeight || "2.0 kg",
         cakeShape: o.cakeShape || "Round",
@@ -664,7 +720,7 @@ export function useOrders({
     setCameraActive(false);
   };
 
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     if (videoRef.current) {
       const canvas = document.createElement("canvas");
       canvas.width = videoRef.current.videoWidth || 640;
@@ -672,8 +728,14 @@ export function useOrders({
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUri = canvas.toDataURL("image/jpeg");
-        setFormData((prev) => ({ ...prev, referenceImage: dataUri }));
+        const dataUri = canvas.toDataURL("image/jpeg", 0.7);
+        try {
+          const compressed = await compressImage(dataUri, 800, 800, 50);
+          setFormData((prev) => ({ ...prev, referenceImage: compressed }));
+        } catch (err) {
+          console.warn("Could not compress captured photo:", err);
+          setFormData((prev) => ({ ...prev, referenceImage: dataUri }));
+        }
         stopCamera();
       }
     }

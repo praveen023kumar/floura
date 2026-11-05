@@ -1,4 +1,4 @@
-import { Customer, Order, InventoryItem, Recipe, ChecklistItem, CustomEvent, DispatchedNotification, CustomScheduledAlert, BakeryProfile, Category } from "./types";
+import { Customer, Order, InventoryItem, Recipe, ChecklistItem, CustomEvent, DispatchedNotification, CustomScheduledAlert, BakeryProfile, Category, Lead } from "./types";
 import CryptoJS from "crypto-js";
 
 function checkDatabaseExists(dbName: string): Promise<boolean> {
@@ -411,6 +411,7 @@ export const localDb = {
   scheduledAlerts: new SQLiteTable<CustomScheduledAlert>("scheduledAlerts"),
   bakeryProfile: new SQLiteTable<BakeryProfile>("bakeryProfile"),
   categories: new SQLiteTable<Category>("categories"),
+  leads: new SQLiteTable<Lead>("leads"),
   preferences: new SQLitePreferencesTable(),
   updated_tables: new SQLiteTable<any>("updated_tables"),
 
@@ -419,7 +420,7 @@ export const localDb = {
   },
 
   async delete(): Promise<void> {
-    const tables = ["customers", "orders", "inventory", "recipes", "checklist", "customEvents", "dispatchedNotifications", "scheduledAlerts", "bakeryProfile", "categories", "preferences", "updated_tables"];
+    const tables = ["customers", "orders", "inventory", "recipes", "checklist", "customEvents", "dispatchedNotifications", "scheduledAlerts", "bakeryProfile", "categories", "leads", "preferences", "updated_tables"];
     for (const table of tables) {
       await sendToWorker("CLEAR", { table });
     }
@@ -492,6 +493,7 @@ export async function seedLocalDbFromPayload(payload: {
   scheduledAlerts: CustomScheduledAlert[];
   bakeryProfile?: BakeryProfile[];
   categories?: Category[];
+  leads?: Lead[];
 }) {
   const tables = [
     { name: "customers", list: payload.customers, dateField: "updatedAt" },
@@ -503,7 +505,8 @@ export async function seedLocalDbFromPayload(payload: {
     { name: "dispatchedNotifications", list: payload.dispatchedNotifications, dateField: "dispatchedAt" },
     { name: "scheduledAlerts", list: payload.scheduledAlerts, dateField: "createdAt" },
     { name: "bakeryProfile", list: payload.bakeryProfile || [], dateField: "updatedAt" },
-    { name: "categories", list: payload.categories || [], dateField: "updatedAt" }
+    { name: "categories", list: payload.categories || [], dateField: "updatedAt" },
+    { name: "leads", list: payload.leads || [], dateField: "updatedAt" }
   ];
 
   for (const table of tables) {

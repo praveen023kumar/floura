@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { type InventoryItem } from "../types";
 import { localDb } from "../db";
 import { useQuery } from "@tanstack/react-query";
@@ -31,6 +31,20 @@ export function useInventory({
 
   const [inventoryCurrentPage, setInventoryCurrentPage] = useState<number>(1);
   const [inventoryItemsPerPage, setInventoryItemsPerPage] = useState<number>(10);
+
+  // Move to top on pagination change
+  const isFirstPageMountRef = useRef(true);
+  useEffect(() => {
+    if (isFirstPageMountRef.current) {
+      isFirstPageMountRef.current = false;
+      return;
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+      document.body.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [inventoryCurrentPage, inventoryItemsPerPage]);
 
   useEffect(() => {
     if (initialViewMode === "form") {

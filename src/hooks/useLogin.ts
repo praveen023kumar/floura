@@ -1,9 +1,20 @@
 import { useState, useEffect } from "react";
 import { auth, googleProvider, signInWithPopup } from "../firebase";
-import { getApiUrl, isNativeApp } from "../utils/api";
+import { getApiUrl, isNativeApp, getDeviceId } from "../utils/api";
 
 export interface UseLoginProps {
-  onLogin: (user: { name: string; email: string; avatar: string; token: string; isNew?: boolean }) => void;
+  onLogin: (user: { 
+    name: string; 
+    email: string; 
+    avatar: string; 
+    token: string; 
+    isNew?: boolean;
+    subscription_status?: string;
+    subscription_expires_at?: string;
+    is_active?: number;
+    last_payment_date?: string | null;
+    [key: string]: any;
+  }) => void;
 }
 
 export function useLogin({ onLogin }: UseLoginProps) {
@@ -45,9 +56,7 @@ export function useLogin({ onLogin }: UseLoginProps) {
             
             setTimeout(() => {
               onLogin({
-                name: data.user.name,
-                email: data.user.email,
-                avatar: data.user.avatar,
+                ...data.user,
                 token: data.token,
                 isNew: data.isNew
               });
@@ -145,9 +154,7 @@ export function useLogin({ onLogin }: UseLoginProps) {
                 setPollingState(null);
                 setTimeout(() => {
                   onLogin({
-                    name: data.user.name,
-                    email: data.user.email,
-                    avatar: data.user.avatar,
+                    ...data.user,
                     token: data.token,
                     isNew: data.isNew
                   });
@@ -206,7 +213,7 @@ export function useLogin({ onLogin }: UseLoginProps) {
 
     if (isNativeApp()) {
       const state = "floura_" + Math.random().toString(36).substring(2) + Date.now();
-      const startUrl = getApiUrl(`/api/auth/external-start?state=${state}`);
+      const startUrl = getApiUrl(`/api/auth/external-start?state=${state}&deviceId=${encodeURIComponent(getDeviceId())}`);
 
       setToastMessage("Opening your system browser...");
       
@@ -261,6 +268,8 @@ export function useLogin({ onLogin }: UseLoginProps) {
           formattedName = "Chef " + displayName;
         }
 
+        const idToken = await googleUser.getIdToken();
+
         const response = await fetch(getApiUrl("/api/auth/login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -268,6 +277,8 @@ export function useLogin({ onLogin }: UseLoginProps) {
             email: emailLower,
             name: formattedName || undefined,
             avatar: googleUser.photoURL || undefined,
+            idToken,
+            deviceId: getDeviceId(),
             isGoogle: true
           })
         });
@@ -282,9 +293,7 @@ export function useLogin({ onLogin }: UseLoginProps) {
         
         setTimeout(() => {
           onLogin({
-            name: data.user.name,
-            email: data.user.email,
-            avatar: data.user.avatar,
+            ...data.user,
             token: data.token,
             isNew: data.isNew
           });

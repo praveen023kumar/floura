@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { localDb, seedLocalDbFromPayload, getPreference, setPreference, removePreference, closeDatabase } from "../db";
-import { getApiUrl } from "../utils/api";
-import { setFormatConfig } from "../utils/format";
+import { getApiUrl, getDeviceId } from "../utils/api";
+import { setFormatConfig, normalizeCurrency } from "../utils/format";
+import { isAuthSignatureError, triggerReauth } from "../utils/auth";
 import {
   Customer,
   Order,
@@ -15,19 +16,61 @@ import { scaleRecipeIngredients, parseWeightToGrams } from "../../shared/calcula
 
 
 export function useAppEngine(
-  initialUser: { name: string; email: string; avatar: string; token?: string; role?: string } | null = null,
-  onLogoutCallback?: () => void
+  initialUser: {
+    name: string;
+    email: string;
+    avatar: string;
+    token?: string;
+    role?: string;
+    is_active?: number;
+    subscription_status?: string;
+    subscription_expires_at?: string;
+    last_payment_date?: string | null;
+    [key: string]: any;
+  } | null = null,
+  onLogoutCallback?: () => void,
+  onUserUpdateCallback?: (user: any) => void
 ) {
   const navigate = useNavigate();
   const location = useLocation();
 
   // User Authenticated State
-  const [user, setUser] = useState<{ name: string; email: string; avatar: string; token?: string; role?: string } | null>(initialUser);
+  const [user, setUser] = useState<{
+    name: string;
+    email: string;
+    avatar: string;
+    token?: string;
+    role?: string;
+    is_active?: number;
+    subscription_status?: string;
+    subscription_expires_at?: string;
+    last_payment_date?: string | null;
+    [key: string]: any;
+  } | null>(initialUser);
 
   // Sync user changes from props
   useEffect(() => {
     setUser(initialUser);
   }, [initialUser]);
+
+  const handleSubscriptionBlocked = (errData: any) => {
+    const currentUser = user || initialUser;
+    if (!currentUser) return;
+    const updated = {
+      ...currentUser,
+      subscription_status: errData?.subscription_status || "expired",
+      subscription_expires_at: errData?.subscription_expires_at || new Date(0).toISOString(),
+      is_active: typeof errData?.is_active === "number" ? errData.is_active : (errData?.code === "ACCOUNT_DEACTIVATED" ? 0 : currentUser.is_active)
+    };
+    try {
+      localStorage.setItem("patisserie_user", JSON.stringify(updated));
+    } catch (e) {}
+    setUser(updated);
+    if (onUserUpdateCallback) {
+      onUserUpdateCallback(updated);
+    }
+    window.dispatchEvent(new CustomEvent("user-update", { detail: { user: updated } }));
+  };
 
   const [initializing, setInitializing] = useState<boolean>(true);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState<boolean>(true);
@@ -77,8 +120,8 @@ export function useAppEngine(
         const savedUser = await getPreference("patisserie_user");
         const savedDarkMode = localStorage.getItem("patisserie_dark_mode") === "true";
         
-        let currency = "$";
-        let dateFormat = "YYYY-MM-DD";
+        let currency = (typeof window !== "undefined" && window.localStorage?.getItem("floura_currency")) || "$";
+        let dateFormat = (typeof window !== "undefined" && window.localStorage?.getItem("floura_date_format")) || "YYYY-MM-DD";
         
         if (savedUser) {
           setUser(savedUser);
@@ -93,8 +136,20 @@ export function useAppEngine(
             await runFreshLoginSync(savedUser);
           } else {
             // Normal startup session recovery
-            currency = await getPreference("floura_currency") || "$";
-            dateFormat = await getPreference("floura_date_format") || "YYYY-MM-DD";
+            const prefCurrency = await getPreference("floura_currency");
+            if (prefCurrency) {
+              currency = prefCurrency;
+              if (typeof window !== "undefined" && window.localStorage) {
+                try { window.localStorage.setItem("floura_currency", normalizeCurrency(currency)); } catch {}
+              }
+            }
+            const prefDateFormat = await getPreference("floura_date_format");
+            if (prefDateFormat) {
+              dateFormat = prefDateFormat;
+              if (typeof window !== "undefined" && window.localStorage) {
+                try { window.localStorage.setItem("floura_date_format", dateFormat); } catch {}
+              }
+            }
             setIsLoadingFromDb(false);
             setInitializing(false);
           }
@@ -103,7 +158,7 @@ export function useAppEngine(
           setInitializing(false);
         }
         
-        setFormatConfig(currency, dateFormat);
+        setFormatConfig(normalizeCurrency(currency), dateFormat);
         setDarkMode(savedDarkMode);
       } catch (err) {
         console.error("Failed to load user preferences on startup:", err);
@@ -117,7 +172,15 @@ export function useAppEngine(
   // Keep formatting utilities updated with user's bakery profile configuration
   useEffect(() => {
     if (bakeryProfile) {
-      setFormatConfig(bakeryProfile.currency || "$", bakeryProfile.dateFormat || "YYYY-MM-DD");
+      const normalized = normalizeCurrency(bakeryProfile.currency || (typeof window !== "undefined" && window.localStorage?.getItem("floura_currency")) || "$");
+      const activeDf = bakeryProfile.dateFormat || (typeof window !== "undefined" && window.localStorage?.getItem("floura_date_format")) || "YYYY-MM-DD";
+      setFormatConfig(normalized, activeDf);
+      if (typeof window !== "undefined" && window.localStorage) {
+        try {
+          window.localStorage.setItem("floura_currency", normalized);
+          window.localStorage.setItem("floura_date_format", activeDf);
+        } catch {}
+      }
       window.dispatchEvent(new Event("floura_settings_changed"));
     }
   }, [bakeryProfile]);
@@ -295,6 +358,7 @@ export function useAppEngine(
           await localDb.scheduledAlerts.clear();
           await localDb.bakeryProfile.clear();
           await localDb.categories.clear();
+          await localDb.leads.clear();
         } catch (e) {
           console.error("Failed to clear local db on user change:", e);
         }
@@ -372,7 +436,8 @@ export function useAppEngine(
         localDb.dispatchedNotifications.clear(),
         localDb.scheduledAlerts.clear(),
         localDb.bakeryProfile.clear(),
-        localDb.categories.clear()
+        localDb.categories.clear(),
+        localDb.leads.clear()
       ]);
 
       while (hasMore) {
@@ -382,13 +447,28 @@ export function useAppEngine(
           method: "GET",
           headers: {
             "Authorization": "Bearer " + (activeUser?.token || ""),
-            "x-user-email": activeUser?.email || "praveen023kumar@gmail.com"
+            "x-user-email": activeUser?.email || "",
+            "x-device-id": getDeviceId()
           }
         });
 
         if (response.status === 401 || response.status === 403) {
+          const errData = await response.json().catch(() => ({}));
           setSyncStatus("error");
-          window.showToast("Your kitchen workspace credentials are empty, expired, or invalid. Please sign in again.", "error");
+          if (errData.code === "SUBSCRIPTION_EXPIRED" || errData.code === "ACCOUNT_DEACTIVATED") {
+            handleSubscriptionBlocked(errData);
+            return;
+          }
+          if (errData.code === "SINGLE_DEVICE_CONFLICT") {
+            window.showToast("Session Expired: You have logged in on another device.", "warning");
+            handleLogout();
+            return;
+          }
+          if (isAuthSignatureError(response.status, errData)) {
+            triggerReauth(location.pathname || "/dashboard", errData.error);
+            return;
+          }
+          window.showToast(errData.error || "Your kitchen workspace credentials are empty, expired, or invalid. Please sign in again.", "error");
           handleLogout();
           return;
         }
@@ -413,7 +493,8 @@ export function useAppEngine(
           dispatchedNotifications: isFirstPage ? (data.dispatchedNotifications || []) : [],
           scheduledAlerts: isFirstPage ? (data.scheduledAlerts || []) : [],
           bakeryProfile: isFirstPage ? (data.bakeryProfile || []) : [],
-          categories: isFirstPage ? (data.categories || []) : []
+          categories: isFirstPage ? (data.categories || []) : [],
+          leads: isFirstPage ? (data.leads || []) : []
         });
 
         isFirstPage = false;
@@ -463,7 +544,8 @@ export function useAppEngine(
         dirtyDispatchedNotifications,
         dirtyScheduledAlerts,
         dirtyBakeryProfile,
-        dirtyCategories
+        dirtyCategories,
+        dirtyLeads
       ] = await Promise.all([
         changedTables.has("customers") ? localDb.customers.where("localChange").equals(1).toArray() : Promise.resolve([]),
         changedTables.has("orders") ? localDb.orders.where("localChange").equals(1).toArray() : Promise.resolve([]),
@@ -474,7 +556,8 @@ export function useAppEngine(
         changedTables.has("dispatchedNotifications") ? localDb.dispatchedNotifications.where("localChange").equals(1).toArray() : Promise.resolve([]),
         changedTables.has("scheduledAlerts") ? localDb.scheduledAlerts.where("localChange").equals(1).toArray() : Promise.resolve([]),
         changedTables.has("bakeryProfile") ? localDb.bakeryProfile.where("localChange").equals(1).toArray() : Promise.resolve([]),
-        changedTables.has("categories") ? localDb.categories.where("localChange").equals(1).toArray() : Promise.resolve([])
+        changedTables.has("categories") ? localDb.categories.where("localChange").equals(1).toArray() : Promise.resolve([]),
+        changedTables.has("leads") ? localDb.leads.where("localChange").equals(1).toArray() : Promise.resolve([])
       ]);
 
       const hasDirtyChanges =
@@ -487,7 +570,8 @@ export function useAppEngine(
         dirtyDispatchedNotifications.length > 0 ||
         dirtyScheduledAlerts.length > 0 ||
         dirtyBakeryProfile.length > 0 ||
-        dirtyCategories.length > 0;
+        dirtyCategories.length > 0 ||
+        dirtyLeads.length > 0;
 
       // If no dirty changes are present, we fast-path exit!
       if (!hasDirtyChanges) {
@@ -501,10 +585,11 @@ export function useAppEngine(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Bearer " + (user?.token || "")
+          "Authorization": "Bearer " + (user?.token || ""),
+          "x-device-id": getDeviceId()
         },
         body: JSON.stringify({
-          userEmail: user?.email || "praveen023kumar@gmail.com",
+          userEmail: user?.email || "",
           customers: dirtyCustomers,
           orders: dirtyOrders,
           inventory: dirtyInventory,
@@ -514,13 +599,28 @@ export function useAppEngine(
           dispatchedNotifications: dirtyDispatchedNotifications,
           scheduledAlerts: dirtyScheduledAlerts,
           bakeryProfile: dirtyBakeryProfile,
-          categories: dirtyCategories
+          categories: dirtyCategories,
+          leads: dirtyLeads
         }),
       });
 
       if (response.status === 401 || response.status === 403) {
+        const errData = await response.json().catch(() => ({}));
         setSyncStatus("error");
-        window.showToast("Your kitchen workspace credentials are empty, expired, or invalid. Please sign in again.", "error");
+        if (errData.code === "SUBSCRIPTION_EXPIRED" || errData.code === "ACCOUNT_DEACTIVATED") {
+          handleSubscriptionBlocked(errData);
+          return;
+        }
+        if (errData.code === "SINGLE_DEVICE_CONFLICT") {
+          window.showToast("Session Expired: You have logged in on another device.", "warning");
+          handleLogout();
+          return;
+        }
+        if (isAuthSignatureError(response.status, errData)) {
+          triggerReauth(location.pathname || "/dashboard", errData.error);
+          return;
+        }
+        window.showToast(errData.error || "Your kitchen workspace credentials are empty, expired, or invalid. Please sign in again.", "error");
         handleLogout();
         return;
       }
@@ -540,7 +640,8 @@ export function useAppEngine(
           localDb.dispatchedNotifications,
           localDb.scheduledAlerts,
           localDb.bakeryProfile,
-          localDb.categories
+          localDb.categories,
+          localDb.leads
         ], async () => {
           const updates = [];
           for (const c of dirtyCustomers) updates.push(localDb.customers.update(c.id, { localChange: 0 }));
@@ -553,6 +654,7 @@ export function useAppEngine(
           for (const sa of dirtyScheduledAlerts) updates.push(localDb.scheduledAlerts.update(sa.id, { localChange: 0 }));
           for (const bp of dirtyBakeryProfile) updates.push(localDb.bakeryProfile.update(bp.id, { localChange: 0 }));
           for (const cat of dirtyCategories) updates.push(localDb.categories.update(cat.id, { localChange: 0 }));
+          for (const ld of dirtyLeads) updates.push(localDb.leads.update(ld.id, { localChange: 0 }));
           await Promise.all(updates);
         });
 
@@ -591,7 +693,8 @@ export function useAppEngine(
         localDb.dispatchedNotifications.clear(),
         localDb.scheduledAlerts.clear(),
         localDb.bakeryProfile.clear(),
-        localDb.categories.clear()
+        localDb.categories.clear(),
+        localDb.leads.clear()
       ]);
     } catch (err) {
       console.warn("Could not wipe existing local db on new device/user login:", err);
@@ -632,6 +735,7 @@ export function useAppEngine(
       await new Promise(resolve => setTimeout(resolve, 800));
       
       setUser({
+        ...authenticatedUser,
         name: authenticatedUser.name,
         email: authenticatedUser.email,
         avatar: authenticatedUser.avatar,
@@ -739,14 +843,47 @@ export function useAppEngine(
           method: "GET",
           headers: {
             "Authorization": "Bearer " + (user!.token || ""),
-            "x-user-email": user!.email
+            "x-user-email": user!.email,
+            "x-device-id": getDeviceId()
           }
         });
 
         if (response.status === 401 || response.status === 403) {
           if (isLoggingOutRef.current) return;
-          window.showToast("Session Expired: You have logged in on another device.", "warning");
+          const errData = await response.json().catch(() => ({}));
+          if (errData.code === "SUBSCRIPTION_EXPIRED" || errData.code === "ACCOUNT_DEACTIVATED") {
+            handleSubscriptionBlocked(errData);
+            return;
+          }
+          window.showToast(errData.error || "Session Expired: You have logged in on another device.", "warning");
           await handleLogout();
+          return;
+        }
+
+        if (response.ok) {
+          const data = await response.json().catch(() => ({}));
+          if (data.status === "success" && data.subscription_expires_at !== undefined) {
+            if (
+              data.subscription_expires_at !== user.subscription_expires_at ||
+              data.is_active !== user.is_active ||
+              data.subscription_status !== user.subscription_status
+            ) {
+              const updated = {
+                ...user,
+                subscription_status: data.subscription_status,
+                subscription_expires_at: data.subscription_expires_at,
+                is_active: data.is_active
+              };
+              try {
+                localStorage.setItem("patisserie_user", JSON.stringify(updated));
+              } catch (e) {}
+              setUser(updated);
+              if (onUserUpdateCallback) {
+                onUserUpdateCallback(updated);
+              }
+              window.dispatchEvent(new CustomEvent("user-update", { detail: { user: updated } }));
+            }
+          }
         }
       } catch (err) {
         console.error("Session verification failed", err);

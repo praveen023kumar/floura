@@ -23,7 +23,8 @@ const SENSITIVE_COLUMNS: Record<string, string[]> = {
   dispatchedNotifications: ["customerName", "customerMobile", "cakeSpec", "messageText"],
   scheduledAlerts: ["customerName", "customerMobile", "notes"],
   bakeryProfile: ["bakeryName", "email", "phone", "address", "role", "currency", "dateFormat"],
-  categories: ["name"]
+  categories: ["name"],
+  leads: ["name", "instagramHandle", "whatsappNumber", "phone", "notes"]
 };
 
 const TABLE_COLUMNS: Record<string, string[]> = {
@@ -44,6 +45,11 @@ const TABLE_COLUMNS: Record<string, string[]> = {
   scheduledAlerts: ["id", "customerName", "customerMobile", "alertDate", "notes", "createdAt", "type", "localChange", "isDeleted"],
   bakeryProfile: ["id", "bakeryName", "email", "phone", "address", "role", "currency", "dateFormat", "updatedAt", "localChange", "isDeleted"],
   categories: ["id", "name", "type", "updatedAt", "localChange", "isDeleted"],
+  leads: [
+    "id", "name", "channel", "instagramHandle", "whatsappNumber", "phone",
+    "lastSpokeDate", "nextContactDate", "status", "notes", "estimatedBudget",
+    "createdAt", "updatedAt", "localChange", "isDeleted"
+  ],
   preferences: ["key", "value"],
   updated_tables: ["tableName", "hasChanges"]
 };
@@ -538,7 +544,34 @@ function createTables() {
     db.exec("CREATE INDEX IF NOT EXISTS idx_categories_localChange ON categories(localChange);");
     db.exec("CREATE INDEX IF NOT EXISTS idx_categories_isDeleted ON categories(isDeleted);");
 
-    // 11. Preferences
+    // 11. Leads Table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS leads (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        channel TEXT DEFAULT 'Instagram',
+        instagramHandle TEXT,
+        whatsappNumber TEXT,
+        phone TEXT,
+        lastSpokeDate TEXT,
+        nextContactDate TEXT,
+        status TEXT DEFAULT 'New Inquiry',
+        notes TEXT,
+        estimatedBudget REAL,
+        createdAt TEXT,
+        updatedAt TEXT,
+        localChange INTEGER DEFAULT 0,
+        isDeleted INTEGER DEFAULT 0
+      );
+    `);
+    try {
+      db.exec("ALTER TABLE leads ADD COLUMN nextContactDate TEXT;");
+    } catch {}
+    db.exec("CREATE INDEX IF NOT EXISTS idx_leads_updatedAt ON leads(updatedAt);");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_leads_localChange ON leads(localChange);");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_leads_isDeleted ON leads(isDeleted);");
+
+    // 12. Preferences
     db.exec(`
       CREATE TABLE IF NOT EXISTS preferences (
         key TEXT PRIMARY KEY,
@@ -546,7 +579,7 @@ function createTables() {
       );
     `);
 
-    // 12. Updated Tables Metadata
+    // 13. Updated Tables Metadata
     db.exec(`
       CREATE TABLE IF NOT EXISTS updated_tables (
         tableName TEXT PRIMARY KEY,
@@ -564,7 +597,8 @@ function createTables() {
       "dispatchedNotifications",
       "scheduledAlerts",
       "bakeryProfile",
-      "categories"
+      "categories",
+      "leads"
     ];
 
     for (const t of syncTables) {
@@ -792,7 +826,6 @@ self.onmessage = async (e: MessageEvent) => {
         const pkName = table === "preferences" ? "key" : "id";
         
         const sql = `SELECT * FROM ${table} WHERE ${pkName} = ? LIMIT 1`;
-        console.log(`[SQLite Worker] GET | SQL: ${sql} | Bind:`, [key]);
         db.exec({
           sql,
           bind: [key],
@@ -825,7 +858,6 @@ self.onmessage = async (e: MessageEvent) => {
         const columns = keys.join(", ");
         const sql = `INSERT OR REPLACE INTO ${table} (${columns}) VALUES (${placeholders})`;
         const params = keys.map(k => encrypted[k]);
-        console.log(`[SQLite Worker] PUT | SQL: ${sql} | Bind:`, params);
 
         db.exec({
           sql,
@@ -845,7 +877,6 @@ self.onmessage = async (e: MessageEvent) => {
         
         const pkName = table === "preferences" ? "key" : "id";
         const sql = `DELETE FROM ${table} WHERE ${pkName} = ?`;
-        console.log(`[SQLite Worker] DELETE | SQL: ${sql} | Bind:`, [key]);
         db.exec({
           sql,
           bind: [key]
@@ -862,7 +893,6 @@ self.onmessage = async (e: MessageEvent) => {
         }
         
         const sql = `DELETE FROM ${table}`;
-        console.log(`[SQLite Worker] CLEAR | SQL: ${sql}`);
         db.transaction(() => {
           db.exec({
             sql
@@ -887,7 +917,6 @@ self.onmessage = async (e: MessageEvent) => {
         
         const result: any[] = [];
         const sql = `SELECT COUNT(*) as count FROM ${table}`;
-        console.log(`[SQLite Worker] COUNT | SQL: ${sql}`);
         db.exec({
           sql,
           rowMode: "object",
@@ -910,7 +939,6 @@ self.onmessage = async (e: MessageEvent) => {
         }
         
         const result: any[] = [];
-        console.log(`[SQLite Worker] QUERY | SQL: ${sql} | Bind:`, params || []);
         db.exec({
           sql,
           bind: params || [],

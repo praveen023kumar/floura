@@ -1,5 +1,6 @@
 import express from "express";
 import { findUserByEmail } from "../models/user.model";
+import { getDb, runSql } from "../models/db";
 
 // Shared memory reference, imported from routes registry or controller sessions
 export const activeAdminSessions = new Map<string, {
@@ -50,12 +51,48 @@ export const requireAuth = async (req: express.Request, res: express.Response, n
     const user = await findUserByEmail(emailKey);
 
     if (!user || user.password_hash !== token) {
-      return res.status(403).json({ error: "Access Denied: Invalid security workspace signature. Please re-authenticate." });
+      return res.status(403).json({ 
+        error: "Access Denied: Invalid security workspace signature. Please re-authenticate.",
+        code: "INVALID_WORKSPACE_SIGNATURE"
+      });
+    }
+
+    // Enforce single-device session locking
+    const reqDeviceId = req.headers["x-device-id"] || req.body?.deviceId;
+    if (!user.device_id && reqDeviceId) {
+      const db = await getDb();
+      await runSql(db, "UPDATE users SET device_id = ? WHERE email = ?", [String(reqDeviceId), emailKey]);
+      db.close();
+      user.device_id = String(reqDeviceId);
+    } else if (user.device_id && (!reqDeviceId || reqDeviceId !== user.device_id)) {
+      return res.status(403).json({
+        error: "Session Terminated: Your account is active on another device. Only one device may access Floura at a time.",
+        code: "SINGLE_DEVICE_CONFLICT"
+      });
+    }
+
+    // Check account active state & subscription expiry
+    const now = Date.now();
+    const expiryTime = user.subscription_expires_at ? new Date(user.subscription_expires_at).getTime() : 0;
+    const isExpired = expiryTime ? now > expiryTime : false;
+    const isInactive = user.is_active === 0;
+
+    if (isInactive || isExpired) {
+      return res.status(403).json({
+        error: isInactive 
+          ? "Your account has been deactivated. Please contact support to restore access." 
+          : "Your 30-day trial or subscription has expired. Please renew to continue using Floura.",
+        code: isInactive ? "ACCOUNT_DEACTIVATED" : "SUBSCRIPTION_EXPIRED",
+        is_active: user.is_active,
+        subscription_status: isInactive ? "deactivated" : (isExpired ? "expired" : user.subscription_status),
+        subscription_expires_at: user.subscription_expires_at
+      });
     }
 
     // Securely stash verified properties for handler pipelines
     (req as any).userEmail = emailKey;
     (req as any).token = token;
+    (req as any).user = user;
 
     next();
   } catch (err: any) {

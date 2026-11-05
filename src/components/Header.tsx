@@ -1,8 +1,9 @@
 // File Path: /src/components/Header.tsx
-import { Sun, Moon, Cloud, CloudOff, RefreshCw, LogOut } from "lucide-react";
+import { Sun, Moon, Cloud, CloudOff, RefreshCw, LogOut, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Avatar from "./Avatar";
 import flouraLogo from "../assets/images/floura_logo.webp";
+import { usePWAInstall } from "../hooks/usePWAInstall";
 
 interface HeaderProps {
   darkMode: boolean;
@@ -24,6 +25,7 @@ export default function Header({
   bakeryName
 }: HeaderProps) {
   const navigate = useNavigate();
+  const { canInstall, installApp } = usePWAInstall();
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 shadow-sm transition-colors duration-200">
@@ -40,6 +42,18 @@ export default function Header({
 
         {/* Action Controls */}
         <div className="flex items-center gap-3">
+          {/* PWA Install Button */}
+          {canInstall && (
+            <button
+              onClick={installApp}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-brand/10 hover:bg-primary-brand/20 dark:bg-orange-500/10 dark:hover:bg-orange-500/20 text-primary-brand dark:text-orange-400 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs font-sans"
+              title="Install Floura App for offline access"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Install App</span>
+            </button>
+          )}
+
           {/* Sync Status Button */}
           <button
             onClick={onSync}

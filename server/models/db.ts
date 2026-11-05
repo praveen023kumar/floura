@@ -4,11 +4,20 @@ import fs from "fs";
 import CryptoJS from "crypto-js";
 import { initSecurityDb } from "./security.model";
 
-const DB_FILE = path.join(process.cwd(), "patisserie.sqlite");
+const DB_FILE = process.env.DB_PATH 
+  ? path.resolve(process.env.DB_PATH) 
+  : path.join(process.cwd(), "patisserie.sqlite");
 
 // Helper to open SQLite database with security constraints and configurations
 export function getDb(): Promise<sqlite3.Database> {
   return new Promise((resolve, reject) => {
+    try {
+      const dbDir = path.dirname(DB_FILE);
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true, mode: 0o700 });
+      }
+    } catch {}
+
     const db = new sqlite3.Database(DB_FILE, (err) => {
       if (err) {
         reject(err);
@@ -69,7 +78,7 @@ export async function initDb() {
       totalOrders INTEGER NOT NULL DEFAULT 0,
       memberSince TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
-      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com'
+      user_email TEXT NOT NULL
     )
   `);
 
@@ -100,7 +109,7 @@ export async function initDb() {
       status TEXT NOT NULL DEFAULT 'Pending',
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
-      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      user_email TEXT NOT NULL,
       paymentStatus TEXT NOT NULL DEFAULT 'Unpaid',
       paidAmount REAL NOT NULL DEFAULT 0,
       paymentHistory TEXT NOT NULL DEFAULT '[]',
@@ -120,7 +129,7 @@ export async function initDb() {
       supplier TEXT,
       costPrice REAL NOT NULL DEFAULT 0,
       updatedAt TEXT NOT NULL,
-      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com'
+      user_email TEXT NOT NULL
     )
   `);
 
@@ -145,7 +154,7 @@ export async function initDb() {
       imageUrl TEXT,
       imageBase64 TEXT,
       updatedAt TEXT NOT NULL,
-      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com'
+      user_email TEXT NOT NULL DEFAULT 'public@floura.app'
     )
   `);
 
@@ -259,12 +268,12 @@ export async function initDb() {
           INSERT INTO recipes (
             id, name, category, stdYield, yieldUnit, ingredients, instructions,
             prepTimeMinutes, cookTimeMinutes, slug, metaTitle, metaDescription,
-            keywords, isPublic, updatedAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            keywords, isPublic, updatedAt, user_email
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
           r.id, r.name, r.category, r.stdYield, r.yieldUnit, r.ingredients, r.instructions,
           r.prepTimeMinutes, r.cookTimeMinutes, r.slug, r.metaTitle, r.metaDescription,
-          r.keywords, r.isPublic, r.updatedAt
+          r.keywords, r.isPublic, r.updatedAt, "public@floura.app"
         ]);
       }
       console.log("Seeded default public SEO recipes in SQLite database.");
@@ -285,7 +294,7 @@ export async function initDb() {
       checked INTEGER NOT NULL DEFAULT 0,
       date TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
-      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      user_email TEXT NOT NULL,
       isDeleted INTEGER NOT NULL DEFAULT 0
     )
   `);
@@ -299,7 +308,7 @@ export async function initDb() {
       type TEXT NOT NULL,
       notes TEXT,
       createdAt TEXT NOT NULL,
-      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      user_email TEXT NOT NULL,
       isDeleted INTEGER NOT NULL DEFAULT 0
     )
   `);
@@ -314,7 +323,7 @@ export async function initDb() {
       messageText TEXT NOT NULL,
       dispatchedAt TEXT NOT NULL,
       status TEXT NOT NULL,
-      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      user_email TEXT NOT NULL,
       isDeleted INTEGER NOT NULL DEFAULT 0
     )
   `);
@@ -328,7 +337,7 @@ export async function initDb() {
       alertDate TEXT NOT NULL,
       notes TEXT,
       createdAt TEXT NOT NULL,
-      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      user_email TEXT NOT NULL,
       isDeleted INTEGER NOT NULL DEFAULT 0
     )
   `);
@@ -345,7 +354,7 @@ export async function initDb() {
       currency TEXT,
       dateFormat TEXT,
       updatedAt TEXT NOT NULL,
-      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      user_email TEXT NOT NULL,
       isDeleted INTEGER NOT NULL DEFAULT 0
     )
   `);
@@ -357,10 +366,36 @@ export async function initDb() {
       name TEXT NOT NULL,
       type TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
-      user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com',
+      user_email TEXT NOT NULL,
       isDeleted INTEGER NOT NULL DEFAULT 0
     )
   `);
+
+  // Create Leads Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS leads (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'Instagram',
+      instagramHandle TEXT,
+      whatsappNumber TEXT,
+      phone TEXT,
+      lastSpokeDate TEXT,
+      nextContactDate TEXT,
+      status TEXT NOT NULL DEFAULT 'New Inquiry',
+      notes TEXT,
+      estimatedBudget REAL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      user_email TEXT NOT NULL,
+      isDeleted INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+  try {
+    await runSql(db, "ALTER TABLE leads ADD COLUMN nextContactDate TEXT;");
+  } catch {}
+  await runSql(db, `CREATE INDEX IF NOT EXISTS idx_leads_user ON leads(user_email);`);
+  await runSql(db, `CREATE INDEX IF NOT EXISTS idx_leads_updatedAt ON leads(updatedAt);`);
 
   // Create Users Table
   await runSql(db, `
@@ -369,6 +404,53 @@ export async function initDb() {
       password_hash TEXT NOT NULL,
       name TEXT NOT NULL,
       avatar TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      subscription_status TEXT NOT NULL DEFAULT 'trial',
+      subscription_expires_at TEXT,
+      last_payment_date TEXT,
+      device_id TEXT
+    )
+  `);
+
+  // Migrate existing users table if columns are missing
+  try {
+    const userCols = await querySqlAll<any>(db, "PRAGMA table_info(users)");
+    const colNames = userCols.map(c => c.name);
+    if (!colNames.includes("is_active")) {
+      await runSql(db, "ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1");
+    }
+    if (!colNames.includes("subscription_status")) {
+      await runSql(db, "ALTER TABLE users ADD COLUMN subscription_status TEXT NOT NULL DEFAULT 'trial'");
+    }
+    if (!colNames.includes("subscription_expires_at")) {
+      await runSql(db, "ALTER TABLE users ADD COLUMN subscription_expires_at TEXT");
+    }
+    if (!colNames.includes("last_payment_date")) {
+      await runSql(db, "ALTER TABLE users ADD COLUMN last_payment_date TEXT");
+    }
+    if (!colNames.includes("device_id")) {
+      await runSql(db, "ALTER TABLE users ADD COLUMN device_id TEXT");
+    }
+    // Set 30 days trial for any legacy users where expiry is null
+    const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    await runSql(db, "UPDATE users SET subscription_expires_at = ? WHERE subscription_expires_at IS NULL", [thirtyDaysLater]);
+  } catch (err) {
+    console.error("Users schema migration warning:", err);
+  }
+
+  // Create Payment Logs Table
+  await runSql(db, `
+    CREATE TABLE IF NOT EXISTS payment_logs (
+      id TEXT PRIMARY KEY,
+      user_email TEXT NOT NULL,
+      amount REAL NOT NULL DEFAULT 99,
+      currency TEXT NOT NULL DEFAULT 'INR',
+      months INTEGER NOT NULL DEFAULT 1,
+      payment_method TEXT NOT NULL,
+      reference_id TEXT,
+      notes TEXT,
+      recorded_by TEXT NOT NULL,
       createdAt TEXT NOT NULL
     )
   `);
@@ -426,14 +508,38 @@ export async function initDb() {
   }
 
   // Safe schema migrations helper (adds user_email & isDeleted if absent in old sqlite tables)
-  const tables = ["customers", "orders", "inventory", "recipes", "checklist", "custom_events", "dispatched_notifications", "scheduled_alerts", "bakery_profile", "categories"];
+  const tables = ["customers", "orders", "inventory", "recipes", "checklist", "custom_events", "dispatched_notifications", "scheduled_alerts", "bakery_profile", "categories", "leads"];
   for (const t of tables) {
     try {
-      await runSql(db, `ALTER TABLE ${t} ADD COLUMN user_email TEXT NOT NULL DEFAULT 'praveen023kumar@gmail.com'`);
+      await runSql(db, `ALTER TABLE ${t} ADD COLUMN user_email TEXT NOT NULL DEFAULT ''`);
     } catch {}
     try {
       await runSql(db, `ALTER TABLE ${t} ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0`);
     } catch {}
+  }
+
+  // Auto-migrate any legacy tables that still have DEFAULT 'praveen023kumar@gmail.com'
+  try {
+    const legacyTables = await querySqlAll<{ name: string; sql: string }>(
+      db,
+      "SELECT name, sql FROM sqlite_master WHERE type='table' AND sql LIKE '%praveen023kumar@gmail.com%'"
+    );
+
+    for (const tbl of legacyTables) {
+      const cleanSql = tbl.sql
+        .replace(/DEFAULT\s+'praveen023kumar@gmail\.com'/gi, "")
+        .replace(new RegExp(`CREATE\\s+TABLE\\s+("?${tbl.name}"?)`, "i"), `CREATE TABLE ${tbl.name}_migration_tmp`);
+
+      await runSql(db, "PRAGMA foreign_keys = OFF;");
+      await runSql(db, cleanSql);
+      await runSql(db, `INSERT INTO ${tbl.name}_migration_tmp SELECT * FROM "${tbl.name}";`);
+      await runSql(db, `DROP TABLE "${tbl.name}";`);
+      await runSql(db, `ALTER TABLE ${tbl.name}_migration_tmp RENAME TO "${tbl.name}";`);
+      await runSql(db, "PRAGMA foreign_keys = ON;");
+      console.log(`[DB Migration] Cleaned legacy default user_email from table: ${tbl.name}`);
+    }
+  } catch (migErr) {
+    console.error("Auto-migration of legacy user_email defaults failed:", migErr);
   }
 
   // Safe migration specifically for deliveryDate on orders table
@@ -462,36 +568,6 @@ export async function initDb() {
   try {
     await runSql(db, `ALTER TABLE feedbacks ADD COLUMN imageUrl TEXT`);
   } catch {}
-
-  // We do not seed the initial bakery profile anymore, as doing so automatically
-  // marks the user as "onboarded" and prevents the Getting Started page from showing.
-  // The profile will be created when the user completes onboarding.
-
-  // Seed default categories if table is empty
-  try {
-    const catCount = await querySqlAll<any>(db, "SELECT count(*) as count FROM categories WHERE user_email = 'praveen023kumar@gmail.com'");
-    if (catCount.length === 0 || catCount[0].count === 0) {
-      const now = new Date().toISOString();
-      const defaultRecipeCats = ["Cakes", "Viennoiserie", "Tarts", "Confectionary", "Classic", "Pastry"];
-      for (const cat of defaultRecipeCats) {
-        const id = `cat-recipe-${cat.toLowerCase().replace(/\s+/g, '-')}`;
-        await runSql(db, `
-          INSERT INTO categories (id, name, type, updatedAt, user_email, isDeleted)
-          VALUES (?, ?, 'recipe', ?, 'praveen023kumar@gmail.com', 0)
-        `, [id, cat, now]);
-      }
-      const defaultInvCats = ["Dry Goods", "Dairy", "Produce", "Packaging", "Flour", "Chocolate"];
-      for (const cat of defaultInvCats) {
-        const id = `cat-inv-${cat.toLowerCase().replace(/\s+/g, '-')}`;
-        await runSql(db, `
-          INSERT INTO categories (id, name, type, updatedAt, user_email, isDeleted)
-          VALUES (?, ?, 'inventory', ?, 'praveen023kumar@gmail.com', 0)
-        `, [id, cat, now]);
-      }
-    }
-  } catch (err) {
-    console.error("Failed to seed default categories SQLite table:", err);
-  }
 
   db.close();
   console.log("SQLite database initialized successfully.");

@@ -535,12 +535,12 @@ export async function seedTop50TamilNaduRecipes() {
           `INSERT INTO recipes (
             id, name, category, stdYield, yieldUnit, ingredients, instructions,
             prepTimeMinutes, cookTimeMinutes, slug, metaTitle, metaDescription,
-            keywords, isPublic, updatedAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            keywords, isPublic, updatedAt, user_email
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             r.id, r.name, r.category, r.stdYield, r.yieldUnit, ingredientsJson,
             instructionsJson, r.prepTimeMinutes, r.cookTimeMinutes, r.slug,
-            r.metaTitle, r.metaDescription, r.keywords, 1, now
+            r.metaTitle, r.metaDescription, r.keywords, 1, now, "public@floura.app"
           ]
         );
       } else {

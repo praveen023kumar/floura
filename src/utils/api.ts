@@ -47,8 +47,28 @@ export const getBackendBaseUrl = (): string => {
   return "";
 };
 
-export const getApiUrl = (path: string): string => {
+export const getApiUrl = (path: string = ""): string => {
   const base = getBackendBaseUrl();
+  if (!path) return base;
   const cleanedPath = path.startsWith("/") ? path : `/${path}`;
   return `${base}${cleanedPath}`;
+};
+
+/**
+ * Returns a persistent unique device identifier for single-device session locking.
+ */
+export const getDeviceId = (): string => {
+  if (typeof window === "undefined") return "browser_device";
+  try {
+    let id = localStorage.getItem("floura_device_id");
+    if (!id) {
+      id = "dev_" + (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID().replace(/-/g, "")
+        : Math.random().toString(36).substring(2) + Date.now().toString(36));
+      localStorage.setItem("floura_device_id", id);
+    }
+    return id;
+  } catch {
+    return "browser_device";
+  }
 };

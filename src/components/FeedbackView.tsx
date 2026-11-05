@@ -16,7 +16,8 @@ import {
   AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { getApiUrl } from "../utils/api";
+import { getApiUrl, getDeviceId } from "../utils/api";
+import { compressImage, getBase64ByteSize } from "../utils/imageCompressor";
 
 interface FeedbackItem {
   id: string;
@@ -60,7 +61,8 @@ function FeedbackView({ user, onNavigate }: FeedbackViewProps) {
         method: "GET",
         headers: {
           "Authorization": "Bearer " + (user.token || ""),
-          "x-user-email": user.email
+          "x-user-email": user.email,
+          "x-device-id": getDeviceId()
         }
       });
 
@@ -82,19 +84,22 @@ function FeedbackView({ user, onNavigate }: FeedbackViewProps) {
     fetchFeedbacks();
   }, [user]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setFormError("Image size must be less than 2MB.");
+      if (!file.type.startsWith("image/")) {
+        setFormError("Please select a valid image file.");
         return;
       }
       setFormError("");
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFeedbackImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImage(file, 800, 800, 50);
+        setFeedbackImage(compressed);
+        window.showToast?.("Screenshot optimized (<50KB)", "success");
+      } catch (err) {
+        console.error("Failed to compress feedback image:", err);
+        setFormError("Failed to process image. Please try another.");
+      }
     }
   };
 
@@ -113,7 +118,8 @@ function FeedbackView({ user, onNavigate }: FeedbackViewProps) {
         headers: { 
           "Content-Type": "application/json",
           "Authorization": "Bearer " + (user?.token || ""),
-          "x-user-email": user?.email || ""
+          "x-user-email": user?.email || "",
+          "x-device-id": getDeviceId()
         },
         body: JSON.stringify({
           name: user?.name || "Logged-in Chef",
@@ -389,7 +395,7 @@ function FeedbackView({ user, onNavigate }: FeedbackViewProps) {
                         <div className="flex flex-col items-center justify-center text-center">
                           <Upload className="w-5 h-5 text-zinc-400 dark:text-zinc-600 mb-1" />
                           <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-450">Upload screenshot or photo</span>
-                          <span className="text-[8px] text-zinc-400 mt-0.5">JPEG or PNG, max 2MB</span>
+                          <span className="text-[8px] text-zinc-400 mt-0.5">JPEG, PNG, WebP (auto-compressed &lt;50KB)</span>
                         </div>
                         <input 
                           type="file" 
@@ -402,6 +408,9 @@ function FeedbackView({ user, onNavigate }: FeedbackViewProps) {
                       <div className="relative inline-block mt-1">
                         <div className="relative w-28 h-28 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm">
                           <img src={feedbackImage} alt="Feedback preview" className="w-full h-full object-cover" />
+                          <span className="absolute bottom-1.5 left-1.5 text-[9px] bg-zinc-900/80 text-white px-1.5 py-0.5 rounded-full font-medium shadow backdrop-blur-xs">
+                            {Math.round(getBase64ByteSize(feedbackImage) / 1024)} KB
+                          </span>
                         </div>
                         <button
                           type="button"

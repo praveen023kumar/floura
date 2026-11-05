@@ -2,6 +2,7 @@
 import React, { useState, useEffect, memo } from "react";
 import { memoWithData } from "../utils/memo";
 import { type Order } from "../types";
+import { useNavigate } from "react-router-dom";
 import { localDb } from "../db";
 import { scaleRecipeIngredients, parseWeightToGrams } from "../../shared/calculations";
 
@@ -45,6 +46,14 @@ function OrderDetail({
   onUpdateOrderStatus,
   onNavigate,
 }: OrderDetailProps) {
+  const routerNavigate = useNavigate();
+  const handleNavigate = (path: string | number, state?: any) => {
+    if (onNavigate) {
+      onNavigate(path, state);
+    } else if (typeof path === "string") {
+      routerNavigate(path, { state });
+    }
+  };
   const {
     orders,
     selectedOrder,
@@ -110,14 +119,14 @@ function OrderDetail({
   }, [selectedOrder, completingOrder]);
 
   const calculateOrderIngredients = (order: Order) => {
-    if (!order || !order.cakeFlavor) return { list: [], totalCost: 0, recipeFound: false };
+    if (!order || !order.cakeFlavor) return { list: [], totalCost: 0, recipeFound: false, recipeId: undefined, recipeName: "" };
     
     const matchingRecipe = recipesList.find(
       (r: any) => r.isDeleted !== 1 && r.name.trim().toLowerCase() === order.cakeFlavor.trim().toLowerCase()
     );
     
     if (!matchingRecipe) {
-      return { list: [], totalCost: 0, recipeFound: false };
+      return { list: [], totalCost: 0, recipeFound: false, recipeId: undefined, recipeName: "" };
     }
     
     const targetWeight = parseWeightToGrams(order.cakeWeight);
@@ -158,21 +167,26 @@ function OrderDetail({
       list,
       totalCost: parseFloat(totalCost.toFixed(2)),
       recipeFound: true,
+      recipeId: matchingRecipe.id,
       recipeName: matchingRecipe.name
     };
   };
 
-  const handleShareWhatsApp = (order: Order) => {
+  const handleShareWhatsApp = async (order: Order) => {
     if (!order.customerMobile) {
       window.showToast?.("No mobile number available for this customer.", "error");
       return;
     }
-    const cleanNum = order.customerMobile.replace(/\D/g, "");
+    let cleanNum = order.customerMobile.replace(/\D/g, "");
     if (!cleanNum) {
       window.showToast?.("Invalid customer phone number format.", "error");
       return;
     }
+    if (cleanNum.length === 10) {
+      cleanNum = `91${cleanNum}`;
+    }
     
+    const seqId = getOrderSeqId(order.id, orders);
     const bakeryName = bakeryProfile?.bakeryName || "Floura Bakery";
     const currency = getCurrencySymbol();
     
@@ -184,9 +198,82 @@ function OrderDetail({
       ? order.venueAddress
       : "In-store pickup";
 
-    const message = `*${bakeryName} - Invoice* 🧾\n----------------------------------------\n*Invoice ID:* #${order.id}\n*Customer:* ${order.customerName}\n*Event Type:* ${order.eventType}\n*Delivery/Pickup:* ${formatDate(order.deliveryDate)} at ${order.deliveryTime || "09:00"}\n*Venue:* ${venueVal}\n\n*Cake Details:*\n• Flavor: ${order.cakeFlavor}\n• Shape: ${order.cakeShape}\n• Weight: ${order.cakeWeight}\n• Layers: ${order.layers}${order.cakeInscription ? `\n• Inscription: "${order.cakeInscription}"` : ""}\n\n*Financial Summary:*\n• Grand Total: ${currency}${totalVal.toFixed(2)}\n• Total Paid: ${currency}${paidVal.toFixed(2)}\n• *Balance Due: ${currency}${balanceVal.toFixed(2)}*\n\nThank you for choosing ${bakeryName}! 🍰`;
-    window.open(`https://wa.me/${cleanNum}?text=${encodeURIComponent(message)}`, "_blank");
-    window.showToast?.("Invoice Generated", "success");
+    const message = `*${bakeryName} - Invoice* 🧾\n----------------------------------------\n*Invoice ID:* #${seqId}\n*Customer:* ${order.customerName}\n*Event Type:* ${order.eventType}\n*Delivery/Pickup:* ${formatDate(order.deliveryDate)} at ${order.deliveryTime || "09:00"}\n*Venue:* ${venueVal}\n\n*Cake Details:*\n• Flavor: ${order.cakeFlavor}\n• Shape: ${order.cakeShape}\n• Weight: ${order.cakeWeight}\n• Layers: ${order.layers}${order.cakeInscription ? `\n• Inscription: "${order.cakeInscription}"` : ""}\n\n*Financial Summary:*\n• Grand Total: ${currency}${totalVal.toFixed(2)}\n• Total Paid: ${currency}${paidVal.toFixed(2)}\n• *Balance Due: ${currency}${balanceVal.toFixed(2)}*\n\nThank you for choosing ${bakeryName}! 🍰`;
+
+    // 1. Try Web Share API (supported on mobile and Safari) which can send image + caption natively
+    let imageFile: File | null = null;
+    if (order.referenceImage && order.referenceImage.startsWith("data:image/")) {
+      try {
+        const res = await fetch(order.referenceImage);
+        const blob = await res.blob();
+        const ext = blob.type.includes("jpeg") || blob.type.includes("jpg") ? "jpg" : "png";
+        imageFile = new File([blob], `cake-design-${seqId}.${ext}`, { type: blob.type || "image/png" });
+      } catch (e) {
+        console.warn("Could not prepare reference image file:", e);
+      }
+    }
+
+    if (navigator.share && imageFile && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+      try {
+        await navigator.share({
+          title: `${bakeryName} - Invoice #${seqId}`,
+          text: message,
+          files: [imageFile],
+        });
+        window.showToast?.("Invoice & design photo shared successfully!", "success");
+        return;
+      } catch (err: any) {
+        if (err.name === "AbortError") return;
+        console.warn("Web Share failed, falling back to WhatsApp Web:", err);
+      }
+    }
+
+    // 2. Fallback for WhatsApp Web on desktop: Auto-copy design image to clipboard
+    let imageCopied = false;
+    if (order.referenceImage && navigator.clipboard && window.ClipboardItem) {
+      try {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = order.referenceImage;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const convertedBlob = await new Promise<Blob | null>((resolve) =>
+            canvas.toBlob(resolve, "image/png")
+          );
+          if (convertedBlob) {
+            await navigator.clipboard.write([
+              new ClipboardItem({ "image/png": convertedBlob }),
+            ]);
+            imageCopied = true;
+          }
+        }
+      } catch (clipErr) {
+        console.warn("Clipboard copy of image failed:", clipErr);
+      }
+    }
+
+    // 3. Open WhatsApp Web or Mobile with named target so existing tab is focused rather than opening duplicates
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const whatsappUrl = isMobile
+      ? `https://wa.me/${cleanNum}?text=${encodeURIComponent(message)}`
+      : `https://web.whatsapp.com/send?phone=${cleanNum}&text=${encodeURIComponent(message)}`;
+
+    window.open(whatsappUrl, "floura_whatsapp_window");
+
+    if (imageCopied) {
+      window.showToast?.("📋 Design photo copied to clipboard! Paste it directly into WhatsApp (Cmd+V / Ctrl+V)", "info");
+    } else {
+      window.showToast?.("Invoice opened in WhatsApp", "success");
+    }
   };
 
   return (
@@ -253,7 +340,16 @@ function OrderDetail({
               </div>
 
               {/* Right aligned action buttons */}
-              <div className="flex items-center gap-2.5 shrink-0 select-none">
+              <div className="flex items-center gap-2.5 shrink-0 select-none flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleStartEdit(selectedOrder)}
+                  className="bg-primary-brand text-white hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 py-2 px-3.5 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-sm font-sans"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Modify Spec</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -359,9 +455,29 @@ function OrderDetail({
                         {selectedOrder.layers} Cake
                       </span>
                     </div>
-                    <h3 className="text-lg font-serif font-bold text-zinc-850 dark:text-zinc-105 leading-tight text-left">
-                      {selectedOrder.cakeFlavor}
-                    </h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-lg font-serif font-bold text-zinc-850 dark:text-zinc-105 leading-tight text-left">
+                        {selectedOrder.cakeFlavor}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const match = recipesList.find(
+                            (r: any) => r.isDeleted !== 1 && r.name.trim().toLowerCase() === selectedOrder.cakeFlavor.trim().toLowerCase()
+                          );
+                          if (match?.id) {
+                            handleNavigate(`/recipes/${match.id}`);
+                          } else {
+                            handleNavigate("/recipes");
+                          }
+                        }}
+                        className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-1.5 py-0.5 rounded border border-amber-200/50 dark:border-amber-800/40 cursor-pointer active:scale-95 transition-all flex items-center gap-1 group"
+                        title="Open Recipes catalog to view formula"
+                      >
+                        <span>From Recipes</span>
+                        <span className="text-[9px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform">↗</span>
+                      </button>
+                    </div>
                     <p className="text-xs text-zinc-500 font-sans text-left">
                       Shape: <strong>{selectedOrder.cakeShape}</strong> • {selectedOrder.cakeWeight.toLowerCase().includes("pieces") || selectedOrder.cakeWeight.toLowerCase().includes("pcs") ? "Quantity" : "Weight"}: <strong>{selectedOrder.cakeWeight}</strong> • Preference:{" "}
                       <span className={`px-1.5 py-0.5 rounded font-bold text-[9px] ${
@@ -594,8 +710,16 @@ function OrderDetail({
                   const ingDetails = calculateOrderIngredients(selectedOrder);
                   if (!ingDetails.recipeFound) {
                     return (
-                      <div className="bg-amber-50 dark:bg-amber-950/20 p-5 rounded-2xl border border-amber-250 dark:border-amber-900/30 text-xs text-amber-700 dark:text-amber-400 text-left">
-                        No matching recipe found for flavor "{selectedOrder.cakeFlavor}" to display ingredient costs.
+                      <div className="bg-amber-50 dark:bg-amber-950/20 p-5 rounded-2xl border border-amber-250 dark:border-amber-900/30 text-xs text-amber-700 dark:text-amber-400 text-left flex items-center justify-between flex-wrap gap-2">
+                        <span>No matching recipe found for flavor "{selectedOrder.cakeFlavor}" to display ingredient costs.</span>
+                        <button
+                          type="button"
+                          onClick={() => handleNavigate("/recipes/new")}
+                          className="text-[11px] font-bold text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 px-2.5 py-1 rounded-lg border border-amber-300 dark:border-amber-700 cursor-pointer active:scale-95 transition-all flex items-center gap-1"
+                        >
+                          <span>Create Recipe</span>
+                          <span className="text-[10px]">↗</span>
+                        </button>
                       </div>
                     );
                   }
@@ -605,9 +729,21 @@ function OrderDetail({
                         <h4 className="text-xs font-bold text-zinc-505 uppercase tracking-wider">
                           Ingredient Cost Breakdown
                         </h4>
-                        <span className="text-[10px] text-zinc-400">
-                          Recipe: {ingDetails.recipeName}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (ingDetails.recipeId) {
+                              handleNavigate(`/recipes/${ingDetails.recipeId}`);
+                            } else {
+                              handleNavigate("/recipes");
+                            }
+                          }}
+                          className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-2 py-0.5 rounded border border-amber-200/50 dark:border-amber-800/40 cursor-pointer active:scale-95 transition-all flex items-center gap-1 group"
+                          title="View Recipe formula and ingredients"
+                        >
+                          <span>Recipe: {ingDetails.recipeName}</span>
+                          <span className="text-[9px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform">↗</span>
+                        </button>
                       </div>
                       <div className="space-y-2 text-xs">
                         {ingDetails.list.map((ing, idx) => (
@@ -783,17 +919,6 @@ function OrderDetail({
               </div>
             </div>
 
-            {/* Action buttons at the bottom of the page */}
-            <div className="flex justify-end pt-4 border-t border-zinc-100 dark:border-zinc-700/60 print:hidden">
-              <button
-                type="button"
-                onClick={() => handleStartEdit(selectedOrder)}
-                className="w-full sm:w-auto bg-primary-brand text-white hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 py-2.5 px-6 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-md font-sans"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Modify Spec</span>
-              </button>
-            </div>
 
             {/* ================= PRINTER-FRIENDLY INVOICE ================= */}
             <div

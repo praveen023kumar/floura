@@ -5,7 +5,7 @@ import { User, Shield, Store, Mail, Phone, MapPin, Check, Edit2, Sparkles, Camer
 import { motion } from "motion/react";
 import Avatar, { AVATAR_PRESETS } from "./Avatar";
 import { setPreference } from "../db";
-import { setFormatConfig } from "../utils/format";
+import { setFormatConfig, normalizeCurrency } from "../utils/format";
 import { getApiUrl } from "../utils/api";
 
 import { useProfile, compressImage } from "../hooks/useProfile";
@@ -128,21 +128,17 @@ function ProfileView({ user, onUpdateProfile, bakeryProfile, onUpdateBakeryProfi
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          if (event.target?.result) {
-                            const rawBase64 = event.target.result as string;
-                            compressImage(rawBase64, 160, 160).then((compressed) => {
-                              setAvatar(compressed);
-                            }).catch(() => {
-                              setAvatar(rawBase64);
-                            });
-                          }
-                        };
-                        reader.readAsDataURL(file);
+                        try {
+                          const compressed = await compressImage(file, 240, 240, 50);
+                          setAvatar(compressed);
+                          window.showToast?.("Profile photo optimized (<50KB)", "success");
+                        } catch (err) {
+                          console.error("Avatar compression error:", err);
+                          window.showToast?.("Failed to process image.", "error");
+                        }
                       }
                     }}
                     className="hidden"
@@ -178,18 +174,6 @@ function ProfileView({ user, onUpdateProfile, bakeryProfile, onUpdateBakeryProfi
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="bg-white dark:bg-zinc-800 text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-400 focus:outline-none"
-                  />
-                </div>
-
-                {/* Baker Role */}
-                <div className="flex flex-col gap-1.5 text-left">
-                  <label className="text-xs font-bold text-zinc-500">Corporate Title/Role</label>
-                  <input
-                    required
-                    type="text"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
                     className="bg-white dark:bg-zinc-800 text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-400 focus:outline-none"
                   />
                 </div>
@@ -258,14 +242,14 @@ function ProfileView({ user, onUpdateProfile, bakeryProfile, onUpdateBakeryProfi
                 <div className="flex flex-col gap-1.5 text-left">
                   <label className="text-xs font-bold text-zinc-500">Currency Symbol</label>
                   <select
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
+                    value={normalizeCurrency(currency)}
+                    onChange={(e) => setCurrency(normalizeCurrency(e.target.value))}
                     className="bg-white dark:bg-zinc-800 text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-400 focus:outline-none"
                   >
+                    <option value="₹">INR (₹)</option>
                     <option value="$">USD ($)</option>
                     <option value="€">EUR (€)</option>
                     <option value="£">GBP (£)</option>
-                    <option value="₹">INR (₹)</option>
                     <option value="¥">JPY/CNY (¥)</option>
                   </select>
                 </div>

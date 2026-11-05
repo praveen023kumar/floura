@@ -3,7 +3,7 @@ import { useEffect, useState, lazy, Suspense, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { isNativeApp } from "./utils/api";
+import { isNativeApp, getApiUrl, getDeviceId } from "./utils/api";
 import { useAppEngine } from "./hooks/useAppEngine";
 import {
   LayoutDashboard,
@@ -29,7 +29,9 @@ import {
   Calendar,
   MessageSquare,
   User,
-  Lock
+  Lock,
+  HelpCircle,
+  UserPlus
 } from "lucide-react";
 
 declare global {
@@ -46,12 +48,14 @@ import flouraLogo from "./assets/images/floura_logo.webp";
 import Avatar from "./components/Avatar";
 import LandingPage from "./components/LandingPage";
 import InitialSyncLoader from "./components/InitialSyncLoader";
+import PWAInstallBanner from "./components/PWAInstallBanner";
 
 // Lazy loaded page components for optimal app bundles and load performance
 const AdminDashboardView = lazy(() => import("./components/AdminDashboardView"));
 const AdminLoginView = lazy(() => import("./components/AdminLoginView"));
 const LoginView = lazy(() => import("./components/LoginView"));
 const DashboardView = lazy(() => import("./components/DashboardView"));
+const LeadsView = lazy(() => import("./components/LeadsView"));
 const OrdersList = lazy(() => import("./components/OrdersList"));
 const OrderCreate = lazy(() => import("./components/OrderCreate"));
 const OrderDetail = lazy(() => import("./components/OrderDetail"));
@@ -67,11 +71,14 @@ const RecipeDetailView = lazy(() => import("./components/RecipeDetailView"));
 const ProfileView = lazy(() => import("./components/ProfileView"));
 const GettingStartedView = lazy(() => import("./components/GettingStartedView"));
 const MoreView = lazy(() => import("./components/MoreView"));
+const HelpView = lazy(() => import("./components/HelpView"));
 const DebriefsView = lazy(() => import("./components/DebriefsView"));
 const FeedbackView = lazy(() => import("./components/FeedbackView"));
 const PublicRecipesListView = lazy(() => import("./components/PublicRecipesListView"));
 const PublicRecipeDetailView = lazy(() => import("./components/PublicRecipeDetailView"));
 const AdminPublicRecipeCreateView = lazy(() => import("./components/AdminPublicRecipeCreateView"));
+const SubscriptionBlockedView = lazy(() => import("./components/SubscriptionBlockedView"));
+const ReauthView = lazy(() => import("./components/ReauthView"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -82,9 +89,10 @@ const queryClient = new QueryClient({
   },
 });
 
-function MainAppContent({ initialUser, onLogout }: {
+function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
   initialUser: any;
   onLogout: () => void;
+  onUserUpdate?: (user: any) => void;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -95,6 +103,7 @@ function MainAppContent({ initialUser, onLogout }: {
     if (pathname.startsWith("/orders")) return "orders";
     if (pathname.startsWith("/customers/new")) return "customers-form";
     if (pathname.startsWith("/customers")) return "customers";
+    if (pathname.startsWith("/leads")) return "leads";
     if (pathname.startsWith("/inventory/new")) return "inventory-form";
     if (pathname.startsWith("/inventory")) return "inventory";
     if (pathname.startsWith("/checklist")) return "checklist";
@@ -104,6 +113,7 @@ function MainAppContent({ initialUser, onLogout }: {
     if (pathname.startsWith("/profile")) return "profile";
     if (pathname.startsWith("/getting-started")) return "getting-started";
     if (pathname.startsWith("/more")) return "more";
+    if (pathname.startsWith("/help")) return "help";
     if (pathname.startsWith("/feedback")) return "feedback";
     return "dashboard";
   };
@@ -148,7 +158,7 @@ function MainAppContent({ initialUser, onLogout }: {
     handleToggleChecklistItem,
     handleAddChecklistItem,
     handleResetChecklist,
-  } = useAppEngine(initialUser, onLogout);
+  } = useAppEngine(initialUser, onLogout, onUserUpdate);
 
   if (!user) {
     return null;
@@ -176,6 +186,15 @@ function MainAppContent({ initialUser, onLogout }: {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [location.pathname]);
+
+  // Notify user when a new PWA service worker version is waiting
+  useEffect(() => {
+    const handleUpdate = () => {
+      window.showToast?.("A new update for Floura is ready! Refresh to apply.", "info");
+    };
+    window.addEventListener("pwa-update-available", handleUpdate);
+    return () => window.removeEventListener("pwa-update-available", handleUpdate);
+  }, []);
 
   // Memoized page elements to prevent unnecessary route-level re-renders when parent states update
   const dashboardViewElement = useMemo(() => (
@@ -299,6 +318,10 @@ function MainAppContent({ initialUser, onLogout }: {
     />
   ), [navigate]);
 
+  const leadsViewElement = useMemo(() => (
+    <LeadsView onSync={triggerSync} bakeryName={bakeryProfile?.bakeryName} />
+  ), [triggerSync, bakeryProfile?.bakeryName]);
+
   const gettingStartedViewElement = useMemo(() => (
     <GettingStartedView
       user={user}
@@ -340,6 +363,10 @@ function MainAppContent({ initialUser, onLogout }: {
   ), [user, handleLogin, handleLogout, darkMode, setDarkMode]);
 
   const debriefsViewElement = useMemo(() => <DebriefsView />, []);
+
+  const helpViewElement = useMemo(() => (
+    <HelpView onNavigate={navigate} />
+  ), [navigate]);
 
   const feedbackViewElement = useMemo(() => (
     <FeedbackView 
@@ -519,6 +546,7 @@ function MainAppContent({ initialUser, onLogout }: {
             {/* Dashboard Link */}
             <button
               onClick={() => navigate("/dashboard")}
+              title="Dashboard"
               className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "dashboard"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
@@ -526,7 +554,7 @@ function MainAppContent({ initialUser, onLogout }: {
               }`}
             >
               <LayoutGrid className="w-5 h-5 shrink-0" />
-              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+              <span className="sidebar-tooltip">
                 Dashboard
               </span>
             </button>
@@ -534,6 +562,7 @@ function MainAppContent({ initialUser, onLogout }: {
             {/* Orders Link */}
             <button
               onClick={() => navigate("/orders")}
+              title="Orders"
               className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "orders" || currentScreen === "orders-form"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
@@ -541,7 +570,7 @@ function MainAppContent({ initialUser, onLogout }: {
               }`}
             >
               <Calendar className="w-5 h-5 shrink-0" />
-              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+              <span className="sidebar-tooltip">
                 Orders
               </span>
             </button>
@@ -549,6 +578,7 @@ function MainAppContent({ initialUser, onLogout }: {
             {/* Recipes Link */}
             <button
               onClick={() => navigate("/recipes")}
+              title="Recipes"
               className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "recipes" || currentScreen === "recipes-form"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
@@ -556,7 +586,7 @@ function MainAppContent({ initialUser, onLogout }: {
               }`}
             >
               <BookOpen className="w-5 h-5 shrink-0" />
-              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+              <span className="sidebar-tooltip">
                 Recipes
               </span>
             </button>
@@ -564,6 +594,7 @@ function MainAppContent({ initialUser, onLogout }: {
             {/* Inventory Link */}
             <button
               onClick={() => navigate("/inventory")}
+              title="Inventory"
               className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "inventory" || currentScreen === "inventory-form"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
@@ -571,7 +602,7 @@ function MainAppContent({ initialUser, onLogout }: {
               }`}
             >
               <Boxes className="w-5 h-5 shrink-0" />
-              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+              <span className="sidebar-tooltip">
                 Inventory
               </span>
             </button>
@@ -579,6 +610,7 @@ function MainAppContent({ initialUser, onLogout }: {
             {/* Customers Link */}
             <button
               onClick={() => navigate("/customers")}
+              title="Customers"
               className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "customers" || currentScreen === "customers-form"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-955 dark:text-white shadow-xs font-extrabold"
@@ -586,14 +618,31 @@ function MainAppContent({ initialUser, onLogout }: {
               }`}
             >
               <Users className="w-5 h-5 shrink-0" />
-              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+              <span className="sidebar-tooltip">
                 Customers
+              </span>
+            </button>
+
+            {/* Leads & Inquiries Link */}
+            <button
+              onClick={() => navigate("/leads")}
+              title="Leads & Inquiries"
+              className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+                currentScreen === "leads"
+                  ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-955 dark:text-white shadow-xs font-extrabold"
+                  : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+              }`}
+            >
+              <UserPlus className="w-5 h-5 shrink-0" />
+              <span className="sidebar-tooltip">
+                Leads & Inquiries
               </span>
             </button>
 
             {/* Debriefs Link */}
             <button
               onClick={() => navigate("/debriefs")}
+              title="Debriefs"
               className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "debriefs"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
@@ -601,7 +650,7 @@ function MainAppContent({ initialUser, onLogout }: {
               }`}
             >
               <MessageSquare className="w-5 h-5 shrink-0" />
-              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+              <span className="sidebar-tooltip">
                 Debriefs
               </span>
             </button>
@@ -609,6 +658,7 @@ function MainAppContent({ initialUser, onLogout }: {
             {/* Checklist Link */}
             <button
               onClick={() => navigate("/checklist")}
+              title="Checklist"
               className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
                 currentScreen === "checklist"
                   ? "bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white shadow-xs font-extrabold"
@@ -616,7 +666,7 @@ function MainAppContent({ initialUser, onLogout }: {
               }`}
             >
               <CheckCircle2 className="w-5 h-5 shrink-0" />
-              <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
+              <span className="sidebar-tooltip">
                 Checklist
               </span>
             </button>
@@ -624,10 +674,27 @@ function MainAppContent({ initialUser, onLogout }: {
         </div>
 
         {/* Bottom Section */}
-        <div className="sidebar-bottom mt-auto flex flex-col items-center gap-4 w-full px-2">
+        <div className="sidebar-bottom mt-auto flex flex-col items-center gap-2 w-full px-2">
+          {/* Profit Guide Link */}
+          <button
+            onClick={() => navigate("/help")}
+            title="Profit Guide"
+            className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
+              currentScreen === "help"
+                ? "bg-zinc-150 dark:bg-zinc-850 text-zinc-950 dark:text-white"
+                : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-550 dark:hover:text-zinc-200"
+            }`}
+          >
+            <HelpCircle className="w-5 h-5" />
+            <span className="sidebar-tooltip">
+              Profit Guide
+            </span>
+          </button>
+
           {/* Settings / More Link */}
           <button
             onClick={() => navigate("/more")}
+            title="More & Settings"
             className={`sidebar-btn w-11 h-11 flex items-center justify-center rounded-2xl transition-all cursor-pointer relative group active:scale-95 ${
               currentScreen === "more"
                 ? "bg-zinc-150 dark:bg-zinc-850 text-zinc-950 dark:text-white"
@@ -635,8 +702,8 @@ function MainAppContent({ initialUser, onLogout }: {
             }`}
           >
             <UserCog className="w-5 h-5" />
-            <span className="absolute left-16 bg-zinc-900 text-white text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">
-              More
+            <span className="sidebar-tooltip">
+              More & Settings
             </span>
           </button>
         </div>
@@ -710,6 +777,7 @@ function MainAppContent({ initialUser, onLogout }: {
               <Route path="/customers" element={customersListViewElement} />
               <Route path="/customers/new" element={customerCreateViewElement} />
               <Route path="/customers/:id" element={customerDetailViewElement} />
+              <Route path="/leads" element={leadsViewElement} />
               <Route path="/inventory" element={inventoryListViewElement} />
               <Route path="/inventory/new" element={inventoryCreateViewElement} />
               <Route path="/checklist" element={checklistViewElement} />
@@ -719,6 +787,7 @@ function MainAppContent({ initialUser, onLogout }: {
               <Route path="/getting-started" element={gettingStartedViewElement} />
               <Route path="/profile" element={profileViewElement} />
               <Route path="/more" element={moreViewElement} />
+              <Route path="/help" element={helpViewElement} />
               <Route path="/debriefs" element={debriefsViewElement} />
               <Route path="/feedback" element={feedbackViewElement} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -807,6 +876,9 @@ function MainAppContent({ initialUser, onLogout }: {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Progressive Web App (PWA) Install Banner */}
+      <PWAInstallBanner />
     </div>
   );
 }
@@ -833,12 +905,13 @@ function AdminLoading() {
   );
 }
 
-function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode }: {
+function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode, onUserUpdate }: {
   user: any;
   onLogin: any;
   onLogout: any;
   darkMode: boolean;
   setDarkMode: any;
+  onUserUpdate?: (user: any) => void;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -849,11 +922,22 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode }: {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
+  // Global listener for invalid workspace signature re-authentication events
+  useEffect(() => {
+    const handleReauthEvent = (e: any) => {
+      const returnTo = e.detail?.returnTo || location.pathname || "/dashboard";
+      navigate(`/reauthenticate?returnTo=${encodeURIComponent(returnTo)}`);
+    };
+    window.addEventListener("floura_reauth_required", handleReauthEvent);
+    return () => window.removeEventListener("floura_reauth_required", handleReauthEvent);
+  }, [navigate, location.pathname]);
+
   useEffect(() => {
     if (!user) {
       const isPublicPath = location.pathname === "/" || 
                            location.pathname === "/landing" || 
                            location.pathname === "/login" ||
+                           location.pathname === "/reauthenticate" ||
                            location.pathname.startsWith("/calculator") ||
                            location.pathname.startsWith("/admin");
       if (!isPublicPath) {
@@ -861,6 +945,29 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode }: {
       }
     }
   }, [user, location.pathname, navigate]);
+
+  // Dedicated /reauthenticate route (displayed when security workspace signature is invalid or expired)
+  if (location.pathname === "/reauthenticate") {
+    return (
+      <Suspense fallback={<LoadingSignIn />}>
+        <ReauthView
+          user={user}
+          onLogin={(freshUser) => {
+            sessionStorage.removeItem("floura_reauth_reason");
+            const params = new URLSearchParams(window.location.search);
+            const returnTo = sessionStorage.getItem("floura_reauth_return_to") || 
+              params.get("returnTo") || 
+              "/dashboard";
+            sessionStorage.removeItem("floura_reauth_return_to");
+            onLogin(freshUser);
+            navigate(returnTo, { replace: true });
+          }}
+          onLogout={onLogout}
+          darkMode={darkMode}
+        />
+      </Suspense>
+    );
+  }
 
   // Dedicated /login route
   if (location.pathname === "/login") {
@@ -886,19 +993,7 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode }: {
     );
   }
 
-  // 1. Admin Public Recipe Builder (/admin/public-recipes)
-  if (location.pathname.startsWith("/admin/public-recipes")) {
-    return (
-      <Suspense fallback={<AdminLoading />}>
-        <Routes>
-          <Route path="/admin/public-recipes" element={<AdminPublicRecipeCreateView />} />
-          <Route path="/admin/public-recipes/:id" element={<AdminPublicRecipeCreateView />} />
-        </Routes>
-      </Suspense>
-    );
-  }
-
-  // 2. Admin paths (Public Login or Private Dashboard)
+  // 1. Admin paths (Public Login or Private Dashboard)
   if (isAdminPath) {
     const isLoggedAdmin = user && (user.role === "admin" || user.role === "superadmin");
     return (
@@ -942,11 +1037,54 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode }: {
     return <Navigate to="/admin" replace />;
   }
 
-  // 4. Authenticated Chef -> render private workspace
+  // 4. Check Subscription Status & Expiration
+  const isDeactivated = user.is_active === 0;
+  const isExpired = user.subscription_expires_at 
+    ? new Date().getTime() > new Date(user.subscription_expires_at).getTime()
+    : false;
+
+  if (isDeactivated || isExpired) {
+    return (
+      <Suspense fallback={<LoadingSignIn />}>
+        <SubscriptionBlockedView
+          user={user}
+          onRefreshStatus={async () => {
+            try {
+              const res = await fetch(`${getApiUrl()}/api/auth/subscription-status?userEmail=${encodeURIComponent(user.email)}`, {
+                headers: { 
+                  "Authorization": `Bearer ${user.token || ""}`,
+                  "x-device-id": getDeviceId()
+                }
+              });
+              const data = await res.json();
+              if (res.ok && data.status === "success") {
+                const updatedUser = {
+                  ...user,
+                  is_active: data.is_active,
+                  subscription_status: data.subscription_status,
+                  subscription_expires_at: data.subscription_expires_at,
+                  last_payment_date: data.last_payment_date
+                };
+                localStorage.setItem("patisserie_user", JSON.stringify(updatedUser));
+                onLogin(updatedUser);
+              }
+            } catch (err) {
+              console.error("Refresh status error:", err);
+            }
+          }}
+          onLogout={onLogout}
+          darkMode={darkMode}
+        />
+      </Suspense>
+    );
+  }
+
+  // 5. Authenticated Chef -> render private workspace
   return (
     <MainAppContent
       initialUser={user}
       onLogout={onLogout}
+      onUserUpdate={onUserUpdate}
     />
   );
 }
@@ -1030,6 +1168,18 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleUserUpdate = (e: any) => {
+      if (e.detail?.user) {
+        setUser(e.detail.user);
+      }
+    };
+    window.addEventListener("user-update", handleUserUpdate);
+    return () => {
+      window.removeEventListener("user-update", handleUserUpdate);
+    };
+  }, []);
+
   return (
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
@@ -1040,6 +1190,7 @@ export default function App() {
             onLogout={handleLogout}
             darkMode={darkMode}
             setDarkMode={setDarkMode}
+            onUserUpdate={(updated: any) => setUser(updated)}
           />
         </Router>
       </QueryClientProvider>

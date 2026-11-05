@@ -7,8 +7,11 @@ import {
   getSharedCurrencySymbol, 
   formatPriceShared, 
   getSharedDateFormat, 
-  formatDateShared 
+  formatDateShared,
+  normalizeCurrency 
 } from "../../shared/format";
+
+export { normalizeCurrency };
 
 export function setFormatConfig(currency: string, dateFormat: string) {
   setSharedFormatConfig(currency, dateFormat);

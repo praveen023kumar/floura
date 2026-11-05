@@ -5,11 +5,12 @@ import CreatableSelect from "react-select/creatable";
 import AsyncCreatableSelect from "react-select/async-creatable";
 import { customSelectStyles, tableSelectStyles } from "./customSelectStyles";
 import { type Recipe } from "../types";
+import { useNavigate } from "react-router-dom";
 
 import { ArrowLeft, CheckCircle2, Plus, Trash2, ImagePlus, X } from "lucide-react";
 import { motion } from "motion/react";
 import { localDb } from "../db";
-import { compressImage } from "../hooks/useProfile";
+import { compressImage, getBase64ByteSize } from "../utils/imageCompressor";
 
 interface RecipeCreateViewProps {
   onAddRecipe: (recipe: Omit<Recipe, "id" | "updatedAt">) => Promise<any>;
@@ -24,6 +25,15 @@ function RecipeCreateView({
   onNavigate,
   recipeToEdit,
 }: RecipeCreateViewProps) {
+  const routerNavigate = useNavigate();
+  const handleNavigate = (path: string | number) => {
+    if (onNavigate) {
+      onNavigate(path);
+    } else if (typeof path === "string") {
+      routerNavigate(path);
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
@@ -148,18 +158,9 @@ function RecipeCreateView({
     }
 
     try {
-      const raw = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          if (typeof reader.result === "string") resolve(reader.result);
-          else reject(new Error("Failed to read file"));
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      const compressed = await compressImage(raw, 400, 400);
+      const compressed = await compressImage(file, 600, 600, 50);
       setImageBase64(compressed);
+      window.showToast?.("Recipe photo optimized (<50KB)", "success");
     } catch (err) {
       console.error("Failed to process image:", err);
       window.showToast?.("Failed to process image. Please try another file.", "error");
@@ -373,6 +374,9 @@ function RecipeCreateView({
                         alt="Recipe preview"
                         className="w-full h-full object-cover"
                       />
+                      <span className="absolute bottom-2 left-2 text-[10px] bg-zinc-900/80 text-white px-2 py-0.5 rounded-full font-medium shadow backdrop-blur-xs">
+                        {Math.round(getBase64ByteSize(imageBase64) / 1024)} KB
+                      </span>
                       {/* Overlay actions */}
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                         <button
@@ -425,13 +429,48 @@ function RecipeCreateView({
               {/* Right Column: Ingredients Table */}
               <div className="space-y-4">
                 <div className="space-y-2 pt-2">
-                  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Formula Ingredients List</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Formula Ingredients List</label>
+                    <button 
+                      type="button"
+                      onClick={() => handleNavigate("/inventory")}
+                      className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/40 cursor-pointer active:scale-95 transition-all flex items-center gap-1 group"
+                      title="Open Inventory to view and manage raw materials"
+                    >
+                      <span>From Inventory Stocks</span>
+                      <span className="text-[9px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform">↗</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                    Select ingredients from your{" "}
+                    <button
+                      type="button"
+                      onClick={() => handleNavigate("/inventory")}
+                      className="font-bold underline text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 cursor-pointer active:scale-95 transition-all inline-flex items-center gap-0.5"
+                    >
+                      <span>Inventory</span>
+                      <span className="text-[9px]">↗</span>
+                    </button>{" "}
+                    to link unit purchase costs for accurate recipe batch costing.
+                  </p>
 
                   <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm bg-white dark:bg-zinc-800">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 font-bold uppercase tracking-wider">
-                          <th className="px-4 py-2.5 bg-zinc-50 dark:bg-zinc-900">Ingredient Name</th>
+                          <th className="px-4 py-2.5 bg-zinc-50 dark:bg-zinc-900">
+                            <div className="flex items-center gap-1.5">
+                              <span>Ingredient Name</span>
+                              <button
+                                type="button"
+                                onClick={() => handleNavigate("/inventory")}
+                                className="text-[9px] font-medium normal-case text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer active:scale-95 transition-all tracking-normal flex items-center gap-0.5"
+                                title="Open Inventory stocks"
+                              >
+                                <span>(from Inventory ↗)</span>
+                              </button>
+                            </div>
+                          </th>
                           <th className="px-4 py-2.5">Quantity</th>
                           <th className="px-4 py-2.5 w-16"></th>
                         </tr>

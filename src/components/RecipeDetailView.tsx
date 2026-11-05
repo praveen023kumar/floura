@@ -1,6 +1,6 @@
 // File Path: /src/components/RecipeDetailView.tsx
 import React, { useState, useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { memoWithData } from "../utils/memo";
 import { localDb } from "../db";
 import { type Recipe } from "../types";
@@ -13,6 +13,14 @@ interface RecipeDetailViewProps {
 
 function RecipeDetailView({ onNavigate }: RecipeDetailViewProps) {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const handleNavigate = (path: string | number) => {
+    if (onNavigate) {
+      onNavigate(path);
+    } else if (typeof path === "string") {
+      navigate(path);
+    }
+  };
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [desiredUnits, setDesiredUnits] = useState<number | string>("");
@@ -228,18 +236,41 @@ function RecipeDetailView({ onNavigate }: RecipeDetailViewProps) {
         {/* Right Column: Original Recipe specs */}
         <div className="lg:col-span-7 space-y-4">
           <div className="bg-white dark:bg-zinc-800 rounded-3xl p-6 border border-zinc-100 dark:border-zinc-700/60 shadow-sm space-y-4 text-left">
-            <div className="flex items-center gap-2 pb-3 border-b border-zinc-100 dark:border-zinc-700/60">
-              <BookOpen className="w-4 h-4 text-primary-brand dark:text-orange-400" />
-              <h3 className="text-xs font-bold text-zinc-750 dark:text-zinc-305 uppercase tracking-wider font-sans">
-                Standard Ratio Ingredients List (100% Base Formula)
-              </h3>
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-700/60">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-primary-brand dark:text-orange-400" />
+                <h3 className="text-xs font-bold text-zinc-750 dark:text-zinc-305 uppercase tracking-wider font-sans">
+                  Standard Ratio Ingredients List (100% Base Formula)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleNavigate("/inventory")}
+                className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/40 cursor-pointer active:scale-95 transition-all flex items-center gap-1 group"
+                title="Open Inventory to view raw material stocks"
+              >
+                <span>From Inventory Stocks</span>
+                <span className="text-[9px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform">↗</span>
+              </button>
             </div>
 
             <div className="overflow-hidden border border-zinc-150 dark:border-zinc-750 rounded-xl font-sans">
               <table className="w-full text-xs">
                 <thead className="bg-zinc-55 dark:bg-zinc-900/60 border-b border-zinc-150 dark:border-zinc-750 text-zinc-500 font-bold">
                   <tr>
-                    <th className="px-4 py-2.5 text-left font-sans">Ingredient</th>
+                    <th className="px-4 py-2.5 text-left font-sans">
+                      <div className="flex items-center gap-1.5">
+                        <span>Ingredient</span>
+                        <button
+                          type="button"
+                          onClick={() => handleNavigate("/inventory")}
+                          className="text-[9px] font-normal normal-case text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer active:scale-95 transition-all tracking-normal flex items-center gap-0.5"
+                          title="Open Inventory stocks"
+                        >
+                          <span>(from Inventory ↗)</span>
+                        </button>
+                      </div>
+                    </th>
                     <th className="px-4 py-2.5 text-right font-sans">Quantity (Base)</th>
                     <th className="px-4 py-2.5 text-right font-sans">Weight Ratio (%)</th>
                   </tr>

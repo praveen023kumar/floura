@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { setPreference } from "../db";
-import { setFormatConfig } from "../utils/format";
-import { getApiUrl } from "../utils/api";
+import { setFormatConfig, normalizeCurrency } from "../utils/format";
+import { getApiUrl, getDeviceId } from "../utils/api";
+import { isAuthSignatureError, triggerReauth } from "../utils/auth";
 
 export interface UseProfileProps {
   user: { name: string; email: string; avatar: string; token?: string } | null;
@@ -10,43 +11,7 @@ export interface UseProfileProps {
   onUpdateBakeryProfile?: (updatedProfile: any) => Promise<void>;
 }
 
-export function compressImage(base64Str: string, maxWidth: number = 160, maxHeight: number = 160): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      let width = img.width;
-      let height = img.height;
-
-      if (width > height) {
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-      } else {
-        if (height > maxHeight) {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
-        }
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", 0.7));
-      } else {
-        resolve(base64Str);
-      }
-    };
-    img.onerror = () => {
-      resolve(base64Str);
-    };
-    img.src = base64Str;
-  });
-}
+export { compressImage, getBase64ByteSize, formatByteSize } from "../utils/imageCompressor";
 
 export function useProfile({
   user,
@@ -71,7 +36,7 @@ export function useProfile({
   const [email, setEmail] = useState(() => {
     if (bakeryProfile?.email) return bakeryProfile.email;
     if (isNewUser) return "";
-    return user?.email || "praveen023kumar@gmail.com";
+    return user?.email || "";
   });
   const [phone, setPhone] = useState(() => {
     if (bakeryProfile?.phone) return bakeryProfile.phone;
@@ -85,8 +50,20 @@ export function useProfile({
     if (bakeryProfile?.role) return bakeryProfile.role;
     return isNewUser ? "" : "Head Baker & Owner";
   });
-  const [currency, setCurrency] = useState(() => bakeryProfile?.currency || "$");
-  const [dateFormat, setDateFormat] = useState(() => bakeryProfile?.dateFormat || "YYYY-MM-DD");
+  const [currency, setCurrency] = useState(() => {
+    const init = bakeryProfile?.currency || (typeof window !== "undefined" && window.localStorage?.getItem("floura_currency")) || "$";
+    return normalizeCurrency(init);
+  });
+  const [dateFormat, setDateFormat] = useState(() => {
+    if (bakeryProfile?.dateFormat) return bakeryProfile.dateFormat;
+    if (typeof window !== "undefined" && window.localStorage) {
+      try {
+        const stored = window.localStorage.getItem("floura_date_format") || window.localStorage.getItem("patisserie_date_format");
+        if (stored) return stored;
+      } catch {}
+    }
+    return "YYYY-MM-DD";
+  });
   const [isSaved, setIsSaved] = useState(false);
 
   // Synchronize inputs dynamically when bakeryProfile loads
@@ -97,7 +74,7 @@ export function useProfile({
       if (bakeryProfile.phone !== undefined) setPhone(bakeryProfile.phone);
       if (bakeryProfile.address !== undefined) setAddress(bakeryProfile.address);
       if (bakeryProfile.role !== undefined) setRole(bakeryProfile.role);
-      if (bakeryProfile.currency !== undefined) setCurrency(bakeryProfile.currency);
+      if (bakeryProfile.currency !== undefined) setCurrency(normalizeCurrency(bakeryProfile.currency));
       if (bakeryProfile.dateFormat !== undefined) setDateFormat(bakeryProfile.dateFormat);
     }
   }, [bakeryProfile]);
@@ -112,7 +89,9 @@ export function useProfile({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + user.token
+            "Authorization": "Bearer " + user.token,
+            "x-user-email": user.email,
+            "x-device-id": getDeviceId()
           },
           body: JSON.stringify({
             email: user.email,
@@ -122,13 +101,19 @@ export function useProfile({
         });
 
         if (!response.ok) {
-          const errData = await response.json();
+          const errData = await response.json().catch(() => ({}));
+          if (isAuthSignatureError(response.status, errData)) {
+            triggerReauth("/profile", errData.error);
+            return;
+          }
           throw new Error(errData.error || "Failed to update profile on backend database.");
         }
       }
 
       onUpdateProfile({ name, email: user?.email || "", avatar, token: user?.token });
       
+      const normalizedCurrency = normalizeCurrency(currency);
+
       if (onUpdateBakeryProfile) {
         await onUpdateBakeryProfile({
           id: bakeryProfile?.id || "active-profile",
@@ -137,20 +122,26 @@ export function useProfile({
           phone,
           address,
           role,
-          currency,
+          currency: normalizedCurrency,
           dateFormat,
           isDeleted: 0
         });
       }
 
-      setFormatConfig(currency, dateFormat);
+      setFormatConfig(normalizedCurrency, dateFormat);
+      if (typeof window !== "undefined" && window.localStorage) {
+        try {
+          window.localStorage.setItem("floura_currency", normalizedCurrency);
+          window.localStorage.setItem("floura_date_format", dateFormat);
+        } catch {}
+      }
 
       await setPreference("patisserie_bakery_name", bakeryName);
       await setPreference("patisserie_bakery_email", email);
       await setPreference("patisserie_bakery_phone", phone);
       await setPreference("patisserie_bakery_address", address);
       await setPreference("patisserie_bakery_role", role);
-      await setPreference("floura_currency", currency);
+      await setPreference("floura_currency", normalizedCurrency);
       await setPreference("floura_date_format", dateFormat);
 
       window.dispatchEvent(new Event("floura_settings_changed"));

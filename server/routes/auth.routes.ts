@@ -10,5 +10,6 @@ router.get("/external-poll", AuthController.externalPoll);
 router.post("/login", AuthController.login);
 router.post("/profile", requireAuth, AuthController.updateProfile);
 router.get("/verify", requireAuth, AuthController.verify);
+router.get("/subscription-status", AuthController.getSubscriptionStatus);
 
 export default router;
