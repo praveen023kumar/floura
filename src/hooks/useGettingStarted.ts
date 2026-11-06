@@ -66,7 +66,7 @@ export function useGettingStarted({
         }
       }
 
-      onUpdateProfile({ name: chefName, email: user?.email || "", avatar: "chef", token: user?.token });
+      onUpdateProfile({ ...(user || {}), name: chefName, email: user?.email || "", avatar: "chef", token: user?.token });
       
       const normalizedCurrency = normalizeCurrency(currency);
 
@@ -153,7 +153,7 @@ export function useGettingStarted({
         }
       }
 
-      onUpdateProfile({ name: finalChef, email: user?.email || "", avatar: "chef", token: user?.token });
+      onUpdateProfile({ ...(user || {}), name: finalChef, email: user?.email || "", avatar: "chef", token: user?.token });
       
       if (onUpdateBakeryProfile) {
         await onUpdateBakeryProfile({

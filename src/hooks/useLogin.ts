@@ -43,7 +43,7 @@ export function useLogin({ onLogin }: UseLoginProps) {
         return;
       }
 
-      const url = getApiUrl(`/api/auth/external-poll?state=${pollingState}`);
+      const url = getApiUrl(`/api/auth/external-poll?state=${pollingState}&deviceId=${encodeURIComponent(getDeviceId())}`);
       try {
         const response = await fetch(url);
         if (response.ok) {
@@ -142,7 +142,7 @@ export function useLogin({ onLogin }: UseLoginProps) {
             return;
           }
           
-          const requestUrl = getApiUrl(`/api/auth/external-poll?state=${state}`);
+          const requestUrl = getApiUrl(`/api/auth/external-poll?state=${state}&deviceId=${encodeURIComponent(getDeviceId())}`);
           try {
             const response = await fetch(requestUrl);
             if (response.ok) {

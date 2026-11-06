@@ -29,7 +29,9 @@ export interface Customer {
   totalOrders: number;
   memberSince: string; // YYYY-MM-DD
   updatedAt: string; // ISO string
+  localChange?: number;
   isDeleted?: number;
+  user_email?: string;
 }
 
 export interface PaymentInstallment {

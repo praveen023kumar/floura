@@ -42,6 +42,9 @@ export interface PaymentLogItem {
   months: number;
   payment_method: string;
   reference_id?: string;
+  razorpay_order_id?: string;
+  status: "success" | "failed" | "pending";
+  failure_reason?: string;
   notes?: string;
   recorded_by: string;
   createdAt: string;

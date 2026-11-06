@@ -1,5 +1,5 @@
-// File Path: /src/components/Footer.tsx
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import flouraLogo from "../assets/images/floura_logo.webp";
 import LegalModal from "./LegalModal";
 
@@ -32,7 +32,21 @@ export default function Footer({ className = "", onOpenLegalModal }: FooterProps
 
           <div>© {new Date().getFullYear()} Floura. All Rights Reserved.</div>
 
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-5 flex-wrap justify-center">
+            <Link
+              id="link-downloads-footer"
+              to="/downloads"
+              className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors"
+            >
+              Downloads & Versions
+            </Link>
+            <Link
+              id="link-calculator-footer"
+              to="/calculator"
+              className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors"
+            >
+              Recipe Calculator
+            </Link>
             <button
               id="btn-terms-modal-footer"
               onClick={() => handleOpenModal("terms")}

@@ -28,6 +28,7 @@ import {
   UserPlus
 } from "lucide-react";
 import LegalModal from "./LegalModal";
+import SubscriptionModal from "./SubscriptionModal";
 import { useMore } from "../hooks/useMore";
 import Avatar from "./Avatar";
 import { getApiUrl, getDeviceId } from "../utils/api";
@@ -86,6 +87,7 @@ function MoreView({
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(
     user?.subscription_status || null
   );
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
 
   useEffect(() => {
     if (user?.subscription_expires_at) {
@@ -392,11 +394,19 @@ function MoreView({
                   </div>
                 </div>
 
-                {renderDaysBadge() && (
-                  <div className="self-start sm:self-center">
-                    {renderDaysBadge()}
-                  </div>
-                )}
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  {renderDaysBadge()}
+                  {user?.email && (
+                    <button
+                      type="button"
+                      onClick={() => setIsSubscriptionModalOpen(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white shadow-xs shadow-primary-brand/20 dark:shadow-orange-500/20 transition cursor-pointer active:scale-95"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Extend Validity</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -511,11 +521,18 @@ function MoreView({
                     </p>
                   </div>
                 </div>
-                {renderDaysBadge() && (
-                  <div className="shrink-0">
-                    {renderDaysBadge()}
-                  </div>
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {renderDaysBadge()}
+                  {user?.email && (
+                    <button
+                      type="button"
+                      onClick={() => setIsSubscriptionModalOpen(true)}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-primary-brand dark:text-orange-400 bg-primary-brand-light dark:bg-primary-brand-dark/20 hover:bg-primary-brand-light/80 dark:hover:bg-primary-brand-dark/40 transition cursor-pointer"
+                    >
+                      Renew
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Dark Mode switcher */}
@@ -577,6 +594,12 @@ function MoreView({
                 />
               )}
               <MenuItem
+                icon={Download}
+                title="Downloads & Versions"
+                description="Direct APK, desktop installers & release changelog"
+                onClick={() => onNavigate?.("/downloads")}
+              />
+              <MenuItem
                 icon={MessageSquare}
                 title="Share Feedback"
                 description="Send bugs, requests or suggestions"
@@ -626,6 +649,35 @@ function MoreView({
           </p>
         </div>
       </div>
+
+      {/* ========================================================
+          SUBSCRIPTION EXTENSION MODAL
+      ======================================================== */}
+      <SubscriptionModal
+        isOpen={isSubscriptionModalOpen}
+        onClose={() => setIsSubscriptionModalOpen(false)}
+        user={user}
+        currentExpiry={subscriptionExpiry}
+        onSubscriptionUpdated={(data) => {
+          setSubscriptionExpiry(data.newExpiry);
+          setSubscriptionStatus(data.status);
+          try {
+            const saved = localStorage.getItem("patisserie_user");
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              localStorage.setItem(
+                "patisserie_user",
+                JSON.stringify({
+                  ...parsed,
+                  subscription_expires_at: data.newExpiry,
+                  subscription_status: data.status,
+                  is_active: 1
+                })
+              );
+            }
+          } catch {}
+        }}
+      />
 
       {/* ========================================================
           LEGAL MODAL

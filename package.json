@@ -7,6 +7,7 @@
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --target=node18 --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "build:cpanel": "npm run build && zip -r cpanel-deploy.zip dist package.json package-lock.json app.cjs -x \"*.DS_Store\"",
+    "build:cpanel:apps": "node scripts/build-cpanel-apps.cjs",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",

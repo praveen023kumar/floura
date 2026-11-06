@@ -449,6 +449,9 @@ export async function initDb() {
       months INTEGER NOT NULL DEFAULT 1,
       payment_method TEXT NOT NULL,
       reference_id TEXT,
+      razorpay_order_id TEXT,
+      status TEXT NOT NULL DEFAULT 'success',
+      failure_reason TEXT,
       notes TEXT,
       recorded_by TEXT NOT NULL,
       createdAt TEXT NOT NULL
@@ -517,6 +520,17 @@ export async function initDb() {
       await runSql(db, `ALTER TABLE ${t} ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0`);
     } catch {}
   }
+
+  // Safe schema migrations for payment_logs (status, failure_reason, razorpay_order_id)
+  try {
+    await runSql(db, "ALTER TABLE payment_logs ADD COLUMN status TEXT NOT NULL DEFAULT 'success'");
+  } catch {}
+  try {
+    await runSql(db, "ALTER TABLE payment_logs ADD COLUMN failure_reason TEXT");
+  } catch {}
+  try {
+    await runSql(db, "ALTER TABLE payment_logs ADD COLUMN razorpay_order_id TEXT");
+  } catch {}
 
   // Auto-migrate any legacy tables that still have DEFAULT 'praveen023kumar@gmail.com'
   try {

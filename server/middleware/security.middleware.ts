@@ -274,7 +274,7 @@ export function corsMiddleware(req: express.Request, res: express.Response, next
   }
 
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-email, idempotency-key, x-idempotency-key");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-email, x-device-id, idempotency-key, x-idempotency-key");
   res.header("Access-Control-Allow-Credentials", "true");
 
   if (req.method === "OPTIONS") {
@@ -292,15 +292,15 @@ export function securityHeadersMiddleware(req: express.Request, res: express.Res
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   
-  // CSP Config supporting development servers, Firebase Auth, Google APIs, and Tauri
+  // CSP Config supporting development servers, Firebase Auth, Google APIs, Tauri, and Razorpay Checkout
   const csp = [
     "default-src 'self' tauri://localhost http://localhost:*",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* https://*.gstatic.com https://www.gstatic.com https://apis.google.com https://*.firebaseapp.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* https://*.gstatic.com https://www.gstatic.com https://apis.google.com https://*.firebaseapp.com https://checkout.razorpay.com",
     "style-src 'self' 'unsafe-inline' http://localhost:* https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
-    "img-src 'self' data: blob: http://localhost:* https: https://images.unsplash.com https://*.googleusercontent.com https://*.google.com",
-    "connect-src 'self' http://localhost:* ws://localhost:* https://*.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.googleusercontent.com https://*.google.com",
-    "frame-src 'self' https://*.firebaseapp.com https://apis.google.com"
+    "img-src 'self' data: blob: http://localhost:* https: https://images.unsplash.com https://*.googleusercontent.com https://*.google.com https://*.razorpay.com",
+    "connect-src 'self' http://localhost:* ws://localhost:* https://*.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.googleusercontent.com https://*.google.com https://api.razorpay.com https://lumberjack.razorpay.com",
+    "frame-src 'self' https://*.firebaseapp.com https://apis.google.com https://api.razorpay.com https://checkout.razorpay.com"
   ].join("; ");
   res.setHeader("Content-Security-Policy", csp);
   

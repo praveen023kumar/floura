@@ -2,16 +2,25 @@ import { Request, Response } from "express";
 import CryptoJS from "crypto-js";
 import path from "path";
 import fs from "fs";
-import { findUserByEmail, updateUserSignature, createUser, updateUserProfile, hasBakeryProfile } from "../models/user.model";
+import { findUserByEmail, updateUserSignature, createUser, updateUserProfile, hasBakeryProfile, updateUserDeviceId } from "../models/user.model";
 import { checkLoginLockout, recordFailedLoginAttempt, resetFailedLoginAttempts, writeAuditLog, validateEmail } from "../middleware/security.middleware";
 
-// In-memory sessions map for secure Tauri system-browser external Google logins
+// In-memory sessions map for secure Tauri/Cordova system-browser external Google logins
 export const activeSessions = new Map<string, {
   status: "pending" | "completed" | "error";
-  user?: { name: string; email: string; avatar: string };
+  user?: { 
+    name: string; 
+    email: string; 
+    avatar: string;
+    is_active?: number;
+    subscription_status?: string;
+    subscription_expires_at?: string;
+    last_payment_date?: string | null;
+  };
   token?: string;
   isNew?: boolean;
   error?: string;
+  deviceId?: string;
 }>();
 
 export async function externalStart(req: Request, res: Response) {
@@ -22,7 +31,7 @@ export async function externalStart(req: Request, res: Response) {
     return res.status(400).send("State key is required to establish external authentication tunnel.");
   }
 
-  activeSessions.set(state, { status: "pending" });
+  activeSessions.set(state, { status: "pending", deviceId: deviceId || undefined });
 
   setTimeout(() => {
     if (activeSessions.get(state)?.status === "pending") {
@@ -298,7 +307,12 @@ export async function externalStart(req: Request, res: Response) {
 
     const firebaseConfig = ${JSON.stringify(firebaseConfig)};
     const state = "${state}";
-    const deviceId = "${deviceId}";
+    let clientDeviceId = "${deviceId}";
+    if (clientDeviceId) {
+      try { sessionStorage.setItem("floura_ext_device_id", clientDeviceId); } catch {}
+    } else {
+      try { clientDeviceId = sessionStorage.getItem("floura_ext_device_id") || ""; } catch {}
+    }
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -340,7 +354,7 @@ export async function externalStart(req: Request, res: Response) {
             name: googleUser.displayName || "",
             avatar: googleUser.photoURL || "",
             idToken: idToken,
-            deviceId: deviceId || undefined
+            deviceId: clientDeviceId || undefined
           })
         });
 
@@ -483,6 +497,9 @@ export async function externalComplete(req: Request, res: Response) {
     let finalAvatar = avatar || "chef";
     let isNew = false;
 
+    const rawDeviceId = deviceId || activeSessions.get(state)?.deviceId || req.headers["x-device-id"];
+    const effectiveDeviceId = typeof rawDeviceId === "string" ? rawDeviceId.replace(/[^a-zA-Z0-9_-]/g, "") : undefined;
+
     if (existingUser) {
       const userHasProfile = await hasBakeryProfile(emailKey);
       if (!userHasProfile) {
@@ -500,30 +517,36 @@ export async function externalComplete(req: Request, res: Response) {
         finalAvatar = avatar;
       }
 
-      await updateUserSignature(emailKey, signatureToken, finalName, finalAvatar, deviceId);
+      await updateUserSignature(emailKey, signatureToken, finalName, finalAvatar, effectiveDeviceId);
     } else {
       isNew = true;
       const formattedName = name ? (name.startsWith("Chef ") ? name : "Chef " + name) : "Chef Paul";
-      await createUser(emailKey, signatureToken, formattedName, finalAvatar, deviceId);
+      await createUser(emailKey, signatureToken, formattedName, finalAvatar, effectiveDeviceId);
       finalName = formattedName;
     }
 
+    const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     activeSessions.set(state, {
       status: "completed",
       user: {
         name: finalName,
         email: emailKey,
-        avatar: finalAvatar
+        avatar: finalAvatar,
+        is_active: existingUser ? (existingUser.is_active !== undefined ? existingUser.is_active : 1) : 1,
+        subscription_status: existingUser ? (existingUser.subscription_status || "trial") : "trial",
+        subscription_expires_at: existingUser ? existingUser.subscription_expires_at : thirtyDaysLater,
+        last_payment_date: existingUser ? existingUser.last_payment_date : null
       },
       token: signatureToken,
-      isNew: isNew
+      isNew: isNew,
+      deviceId: effectiveDeviceId
     });
 
     setTimeout(() => {
       activeSessions.delete(state);
     }, 180000);
 
-    await writeAuditLog(emailKey, "EXTERNAL_AUTH_COMPLETE", { isNew }, req);
+    await writeAuditLog(emailKey, "EXTERNAL_AUTH_COMPLETE", { isNew, deviceId: effectiveDeviceId }, req);
     res.json({ status: "success", isNew });
   } catch (err: any) {
     console.error("External complete error:", err);
@@ -531,8 +554,10 @@ export async function externalComplete(req: Request, res: Response) {
   }
 }
 
-export function externalPoll(req: Request, res: Response) {
+export async function externalPoll(req: Request, res: Response) {
   const { state } = req.query;
+  const rawDeviceId = req.query.deviceId;
+  const pollDeviceId = typeof rawDeviceId === "string" ? rawDeviceId.replace(/[^a-zA-Z0-9_-]/g, "") : "";
   if (!state || typeof state !== "string") {
     return res.status(400).json({ error: "Missing state query parameter." });
   }
@@ -540,6 +565,15 @@ export function externalPoll(req: Request, res: Response) {
   const session = activeSessions.get(state);
   if (!session) {
     return res.json({ status: "pending" });
+  }
+
+  if (session.status === "completed" && session.user?.email && pollDeviceId) {
+    try {
+      const emailKey = session.user.email.toLowerCase().trim();
+      await updateUserDeviceId(emailKey, pollDeviceId);
+    } catch (e) {
+      console.error("Failed to link pollDeviceId in externalPoll:", e);
+    }
   }
 
   return res.json(session);
@@ -655,6 +689,8 @@ export async function login(req: Request, res: Response) {
       isGoogle: req.body?.isGoogle
     });
     const { email, name, avatar, isGoogle, idToken, deviceId } = req.body;
+    const rawDeviceId = deviceId || req.headers["x-device-id"];
+    const effectiveDeviceId = typeof rawDeviceId === "string" ? rawDeviceId.replace(/[^a-zA-Z0-9_-]/g, "") : undefined;
     if (!email) {
       return res.status(400).json({ error: "Email address is required." });
     }
@@ -709,7 +745,7 @@ export async function login(req: Request, res: Response) {
         finalAvatar = avatar;
       }
 
-      await updateUserSignature(emailKey, signatureToken, finalName, finalAvatar, deviceId);
+      await updateUserSignature(emailKey, signatureToken, finalName, finalAvatar, effectiveDeviceId);
 
       const userHasProfile = await hasBakeryProfile(emailKey);
       loginResult = {
@@ -730,7 +766,7 @@ export async function login(req: Request, res: Response) {
       const defaultName = name || "Chef Paul";
       const defaultAvatar = avatar || "chef";
       const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      await createUser(emailKey, signatureToken, defaultName, defaultAvatar, deviceId);
+      await createUser(emailKey, signatureToken, defaultName, defaultAvatar, effectiveDeviceId);
 
       loginResult = {
         status: "success",

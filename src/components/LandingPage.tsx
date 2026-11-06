@@ -29,6 +29,8 @@ import {
   Globe,
   ChevronDown,
   Menu,
+  Download,
+  Laptop,
 } from "lucide-react";
 import flouraLogo from "../assets/images/floura_logo.webp";
 import chefHeroPhoto from "../assets/images/chef_hero_photo.webp";
@@ -194,6 +196,16 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
             <a id="nav-link-features" href="#features" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">Features</a>
             <a id="nav-link-how-it-works" href="#how-it-works" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">How It Works</a>
             <a id="nav-link-modules" href="#modules" className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors">Modules</a>
+            <Link
+              id="nav-link-downloads"
+              to="/downloads"
+              className="hover:text-primary-brand dark:hover:text-pink-400 transition-colors flex items-center gap-1.5"
+            >
+              <span>Downloads</span>
+              <span className="text-[9px] uppercase px-1.5 py-0.2 rounded-full font-bold bg-pink-100 dark:bg-pink-950/60 text-primary-brand dark:text-pink-400">
+                New
+              </span>
+            </Link>
 
             {/* Tools Dropdown */}
             <div className="relative group">
@@ -332,6 +344,19 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
               >
                 Modules
               </a>
+              <Link
+                to="/downloads"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between text-sm font-bold text-zinc-700 dark:text-zinc-300 hover:text-primary-brand dark:hover:text-pink-400 transition-colors py-2 border-b border-zinc-100 dark:border-zinc-900"
+              >
+                <div className="flex items-center gap-2">
+                  <Download className="w-4 h-4 text-primary-brand dark:text-pink-400" />
+                  <span>Downloads & Versions</span>
+                </div>
+                <span className="text-[9px] uppercase px-1.5 py-0.5 rounded-full font-bold bg-pink-100 dark:bg-pink-950/60 text-primary-brand dark:text-pink-400">
+                  New
+                </span>
+              </Link>
             </div>
 
             <Link
@@ -392,6 +417,17 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
               <a href="#pricing-section" className="inline-flex items-center justify-center gap-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-755 font-bold text-sm py-4 px-8 rounded-2xl transition-all active:scale-[0.97] cursor-pointer">
                 <span>Plan: ₹99 / month</span>
               </a>
+            </div>
+
+            <div className="pt-0.5">
+              <Link
+                to="/downloads"
+                className="inline-flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-primary-brand dark:text-zinc-400 dark:hover:text-pink-400 transition-colors group"
+              >
+                <Download className="w-3.5 h-3.5 text-primary-brand dark:text-pink-400 group-hover:translate-y-0.5 transition-transform" />
+                <span>Download Android APK (6.0 MB) or Open Web App</span>
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
             </div>
 
             <div className="grid grid-cols-3 gap-4 pt-4 border-t border-zinc-100 dark:border-zinc-900 max-w-lg">
@@ -602,20 +638,23 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
       <section className="py-10 max-w-7xl mx-auto px-6 lg:px-10">
         <div className="bg-pink-50/50 dark:bg-zinc-900/50 border border-pink-50 dark:border-zinc-800/80 p-8 md:p-12 rounded-[2.5rem] grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 text-left">
-            <span className="text-xs font-bold uppercase tracking-widest text-primary-brand dark:text-pink-400">Available Everywhere</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-pink-100 dark:bg-pink-950/60 text-primary-brand dark:text-pink-400">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Website Direct Release • No Store Accounts Required</span>
+            </div>
             <h2 className="font-serif text-3xl md:text-4xl font-black text-zinc-900 dark:text-white leading-tight">
               Your Bakery in Your Pocket
             </h2>
             <p className="text-zinc-500 dark:text-zinc-400 text-xs md:text-sm leading-relaxed max-w-md">
-              Floura is available as a web app and as a native iOS and Android app. Access your orders, recipes, inventory, and checklists from anywhere, at any time.
+              Floura is available directly from our website without App Store or Play Store middlemen. Download the standalone Android APK directly to your phone, or open and install as an offline Web App on iPhone, iPad, and desktop browsers.
             </p>
 
             <ul className="space-y-2.5">
               {[
-                "Native iOS & Android apps available",
-                "Secure cloud sync across all devices",
-                "Sign in securely with Google",
-                "Order history & records always accessible",
+                "Direct Android APK download (v1.0.0, 6.0 MB)",
+                "Secure offline-first SQLite database and cloud sync",
+                "Instant Web App access on any desktop or tablet browser",
+                "1-tap iOS Web App installation via Safari Home Screen",
               ].map((pt, i) => (
                 <li key={i} className="flex items-center gap-2.5 text-xs text-zinc-600 dark:text-zinc-300 font-semibold">
                   <Check className="w-4 h-4 text-primary-brand dark:text-pink-400 shrink-0" />
@@ -625,22 +664,34 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
             </ul>
 
             <div className="flex flex-wrap gap-3 pt-2">
-              {/* TODO: Replace href with your App Store URL when live */}
-              <a id="link-download-appstore" href="https://apps.apple.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 py-3 px-5 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm select-none" aria-label="Download Floura on the App Store">
-                <Smartphone className="w-5 h-5 shrink-0" />
+              {/* Direct APK Download Button */}
+              <a
+                id="link-download-apk"
+                href="/downloads/floura-v1.0.0.apk"
+                download="floura-v1.0.0.apk"
+                className="flex items-center gap-3 bg-primary-brand hover:bg-orange-600 text-white py-3.5 px-6 rounded-2xl shadow-md shadow-orange-500/20 active:scale-98 transition-all select-none cursor-pointer"
+                aria-label="Direct Download Android APK"
+              >
+                <Download className="w-5 h-5 shrink-0" />
                 <div className="text-left leading-tight">
-                  <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Download on the</p>
-                  <p className="text-xs font-black">App Store</p>
+                  <p className="text-[9px] font-bold text-orange-200 uppercase tracking-wider">Direct Download</p>
+                  <p className="text-xs font-black">Android APK (v1.0.0)</p>
                 </div>
               </a>
-              {/* TODO: Replace href with your Google Play URL when live */}
-              <a id="link-download-googleplay" href="https://play.google.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 py-3 px-5 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm select-none" aria-label="Get Floura on Google Play">
-                <Play className="w-5 h-5 fill-current shrink-0" />
+
+              {/* View Downloads Page */}
+              <Link
+                id="link-view-all-downloads"
+                to="/downloads"
+                className="flex items-center gap-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 py-3.5 px-6 rounded-2xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm select-none"
+                aria-label="View downloads and setup guide"
+              >
+                <Globe className="w-5 h-5 shrink-0" />
                 <div className="text-left leading-tight">
-                  <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Get it on</p>
-                  <p className="text-xs font-black">Google Play</p>
+                  <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Installation Guide</p>
+                  <p className="text-xs font-black">Downloads & Setup</p>
                 </div>
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -649,19 +700,19 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
             <p className="text-[10px] font-extrabold uppercase tracking-widest text-primary-brand dark:text-pink-400">Where Floura Works</p>
             {[
               {
-                icon: <Globe className="w-5 h-5" />,
-                title: "Web App",
-                desc: "Open your browser and start managing orders instantly — no installation needed.",
-              },
-              {
                 icon: <Smartphone className="w-5 h-5" />,
-                title: "iOS & Android",
-                desc: "Native apps built for speed. Take orders, check inventory, and view recipes on the go.",
+                title: "Android Standalone APK",
+                desc: "Direct APK download (6.0 MB) straight from our website. Fast installation, zero Google Play tracking.",
               },
               {
-                icon: <ShieldCheck className="w-5 h-5" />,
-                title: "Fully Encrypted",
-                desc: "Your data is encrypted end-to-end, keeping your orders, customers, and recipes completely private.",
+                icon: <Globe className="w-5 h-5" />,
+                title: "iOS & iPadOS (Add to Home Screen)",
+                desc: "Open in Safari and tap 'Add to Home Screen' for a full-screen offline experience without App Store.",
+              },
+              {
+                icon: <Laptop className="w-5 h-5" />,
+                title: "Web Cloud & Desktop Browser",
+                desc: "Open in Chrome, Safari or Edge with local offline SQLite database and zero installation required.",
               },
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-4">

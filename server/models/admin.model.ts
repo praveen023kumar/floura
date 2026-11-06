@@ -91,36 +91,47 @@ export async function recordPayment(params: {
   months: number;
   paymentMethod: string;
   referenceId?: string;
+  razorpayOrderId?: string;
+  status?: "success" | "failed" | "pending";
+  failureReason?: string;
   notes?: string;
   recordedBy: string;
   customExpiry?: string;
+  paymentId?: string;
 }) {
   const db = await getDb();
   const emailKey = params.userEmail.toLowerCase().trim();
-  const paymentId = "pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8);
+  const paymentId = params.paymentId || ("pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8));
   const now = new Date();
   const nowIso = now.toISOString();
+  const paymentStatus = params.status || "success";
 
   // Find user's current subscription expiry
   const userRows = await querySqlAll<any>(db, "SELECT subscription_expires_at FROM users WHERE email = ?", [emailKey]);
   const currentExpiry = userRows[0]?.subscription_expires_at ? new Date(userRows[0].subscription_expires_at) : null;
 
-  let newExpiry: string;
-  if (params.customExpiry) {
-    newExpiry = new Date(params.customExpiry).toISOString();
-  } else {
-    // If current expiry is in the future, extend from that date; otherwise extend from now
-    const baseTime = (currentExpiry && currentExpiry.getTime() > now.getTime()) 
-      ? currentExpiry.getTime() 
-      : now.getTime();
-    const daysToAdd = (params.months || 1) * 30;
-    newExpiry = new Date(baseTime + daysToAdd * 24 * 60 * 60 * 1000).toISOString();
+  let newExpiry: string | null = null;
+
+  if (paymentStatus === "success") {
+    if (params.customExpiry) {
+      newExpiry = new Date(params.customExpiry).toISOString();
+    } else {
+      // If current expiry is in the future, extend from that date; otherwise extend from now
+      const baseTime = (currentExpiry && currentExpiry.getTime() > now.getTime()) 
+        ? currentExpiry.getTime() 
+        : now.getTime();
+      const daysToAdd = (params.months || 1) * 30;
+      newExpiry = new Date(baseTime + daysToAdd * 24 * 60 * 60 * 1000).toISOString();
+    }
   }
 
   // Insert payment log
   await runSql(db, `
-    INSERT INTO payment_logs (id, user_email, amount, currency, months, payment_method, reference_id, notes, recorded_by, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO payment_logs (
+      id, user_email, amount, currency, months, payment_method, 
+      reference_id, razorpay_order_id, status, failure_reason, notes, recorded_by, createdAt
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     paymentId,
     emailKey,
@@ -129,23 +140,47 @@ export async function recordPayment(params: {
     params.months || 1,
     params.paymentMethod,
     params.referenceId || "",
+    params.razorpayOrderId || "",
+    paymentStatus,
+    params.failureReason || null,
     params.notes || "",
     params.recordedBy,
     nowIso
   ]);
 
-  // Update user subscription & activate account
-  await runSql(db, `
-    UPDATE users 
-    SET is_active = 1, 
-        subscription_status = 'active', 
-        subscription_expires_at = ?, 
-        last_payment_date = ? 
-    WHERE email = ?
-  `, [newExpiry, nowIso, emailKey]);
+  // Update user subscription & activate account ONLY if payment is successful
+  if (paymentStatus === "success" && newExpiry) {
+    await runSql(db, `
+      UPDATE users 
+      SET is_active = 1, 
+          subscription_status = 'active', 
+          subscription_expires_at = ?, 
+          last_payment_date = ? 
+      WHERE email = ?
+    `, [newExpiry, nowIso, emailKey]);
+  }
 
   db.close();
   return { paymentId, newExpiry };
+}
+
+export async function recordPaymentFailure(params: {
+  userEmail: string;
+  amount: number;
+  currency?: string;
+  months: number;
+  paymentMethod: string;
+  referenceId?: string;
+  razorpayOrderId?: string;
+  failureReason: string;
+  notes?: string;
+  recordedBy?: string;
+}) {
+  return recordPayment({
+    ...params,
+    status: "failed",
+    recordedBy: params.recordedBy || "razorpay_gateway"
+  });
 }
 
 export async function updateUserExpiry(
@@ -170,21 +205,34 @@ export async function updateUserExpiry(
   return { newExpiry: isoExpiry };
 }
 
-export async function getPaymentLogs(userEmail?: string) {
+export async function getPaymentLogs(userEmail?: string, statusFilter?: string) {
   const db = await getDb();
   let query = `
     SELECT 
       p.*, 
+      COALESCE(p.status, 'success') as status,
       u.name as user_name,
       u.subscription_expires_at as current_expires_at
     FROM payment_logs p
     LEFT JOIN users u ON p.user_email = u.email
   `;
+  const conditions: string[] = [];
   const params: any[] = [];
+
   if (userEmail) {
-    query += " WHERE p.user_email = ? ";
+    conditions.push("p.user_email = ?");
     params.push(userEmail.toLowerCase().trim());
   }
+
+  if (statusFilter && statusFilter !== "all") {
+    conditions.push("COALESCE(p.status, 'success') = ?");
+    params.push(statusFilter.toLowerCase().trim());
+  }
+
+  if (conditions.length > 0) {
+    query += " WHERE " + conditions.join(" AND ");
+  }
+
   query += " ORDER BY p.createdAt DESC";
 
   const logs = await querySqlAll<any>(db, query, params);

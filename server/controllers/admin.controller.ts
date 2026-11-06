@@ -287,9 +287,12 @@ export async function getPaymentsListHandler(req: Request, res: Response) {
       return res.status(403).json({ error: "Access Denied: Insufficient permissions to view payment logs." });
     }
 
-    const { userEmail } = req.query;
+    const { userEmail, status } = req.query;
     const { getPaymentLogs } = await import("../models/admin.model");
-    const logs = await getPaymentLogs(userEmail ? String(userEmail) : undefined);
+    const logs = await getPaymentLogs(
+      userEmail ? String(userEmail) : undefined,
+      status ? String(status) : undefined
+    );
 
     res.json({
       status: "success",

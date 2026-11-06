@@ -59,3 +59,11 @@ export async function hasBakeryProfile(email: string): Promise<boolean> {
   return results.length > 0;
 }
 
+export async function updateUserDeviceId(email: string, deviceId: string) {
+  const db = await getDb();
+  const emailKey = email.toLowerCase().trim();
+  await runSql(db, "UPDATE users SET device_id = ? WHERE email = ?", [deviceId, emailKey]);
+  db.close();
+}
+
+

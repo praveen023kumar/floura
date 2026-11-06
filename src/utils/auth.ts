@@ -10,11 +10,15 @@
 export function isAuthSignatureError(status: number, errData: any): boolean {
   if (status === 401 || status === 403) {
     if (errData?.code === "INVALID_WORKSPACE_SIGNATURE") return true;
+    if (errData?.code === "SINGLE_DEVICE_CONFLICT") return true;
     const errText = String(errData?.error || errData?.message || "").toLowerCase();
     if (
       errText.includes("invalid security workspace signature") ||
       errText.includes("re-authenticate") ||
-      errText.includes("workspace signature")
+      errText.includes("workspace signature") ||
+      errText.includes("another device") ||
+      errText.includes("session terminated") ||
+      errText.includes("single_device_conflict")
     ) {
       return true;
     }

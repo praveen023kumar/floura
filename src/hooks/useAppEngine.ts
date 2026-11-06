@@ -459,13 +459,8 @@ export function useAppEngine(
             handleSubscriptionBlocked(errData);
             return;
           }
-          if (errData.code === "SINGLE_DEVICE_CONFLICT") {
-            window.showToast("Session Expired: You have logged in on another device.", "warning");
-            handleLogout();
-            return;
-          }
-          if (isAuthSignatureError(response.status, errData)) {
-            triggerReauth(location.pathname || "/dashboard", errData.error);
+          if (errData.code === "SINGLE_DEVICE_CONFLICT" || isAuthSignatureError(response.status, errData)) {
+            triggerReauth(location.pathname || "/dashboard", errData.error || "Session Terminated: Your account is active on another device.");
             return;
           }
           window.showToast(errData.error || "Your kitchen workspace credentials are empty, expired, or invalid. Please sign in again.", "error");
@@ -611,13 +606,8 @@ export function useAppEngine(
           handleSubscriptionBlocked(errData);
           return;
         }
-        if (errData.code === "SINGLE_DEVICE_CONFLICT") {
-          window.showToast("Session Expired: You have logged in on another device.", "warning");
-          handleLogout();
-          return;
-        }
-        if (isAuthSignatureError(response.status, errData)) {
-          triggerReauth(location.pathname || "/dashboard", errData.error);
+        if (errData.code === "SINGLE_DEVICE_CONFLICT" || isAuthSignatureError(response.status, errData)) {
+          triggerReauth(location.pathname || "/dashboard", errData.error || "Session Terminated: Your account is active on another device.");
           return;
         }
         window.showToast(errData.error || "Your kitchen workspace credentials are empty, expired, or invalid. Please sign in again.", "error");
@@ -1429,8 +1419,16 @@ export function useAppEngine(
   }, [completedOrdersCount, activeOrdersCount]);
 
   const handleUpdateProfile = async (updatedUser: any) => {
-    setUser(updatedUser);
-    await setPreference("patisserie_user", updatedUser);
+    const merged = { ...user, ...updatedUser };
+    setUser(merged);
+    try {
+      localStorage.setItem("patisserie_user", JSON.stringify(merged));
+    } catch {}
+    await setPreference("patisserie_user", merged);
+    if (onUserUpdateCallback) {
+      onUserUpdateCallback(merged);
+    }
+    window.dispatchEvent(new CustomEvent("user-update", { detail: { user: merged } }));
   };
 
   const handleUpdateBakeryProfile = async (updatedProfile: any) => {

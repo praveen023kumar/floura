@@ -79,6 +79,7 @@ const PublicRecipeDetailView = lazy(() => import("./components/PublicRecipeDetai
 const AdminPublicRecipeCreateView = lazy(() => import("./components/AdminPublicRecipeCreateView"));
 const SubscriptionBlockedView = lazy(() => import("./components/SubscriptionBlockedView"));
 const ReauthView = lazy(() => import("./components/ReauthView"));
+const DownloadsView = lazy(() => import("./components/DownloadsView"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -99,6 +100,7 @@ function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
 
   const getScreenFromPath = (pathname: string): string => {
     if (pathname.startsWith("/landing")) return "landing";
+    if (pathname.startsWith("/downloads")) return "downloads";
     if (pathname.startsWith("/orders/new")) return "orders-form";
     if (pathname.startsWith("/orders")) return "orders";
     if (pathname.startsWith("/customers/new")) return "customers-form";
@@ -362,6 +364,16 @@ function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
     />
   ), [user, handleLogin, handleLogout, darkMode, setDarkMode]);
 
+  const downloadsViewElement = useMemo(() => (
+    <DownloadsView
+      user={user}
+      onLogin={handleLogin}
+      onLogout={handleLogout}
+      darkMode={darkMode}
+      setDarkMode={setDarkMode}
+    />
+  ), [user, handleLogin, handleLogout, darkMode, setDarkMode]);
+
   const debriefsViewElement = useMemo(() => <DebriefsView />, []);
 
   const helpViewElement = useMemo(() => (
@@ -472,7 +484,8 @@ function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
   // to avoid false redirects on page refresh before data loads
   const isGettingStarted = location.pathname === "/getting-started";
   const isLanding = location.pathname === "/landing";
-  if (profileChecked && !bakeryProfile && !isGettingStarted && !isLanding) {
+  const isDownloads = location.pathname === "/downloads";
+  if (profileChecked && !bakeryProfile && !isGettingStarted && !isLanding && !isDownloads) {
     return <Navigate to="/getting-started" replace />;
   }
 
@@ -489,6 +502,24 @@ function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
         <Routes>
           <Route path="/landing" element={landingPageElement} />
           <Route path="*" element={<Navigate to="/landing" replace />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  if (currentScreen === "downloads") {
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
+          <div className="w-10 h-10 rounded-full border-2 border-primary-brand border-t-transparent animate-spin mb-4" />
+          <p className="text-sm font-serif font-semibold text-zinc-650 dark:text-zinc-350">
+            Loading downloads...
+          </p>
+        </div>
+      }>
+        <Routes>
+          <Route path="/downloads" element={downloadsViewElement} />
+          <Route path="*" element={<Navigate to="/downloads" replace />} />
         </Routes>
       </Suspense>
     );
@@ -939,6 +970,7 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode, onUser
                            location.pathname === "/login" ||
                            location.pathname === "/reauthenticate" ||
                            location.pathname.startsWith("/calculator") ||
+                           location.pathname.startsWith("/downloads") ||
                            location.pathname.startsWith("/admin");
       if (!isPublicPath) {
         navigate("/", { replace: true });
@@ -989,6 +1021,21 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode, onUser
           <Route path="/calculator" element={<PublicRecipesListView />} />
           <Route path="/calculator/:slug" element={<PublicRecipeDetailView />} />
         </Routes>
+      </Suspense>
+    );
+  }
+
+  // 0. Public Downloads Page (/downloads) - No authentication required
+  if (location.pathname.startsWith("/downloads")) {
+    return (
+      <Suspense fallback={<LoadingSignIn />}>
+        <DownloadsView
+          user={user}
+          onLogin={onLogin}
+          onLogout={onLogout}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+        />
       </Suspense>
     );
   }
