@@ -8,8 +8,13 @@ import { PRODUCTION_URL } from "../../shared/api-config";
 export const isCordova = (): boolean => {
   if (typeof window === "undefined") return false;
   return (
+    (window as any).IS_CORDOVA_APP === true ||
+    (window as any).FLOURA_NATIVE_APP === true ||
     (window as any).cordova !== undefined ||
-    window.location.protocol === "file:"
+    window.location.protocol === "file:" ||
+    (typeof navigator !== "undefined" &&
+      /android|iphone|ipad|ipod/i.test(navigator.userAgent) &&
+      (window.location.hostname === "localhost" || !window.location.port))
   );
 };
 
@@ -26,6 +31,8 @@ export const isNativeApp = (): boolean => {
   return (
     typeof window !== "undefined" &&
     ((window as any).ReactNativeWebView !== undefined ||
+      (window as any).IS_CORDOVA_APP === true ||
+      (window as any).FLOURA_NATIVE_APP === true ||
       isCordova() ||
       isElectron())
   );
@@ -34,22 +41,26 @@ export const isNativeApp = (): boolean => {
 export const getBackendBaseUrl = (): string => {
   if (typeof window === "undefined") return "";
 
-  // 1. If running inside a Native App wrapper (Cordova / Electron), use absolute backend URL
+  // 1. If running inside a Native App wrapper (Cordova / Electron), ALWAYS route to production cloud backend
   if (isNativeApp()) {
     const envUrl = (import.meta as any).env?.VITE_BACKEND_URL;
-    return envUrl ? envUrl.trim().replace(/\/+$/, "") : PRODUCTION_URL;
+    return (envUrl ? envUrl.trim().replace(/\/+$/, "") : "") || PRODUCTION_URL || "https://floura.kydigit.com";
   }
 
-  // 2. Local development on localhost
-  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-    const envUrl = (import.meta as any).env?.VITE_BACKEND_URL;
-    if (envUrl && !envUrl.includes(window.location.host)) {
-      return envUrl.trim().replace(/\/+$/, "");
+  // 2. Extra safety for mobile devices running inside WebView on localhost / file protocol
+  if (typeof navigator !== "undefined" && /android|iphone|ipad|ipod/i.test(navigator.userAgent)) {
+    if (window.location.hostname === "localhost" || window.location.protocol === "file:") {
+      return PRODUCTION_URL || "https://floura.kydigit.com";
     }
   }
 
-  // 3. In production web browser (e.g. https://floura.kydigit.com), use relative path ""
-  // This automatically routes all /api calls to the current live domain
+  // 3. Local desktop browser development (e.g. testing at http://localhost:3000)
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    // In local browser, relative path "" calls the local development server on port 3000
+    return "";
+  }
+
+  // 4. In production web browser (e.g. https://floura.kydigit.com), use relative path ""
   return "";
 };
 

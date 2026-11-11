@@ -46,15 +46,21 @@ cleanDir(destDir);
 console.log('Copying build assets from dist/ to cordova/www...');
 copyDir(srcDir, destDir);
 
-// Inject cordova.js into cordova/www/index.html for native mobile builds
+// Inject Cordova environment flags and cordova.js into cordova/www/index.html
 const cordovaHtmlPath = path.join(destDir, 'index.html');
 if (fs.existsSync(cordovaHtmlPath)) {
   let html = fs.readFileSync(cordovaHtmlPath, 'utf8');
+  if (!html.includes('IS_CORDOVA_APP')) {
+    html = html.replace(
+      '<head>',
+      '<head>\n    <script>window.IS_CORDOVA_APP = true; window.FLOURA_NATIVE_APP = true;</script>\n    <script src="cordova.js"></script>'
+    );
+  }
   if (!html.includes('cordova.js')) {
     html = html.replace('<div id="root"></div>', '<div id="root"></div>\n    <script src="cordova.js"></script>');
-    fs.writeFileSync(cordovaHtmlPath, html, 'utf8');
-    console.log('Injected <script src="cordova.js"></script> into cordova/www/index.html');
   }
+  fs.writeFileSync(cordovaHtmlPath, html, 'utf8');
+  console.log('Injected IS_CORDOVA_APP flag and cordova.js into cordova/www/index.html');
 }
 
 console.log('Successfully copied assets to cordova/www!');
