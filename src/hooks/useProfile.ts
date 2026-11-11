@@ -84,32 +84,7 @@ export function useProfile({
     setErrorMsg("");
     
     try {
-      if (user?.token) {
-        const response = await fetch(getApiUrl("/api/auth/profile"), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + user.token,
-            "x-user-email": user.email,
-            "x-device-id": getDeviceId()
-          },
-          body: JSON.stringify({
-            email: user.email,
-            name,
-            avatar
-          })
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          if (isAuthSignatureError(response.status, errData)) {
-            triggerReauth("/profile", errData.error);
-            return;
-          }
-          throw new Error(errData.error || "Failed to update profile on backend database.");
-        }
-      }
-
+      // 1. Immediately update local state & bakery profile offline-first
       onUpdateProfile({ name, email: user?.email || "", avatar, token: user?.token });
       
       const normalizedCurrency = normalizeCurrency(currency);
@@ -148,9 +123,36 @@ export function useProfile({
 
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
+
+      // 2. Sync to backend asynchronously in background without blocking offline flow
+      if (user?.token && typeof navigator !== "undefined" && navigator.onLine) {
+        fetch(getApiUrl("/api/auth/profile"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + user.token,
+            "x-user-email": user.email,
+            "x-device-id": getDeviceId()
+          },
+          body: JSON.stringify({
+            email: user.email,
+            name,
+            avatar
+          })
+        }).then(async (response) => {
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            if (isAuthSignatureError(response.status, errData)) {
+              console.warn("Backend auth token signature mismatch during profile sync:", errData);
+            }
+          }
+        }).catch((err) => {
+          console.warn("Background profile sync deferred (offline/network unreachable):", err);
+        });
+      }
     } catch (err: any) {
       console.error("Failed to update profile details:", err);
-      setErrorMsg(err.message || "Could not save profile. Please check connection.");
+      setErrorMsg(err.message || "Could not save profile.");
     }
   };
 

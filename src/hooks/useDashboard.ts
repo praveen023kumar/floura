@@ -69,6 +69,7 @@ export function useDashboard({ checklist }: UseDashboardProps) {
     lowStockItems: [] as { name: string; quantity: number; unit: string; minStockLevel: number }[],
   } } = useQuery({
     queryKey: ["dashboard", "stats", todayStr],
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const today = new Date().toISOString().split("T")[0];
 

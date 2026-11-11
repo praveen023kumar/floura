@@ -164,6 +164,7 @@ export function useOrders({
       effectiveViewTab,
       paymentFilter
     ],
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const getLocalDateString = (offsetDays = 0) => {
         const d = new Date();

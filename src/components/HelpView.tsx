@@ -209,30 +209,30 @@ export default function HelpView({ onNavigate }: HelpViewProps) {
   const currentStep = WORKFLOW_STEPS.find((s) => s.number === activeStep) || WORKFLOW_STEPS[0];
 
   return (
-    <div className="w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-8 text-zinc-800 dark:text-zinc-100">
-      {/* ======================================================
-          TOP HEADER
-      ====================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200/80 dark:border-zinc-800">
-        <div className="flex items-center gap-3 text-left">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -12 }}
+      transition={{ duration: 0.25 }}
+      className="space-y-6 text-left"
+    >
+      {/* ── HEADER ── */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
             onClick={() => onNavigate?.("/more")}
-            className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition-colors cursor-pointer"
+            className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition-colors cursor-pointer shrink-0"
             title="Back to More"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 uppercase tracking-wider">
-                Bakery ERP Guide
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-white font-sans tracking-tight mt-1">
-              How Floura Works & Calculates Profit
-            </h1>
-            <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate flex items-center gap-2">
+              <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-primary-brand dark:text-orange-400 shrink-0" />
+              Bakery ERP Guide & Profit Engine
+            </h2>
+            <p className="hidden sm:block text-xs text-zinc-550 font-sans mt-0.5">
               From raw stock purchase to exact order profit margins with zero guesswork.
             </p>
           </div>
@@ -241,10 +241,11 @@ export default function HelpView({ onNavigate }: HelpViewProps) {
         <button
           type="button"
           onClick={() => onNavigate?.("/inventory")}
-          className="self-start sm:self-center bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-2 cursor-pointer"
+          className="bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white text-xs font-bold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-2 cursor-pointer shrink-0"
         >
           <Boxes className="w-4 h-4" />
-          <span>Start with Inventory</span>
+          <span className="hidden sm:inline">Start with Inventory</span>
+          <span className="sm:hidden">Inventory</span>
         </button>
       </div>
 
@@ -671,6 +672,6 @@ export default function HelpView({ onNavigate }: HelpViewProps) {
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

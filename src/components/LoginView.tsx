@@ -1,12 +1,12 @@
 // File Path: /src/components/LoginView.tsx
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { RefreshCw, XCircle, X, Sparkles, ArrowLeft } from "lucide-react";
+import { RefreshCw, XCircle, X, ArrowLeft, Mail, KeyRound, ArrowRight, RotateCcw, ShieldCheck, AlertCircle } from "lucide-react";
 import { motion } from "motion/react";
 import bakeryLoginBanner from "../assets/images/bakery_login_banner_1783080828078.webp";
 import LegalModal from "./LegalModal";
 import flouraLogo from "../assets/images/floura_logo.png";
-import { getApiUrl, isCordova, isElectron } from "../utils/api";
+import { isCordova, isElectron } from "../utils/api";
 import { useLogin } from "../hooks/useLogin";
 
 interface LoginViewProps {
@@ -16,15 +16,34 @@ interface LoginViewProps {
 export default function LoginView({ onLogin }: LoginViewProps) {
   const showBackButton = !isCordova() && !isElectron();
   const {
+    ownerEmail,
+    setOwnerEmail,
+    otpCode,
+    setOtpCode,
+    isOtpSent,
+    isSendingOtp,
+    isVerifyingOtp,
+    otpCountdown,
     authenticating,
     toastMessage,
     errorToast,
     setErrorToast,
     activeModal,
     setActiveModal,
-    handleGoogleSignIn,
+    handleSendOtp,
+    handleVerifyOtp,
+    handleResetOtp,
   } = useLogin({ onLogin });
 
+  const onEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSendOtp();
+  };
+
+  const onOtpSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleVerifyOtp();
+  };
 
   return (
     <div id="login-viewport" className="min-h-screen w-screen flex flex-col md:flex-row bg-zinc-50 dark:bg-zinc-950 transition-colors duration-300">
@@ -94,58 +113,148 @@ export default function LoginView({ onLogin }: LoginViewProps) {
         <div id="brand-form-wrapper" className="w-full max-w-[360px] text-center flex flex-col items-center mt-2 md:mt-6">
           {/* Main Titles */}
           <h1 className="font-serif text-2xl lg:text-3xl font-black text-zinc-800 dark:text-zinc-100 tracking-tight leading-tight">
-            Sign In to Floura!
+            Sign In to Floura
           </h1>
-          <p className="font-sans text-xs lg:text-sm font-semibold text-zinc-500 dark:text-zinc-400 max-w-[280px] mt-2 mb-8">
-            Access your personalized premium kitchen workspace & logs securely
+          <p className="font-sans text-xs lg:text-sm font-semibold text-zinc-500 dark:text-zinc-400 max-w-[280px] mt-2 mb-6">
+            Access your personalized kitchen workspace & orders securely
           </p>
 
-          {/* Secure Google Login Block */}
-          <div className="w-full space-y-4">
-            <button
-              id="btn-login-google"
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={authenticating}
-              className="group w-full flex items-center justify-center gap-3.5 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white py-4 px-6 rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-            >
-              {authenticating ? (
-                <RefreshCw className="w-5 h-5 text-white animate-spin shrink-0" />
-              ) : (
-                <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center p-1 shrink-0 shadow-sm">
-                  <svg className="w-full h-full" viewBox="0 0 48 48">
-                    <path
-                      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-                      fill="#EA4335"
-                    ></path>
-                    <path
-                      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
-                      fill="#4285F4"
-                    ></path>
-                    <path
-                      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
-                      fill="#FBBC05"
-                    ></path>
-                    <path
-                      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
-                      fill="#34A853"
-                    ></path>
-                  </svg>
+          {/* Secure Email OTP Login Block */}
+          <div className="w-full">
+            {!isOtpSent ? (
+              /* Step 1: Enter Email & Request OTP */
+              <form onSubmit={onEmailSubmit} className="space-y-4 text-left">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                    Store Owner Email
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
+                    <input
+                      type="email"
+                      placeholder="owner@mybakery.com"
+                      value={ownerEmail}
+                      onChange={(e) => setOwnerEmail(e.target.value)}
+                      required
+                      disabled={isSendingOtp}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 outline-none focus:ring-2 focus:ring-primary-brand focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                    A 6-digit verification code will be sent to your email.
+                  </p>
                 </div>
-              )}
-              <span className="font-bold text-xs uppercase tracking-wider font-sans">
-                {authenticating ? "Verifying..." : "Sign In with Google"}
-              </span>
-            </button>
-            
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 font-medium pt-1">
-              <Sparkles className="w-3.5 h-3.5 text-primary-brand dark:text-orange-400 animate-pulse" />
-              <span>100% Secure Google Cloud Authentication</span>
+
+                <button
+                  id="btn-send-otp"
+                  type="submit"
+                  disabled={isSendingOtp || !ownerEmail.trim() || !ownerEmail.includes("@")}
+                  className="w-full flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white py-3.5 px-6 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-wider"
+                >
+                  {isSendingOtp ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 text-white animate-spin shrink-0" />
+                      <span>Sending Code...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Send Verification Code</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              /* Step 2: Enter 6-digit OTP & Verify */
+              <form onSubmit={onOtpSubmit} className="space-y-4 text-left">
+                <div className="p-3 bg-orange-50/70 dark:bg-orange-950/30 border border-orange-200/50 dark:border-orange-900/40 rounded-xl flex items-center justify-between text-xs">
+                  <div className="truncate pr-2">
+                    <span className="text-zinc-500 dark:text-zinc-400 text-[11px] block">Sent to</span>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200 text-xs font-mono">{ownerEmail}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleResetOtp}
+                    className="text-xs text-primary-brand dark:text-orange-400 font-bold hover:underline shrink-0 cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+
+                {/* Spam/Junk folder guidance callout */}
+                <div className="p-3 bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/50 rounded-xl flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-relaxed">
+                    <strong>Can't find the email?</strong> Please check your <strong>Spam</strong> or <strong>Junk</strong> folder and click <em>"Report not spam"</em>.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                    6-Digit Verification Code
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      placeholder="• • • • • •"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                      required
+                      autoFocus
+                      disabled={isVerifyingOtp}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl text-center text-lg font-mono font-black tracking-[0.4em] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-300 outline-none focus:ring-2 focus:ring-primary-brand focus:border-transparent transition-all"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  id="btn-verify-otp"
+                  type="submit"
+                  disabled={isVerifyingOtp || otpCode.trim().length !== 6}
+                  className="w-full flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white py-3.5 px-6 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-wider"
+                >
+                  {isVerifyingOtp ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 text-white animate-spin shrink-0" />
+                      <span>Verifying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Verify & Enter Workspace</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between pt-1 text-xs">
+                  <span className="text-zinc-400 dark:text-zinc-500 text-[11px]">
+                    Didn't get the code?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleSendOtp()}
+                    disabled={isSendingOtp || otpCountdown > 0}
+                    className="flex items-center gap-1 font-bold text-primary-brand dark:text-orange-400 hover:underline disabled:opacity-40 cursor-pointer text-xs"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{otpCountdown > 0 ? `Resend in ${otpCountdown}s` : "Resend Code"}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 font-medium pt-5">
+              <ShieldCheck className="w-3.5 h-3.5 text-primary-brand dark:text-orange-400" />
+              <span>Direct Secure Workspace Authentication</span>
             </div>
           </div>
 
           {/* Terms & Agreement footer text */}
-          <p className="mt-12 text-[10px] text-zinc-500 dark:text-zinc-400 text-center leading-normal max-w-[280px]">
+          <p className="mt-8 text-[10px] text-zinc-500 dark:text-zinc-400 text-center leading-normal max-w-[280px]">
             By continuing you agree to Floura's{" "}
             <button 
               onClick={(e) => { e.preventDefault(); setActiveModal("terms"); }}
@@ -169,8 +278,6 @@ export default function LoginView({ onLogin }: LoginViewProps) {
         </div>
 
       </div>
-
-
 
       {/* Persistent loading feedback toasts */}
       {toastMessage && (

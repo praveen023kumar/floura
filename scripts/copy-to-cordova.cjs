@@ -20,8 +20,15 @@ function copyDir(src, dest) {
   fs.mkdirSync(dest, { recursive: true });
   const entries = fs.readdirSync(src, { withFileTypes: true });
   for (const entry of entries) {
-    // Exclude backend server build files
-    if (entry.name === 'server.cjs' || entry.name === 'server.cjs.map') {
+    // Exclude backend server build files, downloads, APKs, and OS artifacts
+    if (
+      entry.name === 'server.cjs' ||
+      entry.name === 'server.cjs.map' ||
+      entry.name === 'downloads' ||
+      entry.name === '.DS_Store' ||
+      entry.name.endsWith('.apk') ||
+      entry.name.endsWith('.zip')
+    ) {
       continue;
     }
     const srcPath = path.join(src, entry.name);

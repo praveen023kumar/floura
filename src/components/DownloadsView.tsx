@@ -80,6 +80,14 @@ export default function DownloadsView({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedInstructions, setExpandedInstructions] = useState<Record<string, boolean>>({});
   const [downloadToast, setDownloadToast] = useState<string | null>(null);
+  const [downloadTimestamp, setDownloadTimestamp] = useState<number>(() => Date.now());
+
+  const getDownloadUrlWithTime = (url?: string) => {
+    if (!url) return "";
+    if (!url.startsWith("/downloads/")) return url;
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}t=${downloadTimestamp}`;
+  };
 
   // Auto-detect OS on mount
   useEffect(() => {
@@ -109,7 +117,22 @@ export default function DownloadsView({
     }));
   };
 
-  const handleDownloadClick = (platform: PlatformDownload) => {
+  const handleDownloadClick = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    platform: PlatformDownload,
+    isSecondary: boolean = false
+  ) => {
+    const freshTime = Date.now();
+    setDownloadTimestamp(freshTime);
+
+    // Dynamically ensure the anchor tag uses the exact click timestamp to bypass any CDN or browser cache
+    const target = e.currentTarget;
+    if (target) {
+      const base = isSecondary && platform.secondaryDownloadUrl ? platform.secondaryDownloadUrl : platform.downloadUrl;
+      const separator = base.includes("?") ? "&" : "?";
+      target.href = `${base}${separator}t=${freshTime}`;
+    }
+
     setDownloadToast(`Starting download: ${platform.fileName} (${platform.fileSize})...`);
     setTimeout(() => setDownloadToast(null), 4000);
   };
@@ -339,9 +362,9 @@ export default function DownloadsView({
               <div className="flex flex-col gap-2 shrink-0">
                 {recommendedPlatform.directDownload ? (
                   <a
-                    href={recommendedPlatform.downloadUrl}
+                    href={getDownloadUrlWithTime(recommendedPlatform.downloadUrl)}
                     download={recommendedPlatform.fileName}
-                    onClick={() => handleDownloadClick(recommendedPlatform)}
+                    onClick={(e) => handleDownloadClick(e, recommendedPlatform)}
                     className="flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-orange-600 text-white font-bold text-sm py-3.5 px-6 rounded-2xl shadow-lg shadow-orange-500/25 active:scale-98 transition-all cursor-pointer text-center"
                   >
                     <Download className="w-4 h-4" />
@@ -359,8 +382,9 @@ export default function DownloadsView({
 
                 {recommendedPlatform.secondaryDownloadUrl && (
                   <a
-                    href={recommendedPlatform.secondaryDownloadUrl}
+                    href={getDownloadUrlWithTime(recommendedPlatform.secondaryDownloadUrl)}
                     download
+                    onClick={(e) => handleDownloadClick(e, recommendedPlatform, true)}
                     className="text-[11px] text-center font-bold text-primary-brand dark:text-pink-400 hover:underline"
                   >
                     {recommendedPlatform.secondaryDownloadLabel || "Alternative Link"}
@@ -471,9 +495,9 @@ export default function DownloadsView({
                 <div className="space-y-3 pt-2">
                   {platform.directDownload ? (
                     <a
-                      href={platform.downloadUrl}
+                      href={getDownloadUrlWithTime(platform.downloadUrl)}
                       download={platform.fileName}
-                      onClick={() => handleDownloadClick(platform)}
+                      onClick={(e) => handleDownloadClick(e, platform)}
                       className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-primary-brand hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-orange-500/20 cursor-pointer active:scale-98"
                     >
                       <Download className="w-4 h-4" />

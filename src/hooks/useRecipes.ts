@@ -120,6 +120,7 @@ export function useRecipes({
       recipesCurrentPage,
       recipesItemsPerPage
     ],
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const startIndex = (recipesCurrentPage - 1) * recipesItemsPerPage;
       const hasFilters = selectedCategory !== "All" || searchTerm.trim() !== "";

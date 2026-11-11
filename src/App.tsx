@@ -50,42 +50,48 @@ import LandingPage from "./components/LandingPage";
 import InitialSyncLoader from "./components/InitialSyncLoader";
 import PWAInstallBanner from "./components/PWAInstallBanner";
 
-// Lazy loaded page components for optimal app bundles and load performance
-const AdminDashboardView = lazy(() => import("./components/AdminDashboardView"));
-const AdminLoginView = lazy(() => import("./components/AdminLoginView"));
-const LoginView = lazy(() => import("./components/LoginView"));
-const DashboardView = lazy(() => import("./components/DashboardView"));
-const LeadsView = lazy(() => import("./components/LeadsView"));
-const OrdersList = lazy(() => import("./components/OrdersList"));
-const OrderCreate = lazy(() => import("./components/OrderCreate"));
-const OrderDetail = lazy(() => import("./components/OrderDetail"));
-const CustomersListView = lazy(() => import("./components/CustomersListView"));
-const CustomerCreateView = lazy(() => import("./components/CustomerCreateView"));
-const CustomerDetailView = lazy(() => import("./components/CustomerDetailView"));
-const InventoryListView = lazy(() => import("./components/InventoryListView"));
-const InventoryCreateView = lazy(() => import("./components/InventoryCreateView"));
-const ChecklistView = lazy(() => import("./components/ChecklistView"));
-const RecipesView = lazy(() => import("./components/RecipesView"));
-const RecipeCreateView = lazy(() => import("./components/RecipeCreateView"));
-const RecipeDetailView = lazy(() => import("./components/RecipeDetailView"));
-const ProfileView = lazy(() => import("./components/ProfileView"));
-const GettingStartedView = lazy(() => import("./components/GettingStartedView"));
-const MoreView = lazy(() => import("./components/MoreView"));
-const HelpView = lazy(() => import("./components/HelpView"));
-const DebriefsView = lazy(() => import("./components/DebriefsView"));
-const FeedbackView = lazy(() => import("./components/FeedbackView"));
-const PublicRecipesListView = lazy(() => import("./components/PublicRecipesListView"));
-const PublicRecipeDetailView = lazy(() => import("./components/PublicRecipeDetailView"));
-const AdminPublicRecipeCreateView = lazy(() => import("./components/AdminPublicRecipeCreateView"));
-const SubscriptionBlockedView = lazy(() => import("./components/SubscriptionBlockedView"));
-const ReauthView = lazy(() => import("./components/ReauthView"));
-const DownloadsView = lazy(() => import("./components/DownloadsView"));
+// Statically imported page components to ensure complete offline-first operation without network chunk fetches
+import AdminDashboardView from "./components/AdminDashboardView";
+import AdminLoginView from "./components/AdminLoginView";
+import LoginView from "./components/LoginView";
+import DashboardView from "./components/DashboardView";
+import LeadsView from "./components/LeadsView";
+import OrdersList from "./components/OrdersList";
+import OrderCreate from "./components/OrderCreate";
+import OrderDetail from "./components/OrderDetail";
+import CustomersListView from "./components/CustomersListView";
+import CustomerCreateView from "./components/CustomerCreateView";
+import CustomerDetailView from "./components/CustomerDetailView";
+import InventoryListView from "./components/InventoryListView";
+import InventoryCreateView from "./components/InventoryCreateView";
+import ChecklistView from "./components/ChecklistView";
+import RecipesView from "./components/RecipesView";
+import RecipeCreateView from "./components/RecipeCreateView";
+import RecipeDetailView from "./components/RecipeDetailView";
+import ProfileView from "./components/ProfileView";
+import GettingStartedView from "./components/GettingStartedView";
+import MoreView from "./components/MoreView";
+import HelpView from "./components/HelpView";
+import DebriefsView from "./components/DebriefsView";
+import FeedbackView from "./components/FeedbackView";
+import PublicRecipesListView from "./components/PublicRecipesListView";
+import PublicRecipeDetailView from "./components/PublicRecipeDetailView";
+import AdminPublicRecipeCreateView from "./components/AdminPublicRecipeCreateView";
+import SubscriptionBlockedView from "./components/SubscriptionBlockedView";
+import ReauthView from "./components/ReauthView";
+import DownloadsView from "./components/DownloadsView";
+import DemoLoginView from "./components/DemoLoginView";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      networkMode: "always",
+      refetchOnReconnect: false,
       refetchOnWindowFocus: false,
       staleTime: Infinity,
+    },
+    mutations: {
+      networkMode: "always",
     },
   },
 });
@@ -329,8 +335,9 @@ function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
       user={user}
       onUpdateProfile={handleUpdateProfile}
       onUpdateBakeryProfile={handleUpdateBakeryProfile}
+      onLogout={handleLogout}
     />
-  ), [user, handleUpdateProfile, handleUpdateBakeryProfile]);
+  ), [user, handleUpdateProfile, handleUpdateBakeryProfile, handleLogout]);
 
   const profileViewElement = useMemo(() => (
     <ProfileView
@@ -485,11 +492,18 @@ function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
   const isGettingStarted = location.pathname === "/getting-started";
   const isLanding = location.pathname === "/landing";
   const isDownloads = location.pathname === "/downloads";
-  if (profileChecked && !bakeryProfile && !isGettingStarted && !isLanding && !isDownloads) {
+  const hasCompletedBakerySetup = Boolean(
+    bakeryProfile ||
+    (typeof window !== "undefined" && window.localStorage?.getItem("patisserie_bakery_name"))
+  );
+  if (profileChecked && !hasCompletedBakerySetup && !isGettingStarted && !isLanding && !isDownloads) {
     return <Navigate to="/getting-started" replace />;
   }
 
   if (currentScreen === "landing") {
+    if (isNativeApp()) {
+      return <Navigate to="/dashboard" replace />;
+    }
     return (
       <Suspense fallback={
         <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
@@ -508,6 +522,9 @@ function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
   }
 
   if (currentScreen === "downloads") {
+    if (isNativeApp()) {
+      return <Navigate to="/dashboard" replace />;
+    }
     return (
       <Suspense fallback={
         <div className="min-h-screen bg-baking-cream dark:bg-zinc-950 flex flex-col items-center justify-center text-center p-4">
@@ -559,7 +576,7 @@ function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
           {/* Logo Section */}
           <div className="sidebar-logo-container mb-8 flex items-center justify-center">
             <button
-              onClick={() => navigate("/landing")}
+              onClick={() => navigate(isNativeApp() ? "/dashboard" : "/landing")}
               className="sidebar-logo-btn w-12 h-12 rounded-full cursor-pointer hover:rotate-6 transition-all duration-200 border-none outline-none overflow-hidden shrink-0 shadow-xs"
               title="Floura Logo"
             >
@@ -746,9 +763,9 @@ function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
         {currentScreen === "dashboard" && (
           <header className="md:hidden flex items-center justify-between px-5 h-16 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-900/40 sticky top-0 z-30 select-none shadow-xs">
             <button
-              onClick={() => navigate("/landing")}
+              onClick={() => navigate(isNativeApp() ? "/dashboard" : "/landing")}
               className="flex items-center gap-3 cursor-pointer border-none bg-transparent outline-none focus:outline-none p-0 active:scale-95 transition-all"
-              title="Go to Landing Page"
+              title="Go to Dashboard"
             >
               <img
                 src={flouraLogo}
@@ -957,18 +974,27 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode, onUser
   useEffect(() => {
     const handleReauthEvent = (e: any) => {
       const returnTo = e.detail?.returnTo || location.pathname || "/dashboard";
-      navigate(`/reauthenticate?returnTo=${encodeURIComponent(returnTo)}`);
+      navigate(`/reauthenticate?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
     };
     window.addEventListener("floura_reauth_required", handleReauthEvent);
     return () => window.removeEventListener("floura_reauth_required", handleReauthEvent);
   }, [navigate, location.pathname]);
 
   useEffect(() => {
+    if (isNativeApp()) {
+      if (!user && location.pathname !== "/login" && location.pathname !== "/demo-login") {
+        navigate("/login", { replace: true });
+      } else if (user && (location.pathname === "/landing" || location.pathname === "/downloads" || location.pathname === "/login")) {
+        navigate("/dashboard", { replace: true });
+      }
+      return;
+    }
+
     if (!user) {
       const isPublicPath = location.pathname === "/" || 
                            location.pathname === "/landing" || 
                            location.pathname === "/login" ||
-                           location.pathname === "/reauthenticate" ||
+                           location.pathname === "/demo-login" ||
                            location.pathname.startsWith("/calculator") ||
                            location.pathname.startsWith("/downloads") ||
                            location.pathname.startsWith("/admin");
@@ -980,6 +1006,9 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode, onUser
 
   // Dedicated /reauthenticate route (displayed when security workspace signature is invalid or expired)
   if (location.pathname === "/reauthenticate") {
+    if (!user) {
+      return <Navigate to={isNativeApp() ? "/login" : "/"} replace />;
+    }
     return (
       <Suspense fallback={<LoadingSignIn />}>
         <ReauthView
@@ -994,9 +1023,26 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode, onUser
             onLogin(freshUser);
             navigate(returnTo, { replace: true });
           }}
-          onLogout={onLogout}
+          onLogout={async () => {
+            sessionStorage.removeItem("floura_reauth_reason");
+            sessionStorage.removeItem("floura_reauth_return_to");
+            await onLogout?.();
+            navigate(isNativeApp() ? "/login" : "/", { replace: true });
+          }}
           darkMode={darkMode}
         />
+      </Suspense>
+    );
+  }
+
+  // Dedicated /demo-login route (for Razorpay reviewer and verification access)
+  if (location.pathname === "/demo-login") {
+    if (user) {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return (
+      <Suspense fallback={<LoadingSignIn />}>
+        <DemoLoginView onLogin={onLogin} />
       </Suspense>
     );
   }
@@ -1059,7 +1105,7 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode, onUser
     );
   }
 
-  // 2. Unauthenticated user (LandingPage for web, LoginView for native mobile apps)
+  // 2. Unauthenticated user (In Cordova/native apps: Login is the landing page. In web: LandingPage)
   if (!user) {
     if (isNativeApp()) {
       return (
@@ -1175,6 +1221,10 @@ export default function App() {
     setUser(null);
     localStorage.removeItem("patisserie_user");
     localStorage.removeItem("patisserie_last_synced_email");
+    try {
+      sessionStorage.removeItem("floura_reauth_reason");
+      sessionStorage.removeItem("floura_reauth_return_to");
+    } catch {}
     try {
       const { closeDatabase, localDb } = await import("./db");
       await localDb.delete();

@@ -58,15 +58,16 @@ function ProfileView({ user, onUpdateProfile, bakeryProfile, onUpdateBakeryProfi
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.25 }}
-      className="space-y-6"
+      className="space-y-6 text-left"
     >
       {/* Title Segment */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate">
+          <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate flex items-center gap-2">
+            <User className="w-5 h-5 sm:w-6 sm:h-6 text-primary-brand dark:text-orange-400 shrink-0" />
             {isNewUser ? "Onboarding: Create Your Bakery Profile" : "Account & Profile Setup"}
           </h2>
-          <p className="hidden sm:block text-xs text-zinc-500 font-sans mt-0.5">
+          <p className="hidden sm:block text-xs text-zinc-550 font-sans mt-0.5">
             {isNewUser 
               ? "Welcome to Floura Bakery Pro! Fill in your kitchen details below to custom brand your workspace" 
               : "Manage your kitchen identity, bakery branding, and credentials"}

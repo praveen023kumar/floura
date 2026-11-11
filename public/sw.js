@@ -60,6 +60,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Never intercept Vite development assets, HMR endpoints, or source files
+  if (
+    url.pathname.startsWith('/@') || 
+    url.pathname.startsWith('/src/') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.searchParams.has('t') ||
+    url.searchParams.has('import')
+  ) {
+    return;
+  }
+
   // 1. Navigation requests (HTML pages): Network-first with offline SPA fallback
   if (request.mode === 'navigate') {
     event.respondWith(
@@ -73,11 +84,10 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => {
+        .catch(async () => {
           // Fallback to cached index.html so React Router handles the route offline
-          return caches.match('/index.html').then((cached) => {
-            return cached || caches.match('/');
-          });
+          const cached = (await caches.match('/index.html')) || (await caches.match('/'));
+          return cached || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
         })
     );
     return;
@@ -122,8 +132,8 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           })
           .catch(() => {
-            // Network failed, return cached response if present
-            return cachedResponse;
+            // Network failed, return cached response if present, else empty 404 Response
+            return cachedResponse || new Response('', { status: 404, statusText: 'Not Found' });
           });
 
         return cachedResponse || fetchPromise;
@@ -132,9 +142,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Default: Network with Cache Fallback
+  // Default: Network with Cache Fallback (always resolve to a valid Response)
   event.respondWith(
-    fetch(request).catch(() => caches.match(request))
+    fetch(request).catch(async () => {
+      const cached = await caches.match(request);
+      return cached || new Response('', { status: 404, statusText: 'Not Found' });
+    })
   );
 });
 

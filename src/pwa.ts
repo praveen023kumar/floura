@@ -12,6 +12,22 @@ export function registerServiceWorker(): void {
     return;
   }
 
+  // In development mode (Vite HMR / npm run dev / localhost), do not register the service worker,
+  // and actively unregister any stale service workers to prevent intercepting Vite modules.
+  const isDev = 
+    Boolean((import.meta as any).env?.DEV) || 
+    (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"));
+
+  if (isDev) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+        console.log("[PWA] Unregistered development service worker:", registration.scope);
+      }
+    });
+    return;
+  }
+
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/sw.js")

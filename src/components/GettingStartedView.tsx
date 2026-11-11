@@ -1,7 +1,6 @@
-// File Path: /src/components/GettingStartedView.tsx
 import React, { memo } from "react";
 import { memoWithData } from "../utils/memo";
-import { ArrowRight, Store, User, Phone, MapPin, Mail, Landmark, Calendar, Sparkles } from "lucide-react";
+import { ArrowRight, Store, User, Phone, MapPin, Mail, Landmark, Calendar, Sparkles, LogOut } from "lucide-react";
 import { motion } from "motion/react";
 import { useGettingStarted } from "../hooks/useGettingStarted";
 
@@ -9,9 +8,10 @@ interface GettingStartedViewProps {
   user: { name: string; email: string; avatar: string; token?: string } | null;
   onUpdateProfile: (updatedUser: { name: string; email: string; avatar: string; token?: string }) => void;
   onUpdateBakeryProfile?: (updatedProfile: any) => Promise<void>;
+  onLogout?: () => void;
 }
 
-function GettingStartedView({ user, onUpdateProfile, onUpdateBakeryProfile }: GettingStartedViewProps) {
+function GettingStartedView({ user, onUpdateProfile, onUpdateBakeryProfile, onLogout }: GettingStartedViewProps) {
   const {
     chefName,
     setChefName,
@@ -198,6 +198,19 @@ function GettingStartedView({ user, onUpdateProfile, onUpdateBakeryProfile }: Ge
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
+
+            {onLogout && (
+              <div className="pt-3 text-center border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-650 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Sign out or switch account
+                </button>
+              </div>
+            )}
           </form>
         </motion.div>
       </div>

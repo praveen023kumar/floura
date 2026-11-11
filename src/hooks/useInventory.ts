@@ -69,6 +69,7 @@ export function useInventory({
   // Load metadata using TanStack useQuery
   const metadataQuery = useQuery({
     queryKey: ["inventory", "metadata"],
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const [dbCats, lowStock, activeUnits, allItemsLight] = await Promise.all([
         localDb.categories.filter(c => c.type === "inventory" && c.isDeleted !== 1).toArray(),
@@ -118,6 +119,7 @@ export function useInventory({
       inventoryCurrentPage,
       inventoryItemsPerPage
     ],
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const startIndex = (inventoryCurrentPage - 1) * inventoryItemsPerPage;
 

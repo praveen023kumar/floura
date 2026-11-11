@@ -1,5 +1,5 @@
-// File Path: /src/components/ReauthView.tsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   ShieldAlert, 
   LogOut, 
@@ -8,7 +8,11 @@ import {
   XCircle, 
   X, 
   Sparkles, 
-  Lock 
+  Lock,
+  KeyRound,
+  ShieldCheck,
+  RotateCcw,
+  ArrowRight
 } from "lucide-react";
 import { motion } from "motion/react";
 import flouraLogo from "../assets/images/floura_logo.png";
@@ -35,17 +39,60 @@ export default function ReauthView({
   darkMode
 }: ReauthViewProps) {
   const {
+    otpCode,
+    setOtpCode,
+    isOtpSent,
+    isSendingOtp,
+    isVerifyingOtp,
+    otpCountdown,
     authenticating,
     toastMessage,
     errorToast,
     setErrorToast,
     activeModal,
     setActiveModal,
-    handleGoogleSignIn
+    handleSendOtp,
+    handleVerifyOtp,
+    handleResetOtp,
   } = useLogin({ onLogin });
+
+  const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
+  const userEmail = user?.email || "";
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage?.removeItem("floura_reauth_reason");
+        window.sessionStorage?.removeItem("floura_reauth_return_to");
+      }
+    } catch {}
+    try {
+      await onLogout?.();
+    } catch (e) {
+      console.error("Sign out error:", e);
+    }
+    navigate("/", { replace: true });
+    setTimeout(() => {
+      if (typeof window !== "undefined" && window.location.pathname.startsWith("/reauthenticate")) {
+        window.location.href = "/";
+      }
+    }, 100);
+  };
+
+  let fallbackEmail = "";
+  try {
+    const rawSaved = typeof window !== "undefined" ? window.localStorage?.getItem("patisserie_user") : null;
+    if (rawSaved) {
+      const parsed = JSON.parse(rawSaved);
+      if (parsed?.email) fallbackEmail = parsed.email;
+    }
+  } catch {}
 
   const activeEmail = 
     user?.email || 
+    fallbackEmail ||
     (typeof window !== "undefined" ? window.localStorage?.getItem("patisserie_last_synced_email") : "") ||
     "your registered email";
 
@@ -122,59 +169,109 @@ export default function ReauthView({
 
         {/* Explanation */}
         <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mb-6 font-medium">
-          Your active security workspace signature is no longer synchronized with the cloud database. Please sign in again with Google to refresh your credentials and safely access your recipes, orders, and customer records.
+          Your active security workspace signature is no longer synchronized with the cloud database. Verify your email to refresh your credentials and safely access your recipes, orders, and customer records.
         </p>
 
         {/* Action Buttons */}
         <div className="w-full space-y-3">
-          {/* Sign In Again with Google Button */}
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={authenticating}
-            className="w-full flex items-center justify-center gap-3 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white py-3.5 px-6 rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-wider"
-          >
-            {authenticating ? (
-              <>
-                <RefreshCw className="w-4 h-4 text-white animate-spin shrink-0" />
-                <span>Verifying Credentials...</span>
-              </>
-            ) : (
-              <>
-                <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center p-0.5 shrink-0 shadow-xs">
-                  <svg className="w-full h-full" viewBox="0 0 48 48">
-                    <path
-                      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-                      fill="#EA4335"
-                    />
-                    <path
-                      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
-                      fill="#4285F4"
-                    />
-                    <path
-                      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
-                      fill="#FBBC05"
-                    />
-                    <path
-                      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
-                      fill="#34A853"
-                    />
-                  </svg>
-                </div>
-                <span>Sign In Again with Google</span>
-              </>
-            )}
-          </button>
+          {!isOtpSent ? (
+            <button
+              type="button"
+              onClick={() => handleSendOtp(activeEmail)}
+              disabled={authenticating}
+              className="w-full flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white py-3.5 px-6 rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-wider"
+            >
+              {isSendingOtp ? (
+                <>
+                  <RefreshCw className="w-4 h-4 text-white animate-spin shrink-0" />
+                  <span>Sending Verification Code...</span>
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4 shrink-0" />
+                  <span>Send Code to {activeEmail}</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <form onSubmit={(e) => { e.preventDefault(); handleVerifyOtp(otpCode, activeEmail); }} className="space-y-3">
+              <p className="text-[11px] text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/40 rounded-xl p-2.5 leading-relaxed text-left">
+                Code sent! Please check your <strong>Inbox</strong> and <strong>Spam / Junk</strong> folder for your 6-digit verification code.
+              </p>
+              <div className="relative">
+                <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  placeholder="• • • • • •"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                  required
+                  autoFocus
+                  disabled={isVerifyingOtp}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl text-center text-lg font-mono font-black tracking-[0.4em] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-300 outline-none focus:ring-2 focus:ring-primary-brand"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isVerifyingOtp || otpCode.trim().length !== 6}
+                className="w-full flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white py-3 px-6 rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-wider"
+              >
+                {isVerifyingOtp ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 text-white animate-spin shrink-0" />
+                    <span>Verifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Verify & Reconnect</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center justify-between text-xs pt-1 px-1">
+                <button
+                  type="button"
+                  onClick={handleResetOtp}
+                  className="text-zinc-500 hover:underline text-[11px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendOtp(activeEmail)}
+                  disabled={isSendingOtp || otpCountdown > 0}
+                  className="text-primary-brand dark:text-orange-400 font-bold hover:underline disabled:opacity-40 text-[11px] flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>{otpCountdown > 0 ? `Resend in ${otpCountdown}s` : "Resend Code"}</span>
+                </button>
+              </div>
+            </form>
+          )}
 
           {/* Sign Out / Switch Account */}
           <button
             type="button"
-            onClick={onLogout}
-            disabled={authenticating}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-semibold text-zinc-500 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer active:scale-98"
+            onClick={handleSignOut}
+            disabled={authenticating || signingOut}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-semibold text-zinc-500 hover:text-rose-600 dark:text-zinc-400 dark:hover:text-rose-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer active:scale-98 disabled:opacity-50"
           >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out / Use Another Account</span>
+            {signingOut ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Signing Out...</span>
+              </>
+            ) : (
+              <>
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out / Use Another Account</span>
+              </>
+            )}
           </button>
         </div>
 

@@ -31,6 +31,9 @@ import {
   Menu,
   Download,
   Laptop,
+  Mail,
+  KeyRound,
+  RotateCcw,
 } from "lucide-react";
 import flouraLogo from "../assets/images/floura_logo.webp";
 import chefHeroPhoto from "../assets/images/chef_hero_photo.webp";
@@ -50,14 +53,25 @@ interface LandingPageProps {
 export default function LandingPage({ user, onLogin, onLogout, darkMode, setDarkMode }: LandingPageProps) {
   const navigate = useNavigate();
   const {
-    authenticating,
+    ownerEmail,
+    setOwnerEmail,
+    otpCode,
+    setOtpCode,
+    isOtpSent,
+    isSendingOtp,
+    isVerifyingOtp,
+    otpCountdown,
     toastMessage,
     errorToast,
     setErrorToast,
     activeModal,
     setActiveModal,
-    handleGoogleSignIn,
+    handleSendOtp,
+    handleVerifyOtp,
+    handleResetOtp,
   } = useLogin({ onLogin });
+
+  const [downloadTimestamp, setDownloadTimestamp] = useState<number>(() => Date.now());
 
   const loginSectionRef = useRef<HTMLDivElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -667,8 +681,13 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
               {/* Direct APK Download Button */}
               <a
                 id="link-download-apk"
-                href="/downloads/floura-v1.0.0.apk"
+                href={`/downloads/floura-v1.0.0.apk?t=${downloadTimestamp}`}
                 download="floura-v1.0.0.apk"
+                onClick={(e) => {
+                  const freshTime = Date.now();
+                  setDownloadTimestamp(freshTime);
+                  e.currentTarget.href = `/downloads/floura-v1.0.0.apk?t=${freshTime}`;
+                }}
                 className="flex items-center gap-3 bg-primary-brand hover:bg-orange-600 text-white py-3.5 px-6 rounded-2xl shadow-md shadow-orange-500/20 active:scale-98 transition-all select-none cursor-pointer"
                 aria-label="Direct Download Android APK"
               >
@@ -858,38 +877,111 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
                 </div>
               </div>
             ) : (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
                   <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Sign In to Floura</span>
                   <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-950/60 text-green-600 dark:text-green-400 px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase">
                     <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                    Secure
+                    Email OTP
                   </div>
                 </div>
 
-                <button
-                  id="btn-signin-google"
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={authenticating}
-                  className="group w-full flex items-center justify-center gap-3 bg-primary-brand hover:bg-primary-brand-dark text-white py-3.5 px-6 rounded-xl shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-widest"
-                >
-                  {authenticating ? (
-                    <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
-                  ) : (
-                    <div className="w-5.5 h-5.5 bg-white rounded-full flex items-center justify-center p-1 shrink-0 shadow-sm">
-                      <svg className="w-full h-full" viewBox="0 0 48 48">
-                        <path d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" fill="#EA4335" />
-                        <path d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" fill="#4285F4" />
-                        <path d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" fill="#FBBC05" />
-                        <path d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" fill="#34A853" />
-                      </svg>
+                {!isOtpSent ? (
+                  <form onSubmit={(e) => { e.preventDefault(); handleSendOtp(); }} className="space-y-3 text-left">
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
+                      <input
+                        type="email"
+                        placeholder="chef@flourabakery.com"
+                        value={ownerEmail}
+                        onChange={(e) => setOwnerEmail(e.target.value)}
+                        required
+                        disabled={isSendingOtp}
+                        className="w-full pl-10 pr-4 py-3 rounded-xl text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 outline-none focus:ring-2 focus:ring-primary-brand"
+                      />
                     </div>
-                  )}
-                  <span>{authenticating ? "Signing in..." : "Continue with Google"}</span>
-                </button>
+                    <button
+                      id="btn-landing-send-otp"
+                      type="submit"
+                      disabled={isSendingOtp || !ownerEmail.trim() || !ownerEmail.includes("@")}
+                      className="w-full flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white py-3 px-6 rounded-xl shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-widest"
+                    >
+                      {isSendingOtp ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                          <span>Sending Code...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Send Verification Code</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={(e) => { e.preventDefault(); handleVerifyOtp(); }} className="space-y-3 text-left">
+                    <div className="flex items-center justify-between text-[11px] px-1 text-zinc-500 dark:text-zinc-400">
+                      <span>Code sent to <strong className="text-zinc-700 dark:text-zinc-300 font-mono">{ownerEmail}</strong></span>
+                      <button
+                        type="button"
+                        onClick={handleResetOtp}
+                        className="text-primary-brand dark:text-orange-400 font-bold hover:underline"
+                      >
+                        Change
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/40 rounded-lg p-2 leading-tight">
+                      <strong>Check Spam:</strong> If the code does not appear in your inbox, please check your Spam or Junk folder.
+                    </p>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        placeholder="• • • • • •"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                        required
+                        autoFocus
+                        disabled={isVerifyingOtp}
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl text-center text-lg font-mono font-black tracking-[0.4em] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-300 outline-none focus:ring-2 focus:ring-primary-brand"
+                      />
+                    </div>
+                    <button
+                      id="btn-landing-verify-otp"
+                      type="submit"
+                      disabled={isVerifyingOtp || otpCode.trim().length !== 6}
+                      className="w-full flex items-center justify-center gap-2 bg-primary-brand hover:bg-primary-brand-dark text-white py-3 px-6 rounded-xl shadow-md transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-widest"
+                    >
+                      {isVerifyingOtp ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                          <span>Verifying...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>Verify & Enter Workspace</span>
+                        </>
+                      )}
+                    </button>
+                    <div className="text-center pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleSendOtp()}
+                        disabled={isSendingOtp || otpCountdown > 0}
+                        className="text-[11px] font-bold text-primary-brand dark:text-orange-400 hover:underline disabled:opacity-40"
+                      >
+                        {otpCountdown > 0 ? `Resend code in ${otpCountdown}s` : "Resend code"}
+                      </button>
+                    </div>
+                  </form>
+                )}
 
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 leading-relaxed text-center font-semibold">
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500 leading-relaxed text-center font-semibold pt-1">
                   By signing in, you agree to our{" "}
                   <button id="btn-terms-modal-signin" onClick={(e) => { e.preventDefault(); setActiveModal("terms"); }} className="underline hover:text-zinc-750 dark:hover:text-zinc-350 cursor-pointer">Terms</button>,{" "}
                   <button id="btn-privacy-modal-signin" onClick={(e) => { e.preventDefault(); setActiveModal("privacy"); }} className="underline hover:text-zinc-750 dark:hover:text-zinc-350 cursor-pointer">Privacy Policy</button>{" "}

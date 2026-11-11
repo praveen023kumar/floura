@@ -12,9 +12,9 @@ export const SUBSCRIPTION_PLANS = [
 ];
 
 function getRazorpayCredentials() {
-  const keyId = process.env.RAZORPAY_KEY_ID?.trim() || "";
-  const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim() || "";
-  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim() || "";
+  const keyId = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID)?.trim() || "";
+  const keySecret = (process.env.RAZORPAY_KEY_SECRET || process.env.VITE_RAZORPAY_KEY_SECRET)?.trim() || "";
+  const webhookSecret = (process.env.RAZORPAY_WEBHOOK_SECRET || process.env.VITE_RAZORPAY_WEBHOOK_SECRET)?.trim() || "";
   const isConfigured = keyId.length > 0 && keySecret.length > 0 && !keyId.includes("your_key_id");
   return { keyId, keySecret, webhookSecret, isConfigured };
 }

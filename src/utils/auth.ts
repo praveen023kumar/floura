@@ -44,6 +44,13 @@ export function triggerReauth(returnTo: string = window.location.pathname, reaso
           detail: { returnTo, reason: activeReason }
         })
       );
+
+      // Reliable navigation fallback in case event listener hasn't caught it or route is still unchanged
+      setTimeout(() => {
+        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/reauthenticate")) {
+          window.location.href = `/reauthenticate?returnTo=${encodeURIComponent(returnTo)}`;
+        }
+      }, 50);
     }
   } catch (e) {
     console.error("Failed to dispatch reauth event:", e);

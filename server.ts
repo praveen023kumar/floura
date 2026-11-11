@@ -1,10 +1,12 @@
 // File Path: /server.ts
-import "dotenv/config";
+import dotenv from "dotenv";
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { initDb } from "./server/models/db";
 import apiRouter from "./server/routes";
+import { getResolvedFirebaseConfig } from "./server/controllers/auth.controller";
 import {
   ipBlockingMiddleware,
   monitoringMiddleware,
@@ -18,6 +20,19 @@ import {
   inputSanitizationMiddleware,
   refreshBlockedIpsCache
 } from "./server/middleware/security.middleware";
+
+// Multi-location .env loader so environment is parsed regardless of cwd, ESM, or Passenger entry
+const serverDir = typeof __dirname !== "undefined" ? __dirname : process.cwd();
+const possibleEnvPaths = [
+  path.join(process.cwd(), ".env"),
+  path.join(serverDir, ".env"),
+  path.join(serverDir, "..", ".env")
+];
+for (const envPath of possibleEnvPaths) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath, override: false });
+  }
+}
 
 async function startServer() {
   // Ensure DB and seed data exists (chains initSecurityDb internally)
@@ -87,6 +102,7 @@ async function startServer() {
 
   app.use("/api", (req, res, next) => {
     const isAuthRoute = req.path === "/auth/login" || 
+                        req.path === "/auth/demo-login" || 
                         req.path === "/admin/login" || 
                         req.path === "/auth/external-start" || 
                         req.path === "/auth/external-complete";
@@ -127,6 +143,14 @@ async function startServer() {
     res.sendFile(filePath);
   });
 
+  // Downloads: Prevent intermediate proxies, CDNs, and browsers from caching APK / app downloads
+  app.use("/downloads", (req, res, next) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    next();
+  });
+
   // Serve Frontend with Vite Middleware in Development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -148,6 +172,30 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
+    const fbConfig = getResolvedFirebaseConfig();
+    const mask = (str?: string, visible: number = 4) => {
+      if (!str) return "(not set)";
+      if (str.length <= visible * 2) return "***";
+      return `${str.slice(0, visible)}...${str.slice(-visible)} (${str.length} chars)`;
+    };
+
+    console.log("\n=======================================================");
+    console.log("🚀 FLOURA BACKEND SERVER INITIALIZATION");
+    console.log("=======================================================");
+    console.log(`⏱️  Timestamp:        ${new Date().toISOString()}`);
+    console.log(`🌍 NODE_ENV:         ${process.env.NODE_ENV || "development"}`);
+    console.log(`🔌 Port:             ${PORT}`);
+    console.log(`📂 Process CWD:      ${process.cwd()}`);
+    console.log(`📁 Server Dir:       ${serverDir}`);
+    console.log(`🌐 APP_URL:          ${process.env.APP_URL || "(not set)"}`);
+    console.log(`🔗 BACKEND_URL:      ${process.env.BACKEND_URL || "(not set)"}`);
+    console.log(`💳 RAZORPAY_KEY_ID:  ${mask(process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID, 8)}`);
+    console.log(`🔐 RAZORPAY_SECRET:  ${(process.env.RAZORPAY_KEY_SECRET || process.env.VITE_RAZORPAY_KEY_SECRET) ? `[SET - ${(process.env.RAZORPAY_KEY_SECRET || process.env.VITE_RAZORPAY_KEY_SECRET)!.length} chars]` : "(not set)"}`);
+    console.log(`🔥 FIREBASE_API_KEY: ${mask(fbConfig?.apiKey, 6)}`);
+    console.log(`🔥 FIREBASE_PROJECT: ${fbConfig?.projectId || "(not set)"}`);
+    console.log(`🔥 FIREBASE_AUTH_DOM:${fbConfig?.authDomain || "(not set)"}`);
+    console.log(`💾 DATABASE_FILE:    ${path.join(process.cwd(), "patisserie.sqlite")}`);
+    console.log("=======================================================\n");
     console.log(`Floura custom Express/SQLite MVC backend listening on port ${PORT}`);
   });
 }

@@ -439,7 +439,7 @@ export function useAppEngine(
         localDb.categories.clear(),
         localDb.leads.clear()
       ]);
-
+      
       while (hasMore) {
         if (onProgress) onProgress(`Retrieving baking records page ${page}...`, Math.min(25 + page * 10, 85));
         
@@ -472,6 +472,24 @@ export function useAppEngine(
         
         const data = await response.json();
         if (data.status !== "success") throw new Error("Fetch returned failure");
+
+        // Clear local DB tables only once we have successfully received and verified cloud records
+        if (isFirstPage) {
+          if (onProgress) onProgress("Refreshing local workspace partition...", 25);
+          await Promise.all([
+            localDb.customers.clear(),
+            localDb.orders.clear(),
+            localDb.inventory.clear(),
+            localDb.recipes.clear(),
+            localDb.checklist.clear(),
+            localDb.customEvents.clear(),
+            localDb.dispatchedNotifications.clear(),
+            localDb.scheduledAlerts.clear(),
+            localDb.bakeryProfile.clear(),
+            localDb.categories.clear(),
+            localDb.leads.clear()
+          ]);
+        }
 
         hasMore = data.hasMore;
 
@@ -843,6 +861,10 @@ export function useAppEngine(
           const errData = await response.json().catch(() => ({}));
           if (errData.code === "SUBSCRIPTION_EXPIRED" || errData.code === "ACCOUNT_DEACTIVATED") {
             handleSubscriptionBlocked(errData);
+            return;
+          }
+          if (errData.code === "SINGLE_DEVICE_CONFLICT" || isAuthSignatureError(response.status, errData)) {
+            triggerReauth(location.pathname || "/dashboard", errData.error || "Access Denied: Invalid security workspace signature. Please re-authenticate.");
             return;
           }
           window.showToast(errData.error || "Session Expired: You have logged in on another device.", "warning");
@@ -1432,13 +1454,24 @@ export function useAppEngine(
   };
 
   const handleUpdateBakeryProfile = async (updatedProfile: any) => {
-    await localDb.bakeryProfile.put({
-      ...updatedProfile,
-      localChange: 1,
-      updatedAt: new Date().toISOString()
-    });
+    try {
+      if (updatedProfile?.bakeryName) {
+        localStorage.setItem("patisserie_bakery_name", updatedProfile.bakeryName);
+      }
+    } catch {}
+    try {
+      await localDb.bakeryProfile.put({
+        ...updatedProfile,
+        localChange: 1,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn("Could not save bakeryProfile to localDb:", e);
+    }
     setBakeryProfile(updatedProfile);
-    await refreshReactStates(false, "bakeryProfile");
+    try {
+      await refreshReactStates(false, "bakeryProfile");
+    } catch {}
     if (typeof navigator !== "undefined" && navigator.onLine) {
       triggerSync();
     }

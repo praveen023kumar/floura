@@ -34,16 +34,22 @@ export const isNativeApp = (): boolean => {
 export const getBackendBaseUrl = (): string => {
   if (typeof window === "undefined") return "";
 
-  // 1. Check if a build-time environment variable is set
-  const envUrl = (import.meta as any).env?.VITE_BACKEND_URL;
-  if (envUrl) {
-    return envUrl.trim().replace(/\/+$/, "");
+  // 1. If running inside a Native App wrapper (Cordova / Electron), use absolute backend URL
+  if (isNativeApp()) {
+    const envUrl = (import.meta as any).env?.VITE_BACKEND_URL;
+    return envUrl ? envUrl.trim().replace(/\/+$/, "") : PRODUCTION_URL;
   }
 
-  // 2. If running inside a Native App wrapper, return production backend URL to avoid broken relative fetches on file://
-  if (isNativeApp()) {
-    return PRODUCTION_URL;
+  // 2. Local development on localhost
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    const envUrl = (import.meta as any).env?.VITE_BACKEND_URL;
+    if (envUrl && !envUrl.includes(window.location.host)) {
+      return envUrl.trim().replace(/\/+$/, "");
+    }
   }
+
+  // 3. In production web browser (e.g. https://floura.kydigit.com), use relative path ""
+  // This automatically routes all /api calls to the current live domain
   return "";
 };
 

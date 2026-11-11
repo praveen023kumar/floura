@@ -37,12 +37,21 @@ function getFileSize(filePath) {
 }
 
 // ----------------------------------------------------------------------
-// 1. ANDROID APK SETUP & COPY
 // ----------------------------------------------------------------------
-console.log('📱 [1/3] Setting up Android Standalone APK...');
+// 1. PRODUCTION WEB BUILD
+// ----------------------------------------------------------------------
+console.log('🌐 [1/3] Building production web bundles (npm run build)...');
+execSync('npm run build', { stdio: 'inherit', cwd: rootDir });
+
+// ----------------------------------------------------------------------
+// 2. ANDROID APK SETUP & COPY (directly to dist/downloads)
+// ----------------------------------------------------------------------
+console.log('\n📱 [2/3] Setting up Android Standalone APK in dist/downloads...');
 const androidApkSource = path.join(rootDir, 'cordova', 'platforms', 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
-const androidTarget = path.join(downloadsDir, 'floura-v1.0.0.apk');
-const androidLatestTarget = path.join(downloadsDir, 'floura-latest.apk');
+const androidTarget = path.join(distDownloadsDir, 'floura-v1.0.0.apk');
+const androidLatestTarget = path.join(distDownloadsDir, 'floura-latest.apk');
+
+fs.mkdirSync(distDownloadsDir, { recursive: true });
 
 if (fs.existsSync(androidApkSource)) {
   fs.copyFileSync(androidApkSource, androidTarget);
@@ -51,41 +60,27 @@ if (fs.existsSync(androidApkSource)) {
   const hash = calculateSha256(androidTarget);
   console.log(`   ✅ Android APK ready: ${androidTarget} (${size})`);
   console.log(`   🔑 SHA-256 Checksum: ${hash}`);
-} else if (fs.existsSync(androidTarget)) {
-  const size = getFileSize(androidTarget);
-  const hash = calculateSha256(androidTarget);
-  console.log(`   ✅ Using existing Android APK: ${androidTarget} (${size})`);
-  console.log(`   🔑 SHA-256 Checksum: ${hash}`);
 } else {
   console.error('   ❌ Error: Android APK not found. Run cordova build first.');
   process.exit(1);
 }
 
-// ----------------------------------------------------------------------
-// 2. PRODUCTION WEB BUILD
-// ----------------------------------------------------------------------
-console.log('\n🌐 [2/3] Building production web bundles (npm run build)...');
-execSync('npm run build', { stdio: 'inherit', cwd: rootDir });
-
-// Ensure downloads are copied into dist/downloads/
-fs.mkdirSync(distDownloadsDir, { recursive: true });
-for (const file of fs.readdirSync(downloadsDir)) {
-  if (file.endsWith('.apk')) {
-    fs.copyFileSync(path.join(downloadsDir, file), path.join(distDownloadsDir, file));
-  }
+const fbSource = path.join(rootDir, 'firebase-applet-config.json');
+if (fs.existsSync(fbSource)) {
+  fs.copyFileSync(fbSource, path.join(rootDir, 'dist', 'firebase-applet-config.json'));
 }
-console.log('   ✅ Android APK synced to dist/downloads/.');
+console.log('   ✅ Android APK & Firebase config synced to dist/.');
 
 // ----------------------------------------------------------------------
 // 3. CREATE cPANEL DEPLOYMENT ZIP
 // ----------------------------------------------------------------------
-console.log('\n📦 [3/3] Packaging cpanel-deploy.zip with web app and APK...');
+console.log('\n📦 [3/3] Packaging cpanel-deploy.zip with web app, APK, and server configurations...');
 const zipFile = path.join(rootDir, 'cpanel-deploy.zip');
 if (fs.existsSync(zipFile)) {
   fs.unlinkSync(zipFile);
 }
 
-execSync('zip -r cpanel-deploy.zip dist package.json package-lock.json app.cjs -x "*.DS_Store"', {
+execSync('zip -r cpanel-deploy.zip dist package.json package-lock.json app.cjs firebase-applet-config.json .env.example -x "*.DS_Store"', {
   cwd: rootDir,
   stdio: 'inherit'
 });

@@ -100,6 +100,7 @@ export function useCustomers({
       customersCurrentPage,
       customersItemsPerPage
     ],
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const startIndex = (customersCurrentPage - 1) * customersItemsPerPage;
       const hasEncryptedFilters = searchTerm.trim() !== "" || sortBy === "name-az";

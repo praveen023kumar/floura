@@ -40,76 +40,88 @@ export function useGettingStarted({
     e.preventDefault();
     setSaving(true);
     try {
-      if (user?.token) {
-        const response = await fetch(getApiUrl("/api/auth/profile"), {
+      const normalizedCurrency = normalizeCurrency(currency);
+      const activeBakery = bakeryName.trim() || "Sweet Home Bakery";
+      const activeChef = chefName.trim() || user?.name || "Chef Paul";
+      const activeEmail = email.trim() || user?.email || "";
+      const activePhone = phone.trim() || "";
+      const activeAddress = address.trim() || "";
+      const activeRole = role.trim() || "Head Baker & Owner";
+      const activeDateFormat = dateFormat || "YYYY-MM-DD";
+
+      const profilePayload = {
+        id: "active-profile",
+        bakeryName: activeBakery,
+        email: activeEmail,
+        phone: activePhone,
+        address: activeAddress,
+        role: activeRole,
+        currency: normalizedCurrency,
+        dateFormat: activeDateFormat,
+        isDeleted: 0,
+      };
+
+      // 1. Immediately save to local profile states & storage (guaranteed offline-first!)
+      if (onUpdateBakeryProfile) {
+        await onUpdateBakeryProfile(profilePayload);
+      }
+
+      onUpdateProfile({
+        ...(user || {}),
+        name: activeChef,
+        email: user?.email || activeEmail,
+        avatar: "chef",
+        token: user?.token,
+      });
+
+      setFormatConfig(normalizedCurrency, activeDateFormat);
+      if (typeof window !== "undefined" && window.localStorage) {
+        try {
+          window.localStorage.setItem("patisserie_bakery_name", activeBakery);
+          window.localStorage.setItem("floura_currency", normalizedCurrency);
+          window.localStorage.setItem("floura_date_format", activeDateFormat);
+        } catch {}
+      }
+
+      await setPreference("patisserie_bakery_name", activeBakery);
+      await setPreference("patisserie_bakery_email", activeEmail);
+      await setPreference("patisserie_bakery_phone", activePhone);
+      await setPreference("patisserie_bakery_address", activeAddress);
+      await setPreference("patisserie_bakery_role", activeRole);
+      await setPreference("floura_currency", normalizedCurrency);
+      await setPreference("floura_date_format", activeDateFormat);
+      await removePreference("patisserie_is_new_user");
+
+      window.dispatchEvent(new Event("floura_settings_changed"));
+      window.showToast?.("Bakery Profile personalized successfully!", "success");
+
+      // 2. Non-blocking background sync to server
+      if (user?.token && typeof navigator !== "undefined" && navigator.onLine) {
+        fetch(getApiUrl("/api/auth/profile"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + user.token,
+            Authorization: "Bearer " + user.token,
             "x-user-email": user.email,
-            "x-device-id": getDeviceId()
+            "x-device-id": getDeviceId(),
           },
           body: JSON.stringify({
             userEmail: user.email,
             email: user.email,
-            name: chefName,
-            avatar: "chef"
-          })
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          if (isAuthSignatureError(response.status, errData)) {
-            triggerReauth("/getting-started", errData.error);
-            return;
-          }
-        }
-      }
-
-      onUpdateProfile({ ...(user || {}), name: chefName, email: user?.email || "", avatar: "chef", token: user?.token });
-      
-      const normalizedCurrency = normalizeCurrency(currency);
-
-      if (onUpdateBakeryProfile) {
-        await onUpdateBakeryProfile({
-          id: "active-profile",
-          bakeryName,
-          email,
-          phone,
-          address,
-          role,
-          currency: normalizedCurrency,
-          dateFormat,
-          isDeleted: 0
+            name: activeChef,
+            avatar: "chef",
+          }),
+        }).catch((err) => {
+          console.warn("[GettingStarted] Background profile sync warning:", err);
         });
       }
 
-      setFormatConfig(normalizedCurrency, dateFormat);
-      if (typeof window !== "undefined" && window.localStorage) {
-        try {
-          window.localStorage.setItem("floura_currency", normalizedCurrency);
-          window.localStorage.setItem("floura_date_format", dateFormat);
-        } catch {}
-      }
-
-      await setPreference("patisserie_bakery_name", bakeryName);
-      await setPreference("patisserie_bakery_email", email);
-      await setPreference("patisserie_bakery_phone", phone);
-      await setPreference("patisserie_bakery_address", address);
-      await setPreference("patisserie_bakery_role", role);
-      await setPreference("floura_currency", normalizedCurrency);
-      await setPreference("floura_date_format", dateFormat);
-      
-      await removePreference("patisserie_is_new_user");
-      
-      window.dispatchEvent(new Event("floura_settings_changed"));
-      
-      window.showToast?.("Bakery Profile personalized successfully!", "success");
-      navigate("/dashboard");
+      // 3. Immediately transition to Dashboard
+      navigate("/dashboard", { replace: true });
     } catch (err) {
-      console.error(err);
-      window.showToast?.("Could not save profile. Using local defaults instead.", "warning");
-      navigate("/dashboard");
+      console.error("[GettingStarted] Error during profile setup:", err);
+      // Fallback: still navigate to dashboard so user is never trapped
+      navigate("/dashboard", { replace: true });
     } finally {
       setSaving(false);
     }
@@ -124,54 +136,37 @@ export function useGettingStarted({
       const finalPhone = "+1 (555) 012-3456";
       const finalAddress = "456 Confectionary Boulevard, Suite A";
       const finalRole = "Head Baker & Owner";
-      const finalCurrency = "$";
+      const finalCurrency = "₹";
       const finalDateFormat = "YYYY-MM-DD";
 
-      if (user?.token) {
-        const response = await fetch(getApiUrl("/api/auth/profile"), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + user.token,
-            "x-user-email": user.email,
-            "x-device-id": getDeviceId()
-          },
-          body: JSON.stringify({
-            userEmail: user.email,
-            email: user.email,
-            name: finalChef,
-            avatar: "chef"
-          })
-        });
+      const profilePayload = {
+        id: "active-profile",
+        bakeryName: finalBakery,
+        email: finalEmail,
+        phone: finalPhone,
+        address: finalAddress,
+        role: finalRole,
+        currency: finalCurrency,
+        dateFormat: finalDateFormat,
+        isDeleted: 0,
+      };
 
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          if (isAuthSignatureError(response.status, errData)) {
-            triggerReauth("/getting-started", errData.error);
-            return;
-          }
-        }
-      }
-
-      onUpdateProfile({ ...(user || {}), name: finalChef, email: user?.email || "", avatar: "chef", token: user?.token });
-      
       if (onUpdateBakeryProfile) {
-        await onUpdateBakeryProfile({
-          id: "active-profile",
-          bakeryName: finalBakery,
-          email: finalEmail,
-          phone: finalPhone,
-          address: finalAddress,
-          role: finalRole,
-          currency: finalCurrency,
-          dateFormat: finalDateFormat,
-          isDeleted: 0
-        });
+        await onUpdateBakeryProfile(profilePayload);
       }
+
+      onUpdateProfile({
+        ...(user || {}),
+        name: finalChef,
+        email: user?.email || finalEmail,
+        avatar: "chef",
+        token: user?.token,
+      });
 
       setFormatConfig(finalCurrency, finalDateFormat);
       if (typeof window !== "undefined" && window.localStorage) {
         try {
+          window.localStorage.setItem("patisserie_bakery_name", finalBakery);
           window.localStorage.setItem("floura_currency", finalCurrency);
           window.localStorage.setItem("floura_date_format", finalDateFormat);
         } catch {}
@@ -184,16 +179,36 @@ export function useGettingStarted({
       await setPreference("patisserie_bakery_role", finalRole);
       await setPreference("floura_currency", finalCurrency);
       await setPreference("floura_date_format", finalDateFormat);
-      
       await removePreference("patisserie_is_new_user");
-      
+
       window.dispatchEvent(new Event("floura_settings_changed"));
-      
       window.showToast?.("Workspace initialized with premium defaults!", "success");
-      navigate("/dashboard");
+
+      // Non-blocking background sync
+      if (user?.token && typeof navigator !== "undefined" && navigator.onLine) {
+        fetch(getApiUrl("/api/auth/profile"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + user.token,
+            "x-user-email": user.email,
+            "x-device-id": getDeviceId(),
+          },
+          body: JSON.stringify({
+            userEmail: user.email,
+            email: user.email,
+            name: finalChef,
+            avatar: "chef",
+          }),
+        }).catch((err) => {
+          console.warn("[GettingStarted] Background skip profile sync warning:", err);
+        });
+      }
+
+      navigate("/dashboard", { replace: true });
     } catch (err) {
-      console.error(err);
-      navigate("/dashboard");
+      console.error("[GettingStarted] Error skipping:", err);
+      navigate("/dashboard", { replace: true });
     } finally {
       setSaving(false);
     }

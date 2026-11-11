@@ -2,8 +2,74 @@ import { Request, Response } from "express";
 import CryptoJS from "crypto-js";
 import path from "path";
 import fs from "fs";
-import { findUserByEmail, updateUserSignature, createUser, updateUserProfile, hasBakeryProfile, updateUserDeviceId } from "../models/user.model";
+import bundledFirebaseConfig from "../../firebase-applet-config.json";
+import { findUserByEmail, updateUserSignature, createUser, updateUserProfile, hasBakeryProfile, updateUserDeviceId, ensureDemoUser } from "../models/user.model";
 import { checkLoginLockout, recordFailedLoginAttempt, resetFailedLoginAttempts, writeAuditLog, validateEmail } from "../middleware/security.middleware";
+import { requestOtp, verifyOtp } from "../services/otp.service";
+
+export function getResolvedFirebaseConfig(): any {
+  // 1. Allow full JSON string via environment variable
+  if (process.env.FIREBASE_CONFIG) {
+    try {
+      const parsed = typeof process.env.FIREBASE_CONFIG === "string"
+        ? JSON.parse(process.env.FIREBASE_CONFIG)
+        : process.env.FIREBASE_CONFIG;
+      if (parsed?.apiKey && parsed.apiKey !== "dummy-api-key") {
+        return parsed;
+      }
+    } catch (e) {
+      console.warn("[Auth Controller] Failed to parse FIREBASE_CONFIG env:", e);
+    }
+  }
+
+  // 2. Allow granular environment variable overrides
+  const envApiKey = (process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY)?.trim();
+  if (envApiKey) {
+    return {
+      apiKey: envApiKey,
+      authDomain: (process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN)?.trim() || "kydigit-floura.firebaseapp.com",
+      projectId: (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID)?.trim() || "kydigit-floura",
+      storageBucket: (process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET)?.trim() || "kydigit-floura.firebasestorage.app",
+      messagingSenderId: (process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID)?.trim() || "729019245295",
+      appId: (process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID)?.trim() || "1:729019245295:web:c9ace15acbf5697943311a",
+      measurementId: (process.env.FIREBASE_MEASUREMENT_ID || process.env.VITE_FIREBASE_MEASUREMENT_ID)?.trim() || "G-W6JBGR0MX3"
+    };
+  }
+
+  // 3. Try reading from filesystem in candidate locations
+  const serverDir = typeof __dirname !== "undefined" ? __dirname : process.cwd();
+  const candidatePaths = [
+    path.join(process.cwd(), "firebase-applet-config.json"),
+    path.join(process.cwd(), "dist", "firebase-applet-config.json"),
+    path.join(serverDir, "firebase-applet-config.json"),
+    path.join(serverDir, "..", "firebase-applet-config.json"),
+    path.join(serverDir, "..", "..", "firebase-applet-config.json")
+  ];
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      try {
+        const fileConfig = JSON.parse(fs.readFileSync(p, "utf-8"));
+        if (fileConfig?.apiKey && fileConfig.apiKey !== "dummy-api-key") {
+          return fileConfig;
+        }
+      } catch {}
+    }
+  }
+
+  // 4. Default to bundled compile-time config
+  if (bundledFirebaseConfig && (bundledFirebaseConfig as any).apiKey && (bundledFirebaseConfig as any).apiKey !== "dummy-api-key") {
+    return bundledFirebaseConfig;
+  }
+
+  return {
+    apiKey: "dummy-api-key",
+    authDomain: "dummy.firebaseapp.com",
+    projectId: "dummy-project",
+    storageBucket: "dummy.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123:web:123"
+  };
+}
 
 // In-memory sessions map for secure Tauri/Cordova system-browser external Google logins
 export const activeSessions = new Map<string, {
@@ -39,22 +105,7 @@ export async function externalStart(req: Request, res: Response) {
     }
   }, 300000);
 
-  const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
-  let firebaseConfig = {
-    apiKey: "dummy-api-key",
-    authDomain: "dummy.firebaseapp.com",
-    projectId: "dummy-project",
-    storageBucket: "dummy.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123:web:123"
-  };
-  if (fs.existsSync(firebaseConfigPath)) {
-    try {
-      firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
-    } catch (err) {
-      console.error("Error loading firebase-applet-config.json:", err);
-    }
-  }
+  const firebaseConfig = getResolvedFirebaseConfig();
 
   res.send(`
 <!DOCTYPE html>
@@ -680,15 +731,135 @@ export async function verifyFirebaseIdToken(
   }
 }
 
+/**
+ * POST /api/auth/send-otp
+ * Generates a 6-digit OTP code, rate limits requests, logs to terminal, and sends via SMTP.
+ */
+export async function sendOtp(req: Request, res: Response) {
+  try {
+    const { email } = req.body || {};
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ success: false, message: "Email address is required." });
+    }
+
+    const emailKey = email.toLowerCase().trim();
+    if (!validateEmail(emailKey)) {
+      return res.status(400).json({ success: false, message: "Please provide a valid email address." });
+    }
+
+    const result = await requestOtp(emailKey);
+    if (!result.success) {
+      return res.status(result.retryAfter ? 429 : 400).json(result);
+    }
+
+    await writeAuditLog(emailKey, "OTP_REQUESTED", { ip: req.ip || "unknown" }, req);
+    return res.json(result);
+  } catch (err: any) {
+    console.error("[Auth Controller] sendOtp error:", err);
+    return res.status(500).json({ success: false, message: err.message || "Failed to send verification code." });
+  }
+}
+
+/**
+ * POST /api/auth/verify-otp
+ * Validates the 6-digit OTP code, sets up the workspace session, and returns user + signature token.
+ */
+export async function verifyOtpHandler(req: Request, res: Response) {
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  try {
+    const { email, otp, name, deviceId } = req.body || {};
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: "Email and verification code are required." });
+    }
+
+    const emailKey = email.toLowerCase().trim();
+    const cleanOtp = String(otp).trim();
+
+    const lockout = await checkLoginLockout(emailKey, ip);
+    if (lockout.locked) {
+      await writeAuditLog(emailKey, "LOGIN_LOCKOUT_BLOCKED", { ip }, req);
+      return res.status(423).json({
+        success: false,
+        message: `Too many failed attempts. This account or IP is temporarily locked out. Try again in ${lockout.timeLeftSec} seconds.`
+      });
+    }
+
+    const verification = verifyOtp(emailKey, cleanOtp);
+    if (!verification.success) {
+      await recordFailedLoginAttempt(emailKey, ip);
+      await writeAuditLog(emailKey, "LOGIN_FAILURE_INVALID_OTP", { ip, reason: verification.message }, req);
+      return res.status(400).json(verification);
+    }
+
+    // OTP is valid! Provision or retrieve user
+    const rawDeviceId = deviceId || req.headers["x-device-id"];
+    const effectiveDeviceId = typeof rawDeviceId === "string" ? rawDeviceId.replace(/[^a-zA-Z0-9_-]/g, "") : undefined;
+
+    const signatureToken = CryptoJS.SHA256(emailKey + "FLOURA_OTP_SALT_2026_" + Date.now() + "_" + Math.random().toString()).toString();
+    const existingUser = await findUserByEmail(emailKey);
+
+    let loginResult: any = null;
+    if (existingUser) {
+      let finalName = existingUser.name;
+      if (!finalName || finalName === "Chef Paul") {
+        finalName = name || (emailKey.split("@")[0] ? "Chef " + emailKey.split("@")[0] : "Chef Paul");
+      }
+      let finalAvatar = existingUser.avatar || "chef";
+
+      await updateUserSignature(emailKey, signatureToken, finalName, finalAvatar, effectiveDeviceId);
+      const userHasProfile = await hasBakeryProfile(emailKey);
+
+      loginResult = {
+        success: true,
+        status: "success",
+        isNew: !userHasProfile ? true : undefined,
+        user: {
+          name: finalName,
+          email: existingUser.email,
+          avatar: finalAvatar,
+          is_active: existingUser.is_active !== undefined ? existingUser.is_active : 1,
+          subscription_status: existingUser.subscription_status || "trial",
+          subscription_expires_at: existingUser.subscription_expires_at,
+          last_payment_date: existingUser.last_payment_date
+        },
+        token: signatureToken
+      };
+    } else {
+      const defaultName = name || (emailKey.split("@")[0] ? "Chef " + emailKey.split("@")[0] : "Chef Paul");
+      const defaultAvatar = "chef";
+      const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      await createUser(emailKey, signatureToken, defaultName, defaultAvatar, effectiveDeviceId);
+
+      loginResult = {
+        success: true,
+        status: "success",
+        isNew: true,
+        user: {
+          name: defaultName,
+          email: emailKey,
+          avatar: defaultAvatar,
+          is_active: 1,
+          subscription_status: "trial",
+          subscription_expires_at: thirtyDaysLater,
+          last_payment_date: null
+        },
+        token: signatureToken
+      };
+    }
+
+    await resetFailedLoginAttempts(emailKey, ip);
+    await writeAuditLog(emailKey, "USER_LOGIN_OTP_SUCCESS", { isNew: !!loginResult.isNew }, req);
+    return res.json(loginResult);
+  } catch (err: any) {
+    console.error("[Auth Controller] verifyOtpHandler error:", err);
+    return res.status(500).json({ success: false, message: err.message || "Failed to verify code." });
+  }
+}
+
 export async function login(req: Request, res: Response) {
   const ip = req.ip || req.socket.remoteAddress || "unknown";
   try {
-    console.log("[Auth Debug] Received Google login payload:", {
-      email: req.body?.email,
-      hasIdToken: !!req.body?.idToken,
-      isGoogle: req.body?.isGoogle
-    });
-    const { email, name, avatar, isGoogle, idToken, deviceId } = req.body;
+    const { email, name, avatar, isGoogle, idToken, otp, deviceId } = req.body || {};
     const rawDeviceId = deviceId || req.headers["x-device-id"];
     const effectiveDeviceId = typeof rawDeviceId === "string" ? rawDeviceId.replace(/[^a-zA-Z0-9_-]/g, "") : undefined;
     if (!email) {
@@ -704,26 +875,34 @@ export async function login(req: Request, res: Response) {
       });
     }
 
-    if (!isGoogle) {
-      await recordFailedLoginAttempt(emailKey, ip);
-      await writeAuditLog(emailKey, "LOGIN_FAILURE_NOT_GOOGLE", { ip }, req);
-      return res.status(403).json({ error: "Direct access to Google-auth handler is forbidden. Please log in through Google secure authentication." });
-    }
-
     if (!validateEmail(emailKey)) {
       await recordFailedLoginAttempt(emailKey, ip);
       return res.status(400).json({ error: "Invalid email format." });
     }
 
-    // Cryptographically verify Google Firebase ID Token
-    const verification = await verifyFirebaseIdToken(idToken, emailKey);
-    if (!verification.valid) {
-      await recordFailedLoginAttempt(emailKey, ip);
-      await writeAuditLog(emailKey, "LOGIN_FAILURE_INVALID_TOKEN", { ip, reason: verification.error }, req);
-      return res.status(401).json({
-        error: `Authentication failed: ${verification.error || "Invalid Google ID token."}`
-      });
+    // If OTP provided, verify via OTP service
+    if (otp) {
+      const verification = verifyOtp(emailKey, String(otp).trim());
+      if (!verification.success) {
+        await recordFailedLoginAttempt(emailKey, ip);
+        await writeAuditLog(emailKey, "LOGIN_FAILURE_INVALID_OTP", { ip, reason: verification.message }, req);
+        return res.status(400).json({ error: verification.message });
+      }
+    } else if (isGoogle && idToken) {
+      // Legacy Google ID Token check
+      const verification = await verifyFirebaseIdToken(idToken, emailKey);
+      if (!verification.valid) {
+        await recordFailedLoginAttempt(emailKey, ip);
+        await writeAuditLog(emailKey, "LOGIN_FAILURE_INVALID_TOKEN", { ip, reason: verification.error }, req);
+        return res.status(401).json({
+          error: `Authentication failed: ${verification.error || "Invalid Google ID token."}`
+        });
+      }
+    } else {
+      // Direct login requires OTP verification
+      return res.status(400).json({ error: "Verification code is required to sign in." });
     }
+
 
     const signatureToken = CryptoJS.SHA256(emailKey + "FLOURA_GOOGLE_WORKSPACE_SALT_2026_" + Date.now() + "_" + Math.random().toString()).toString();
     const existingUser = await findUserByEmail(emailKey);
@@ -872,6 +1051,64 @@ export async function getSubscriptionStatus(req: Request, res: Response) {
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to retrieve subscription status." });
+  }
+}
+
+export async function demoLogin(req: Request, res: Response) {
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required." });
+    }
+
+    const emailKey = String(email).toLowerCase().trim();
+    const demoEmail = (process.env.DEMO_USER_EMAIL || "hello@kydigit.com").toLowerCase().trim();
+    const allowedPasswords = new Set([
+      process.env.DEMO_USER_PASSWORD,
+      "Kd#9mP26",
+      "84920163"
+    ].filter(Boolean));
+
+    if (emailKey !== demoEmail) {
+      await recordFailedLoginAttempt(emailKey, ip);
+      await writeAuditLog(emailKey, "DEMO_LOGIN_INVALID_EMAIL", { ip }, req);
+      return res.status(401).json({ error: "Invalid demo credentials. Please verify your demo username." });
+    }
+
+    const providedPassword = String(password).trim();
+    if (!allowedPasswords.has(providedPassword)) {
+      await recordFailedLoginAttempt(emailKey, ip);
+      await writeAuditLog(emailKey, "DEMO_LOGIN_INVALID_PASSWORD", { ip }, req);
+      return res.status(401).json({ error: "Invalid demo password. Please check credentials and try again." });
+    }
+
+    await resetFailedLoginAttempts(emailKey, ip);
+
+    const signatureToken = CryptoJS.SHA256(emailKey + "FLOURA_GOOGLE_WORKSPACE_SALT_2026_" + Date.now() + "_" + Math.random().toString()).toString();
+    const displayName = "KyDigit Demo Chef";
+
+    await ensureDemoUser(emailKey, signatureToken, displayName);
+    await writeAuditLog(emailKey, "DEMO_LOGIN_SUCCESS", { ip }, req);
+
+    const oneYearLater = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    return res.json({
+      status: "success",
+      isNew: false,
+      user: {
+        name: displayName,
+        email: emailKey,
+        avatar: "chef",
+        is_active: 1,
+        subscription_status: "active",
+        subscription_expires_at: oneYearLater,
+        last_payment_date: new Date().toISOString()
+      },
+      token: signatureToken
+    });
+  } catch (err: any) {
+    console.error("[Demo Login Error]:", err);
+    res.status(500).json({ error: err.message || "Failed to process demo login request." });
   }
 }
 

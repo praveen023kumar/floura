@@ -1,5 +1,6 @@
 // /src/components/MoreView.tsx
 import React, { memo, useState, useEffect } from "react";
+import { motion } from "motion/react";
 import { memoWithData } from "../utils/memo";
 
 import {
@@ -303,22 +304,22 @@ function MoreView({
 
   return (
     <>
-      <div
+      <motion.div
         id="more-page-container"
-        className="w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 text-zinc-800 dark:text-zinc-100"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -12 }}
+        transition={{ duration: 0.25 }}
+        className="space-y-6 text-left"
       >
-        {/* ======================================================
-            PAGE HEADER
-        ====================================================== */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <UserCog className="w-5 h-5 text-amber-500" />
-              <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-white font-sans tracking-tight">
-                More Settings
-              </h1>
-            </div>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        {/* ── HEADER ── */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate flex items-center gap-2">
+              <UserCog className="w-5 h-5 sm:w-6 sm:h-6 text-primary-brand dark:text-orange-400 shrink-0" />
+              More Settings
+            </h2>
+            <p className="hidden sm:block text-xs text-zinc-550 font-sans mt-0.5">
               Manage your bakery details, account profiles, operations, and preferences.
             </p>
           </div>
@@ -648,7 +649,7 @@ function MoreView({
             Floura Bakery Management System
           </p>
         </div>
-      </div>
+      </motion.div>
 
       {/* ========================================================
           SUBSCRIPTION EXTENSION MODAL

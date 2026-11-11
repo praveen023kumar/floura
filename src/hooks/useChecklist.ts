@@ -126,6 +126,7 @@ export function useChecklist({
       checklistCurrentPage,
       checklistItemsPerPage
     ],
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const startIndex = (checklistCurrentPage - 1) * checklistItemsPerPage;
 
