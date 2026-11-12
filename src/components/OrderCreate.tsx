@@ -250,38 +250,38 @@ function OrderCreate({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <motion.div
         key="form-subpage"
         initial={{ opacity: 0, x: 10 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -10 }}
-        className="bg-white dark:bg-zinc-800 rounded-3xl p-6 border border-zinc-100 dark:border-zinc-700/60 shadow-sm w-full mx-auto"
+        className="bg-white dark:bg-zinc-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 border border-zinc-100 dark:border-zinc-700/60 shadow-sm w-full mx-auto"
       >
-        <div className="flex items-start gap-3 mb-6 text-left">
+        <div className="flex items-center gap-2.5 mb-3 sm:mb-6 text-left">
           <button
             onClick={() => handleSetViewMode("list")}
-            className="mt-0.5 p-1.5 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 cursor-pointer"
+            className="p-1 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 cursor-pointer"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4.5 h-4.5" />
           </button>
           <div>
-            <h2 className="text-xl font-bold font-serif text-zinc-800 dark:text-zinc-200">
+            <h2 className="text-base sm:text-xl font-bold font-serif text-zinc-800 dark:text-zinc-200">
               {editingOrderId ? "Modify Event Order" : "New Event Order"}
             </h2>
-            <p className="text-[11px] text-zinc-450 dark:text-zinc-400">
+            <p className="text-[10px] sm:text-[11px] text-zinc-450 dark:text-zinc-400">
               {editingOrderId ? "Revise sweet details for this event schedule." : "Capture every sweet detail for their special day."}
             </p>
           </div>
         </div>
 
         {/* Multi-step progress stepper */}
-        <div className="mb-10 select-none max-w-2xl mx-auto">
+        <div className="mb-4 sm:mb-8 select-none max-w-2xl mx-auto">
           <div className="relative flex items-center justify-between px-2">
-            <div className="absolute left-6 right-6 top-5 h-[3px] bg-zinc-100 dark:bg-zinc-750 z-0 rounded-full" />
+            <div className="absolute left-6 right-6 top-4 sm:top-5 h-[2px] bg-zinc-100 dark:bg-zinc-750 z-0 rounded-full" />
             
             <div 
-              className="absolute left-6 top-5 h-[3px] bg-gradient-to-r from-primary-brand to-sweet-pink dark:from-orange-400 dark:to-orange-300 z-0 transition-all duration-500 ease-out rounded-full"
+              className="absolute left-6 top-4 sm:top-5 h-[2px] bg-gradient-to-r from-primary-brand to-sweet-pink dark:from-orange-400 dark:to-orange-300 z-0 transition-all duration-500 ease-out rounded-full"
               style={{ width: `calc(${((currentStep - 1) / 2) * 100}% - 4px)` }}
             />
 
@@ -289,18 +289,18 @@ function OrderCreate({
             <button
               type="button"
               onClick={() => currentStep > 1 && setCurrentStep(1)}
-              className="relative z-10 flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer group"
+              className="relative z-10 flex flex-col items-center gap-1 focus:outline-none cursor-pointer group"
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-305 border shadow-sm ${
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-305 border shadow-sm ${
                 currentStep === 1
-                  ? "bg-primary-brand text-white border-primary-brand dark:bg-orange-400 dark:border-orange-300 ring-4 ring-primary-brand/20 dark:ring-orange-400/20 scale-105"
+                  ? "bg-primary-brand text-white border-primary-brand dark:bg-orange-400 dark:border-orange-300 ring-2 sm:ring-4 ring-primary-brand/20 dark:ring-orange-400/20 scale-105"
                   : currentStep > 1
                   ? "bg-emerald-500 text-white border-emerald-500 dark:bg-emerald-600 dark:border-emerald-500"
                   : "bg-white text-zinc-400 border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700"
               }`}>
-                {currentStep > 1 ? <Check className="w-5 h-5" strokeWidth={3} /> : <User className="w-4.5 h-4.5" strokeWidth={2.5} />}
+                {currentStep > 1 ? <Check className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={3} /> : <User className="w-4 h-4 sm:w-4.5 sm:h-4.5" strokeWidth={2.5} />}
               </div>
-              <span className={`text-[10px] font-extrabold tracking-widest uppercase transition-colors duration-300 ${
+              <span className={`text-[9px] sm:text-[10px] font-extrabold tracking-wider uppercase transition-colors duration-300 ${
                 currentStep === 1
                   ? "text-primary-brand dark:text-orange-400"
                   : currentStep > 1
@@ -318,18 +318,18 @@ function OrderCreate({
                 if (currentStep > 2) setCurrentStep(2);
                 else if (currentStep === 1 && validateStep1()) setCurrentStep(2);
               }}
-              className="relative z-10 flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer group"
+              className="relative z-10 flex flex-col items-center gap-1 focus:outline-none cursor-pointer group"
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-305 border shadow-sm ${
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-305 border shadow-sm ${
                 currentStep === 2
-                  ? "bg-primary-brand text-white border-primary-brand dark:bg-orange-400 dark:border-orange-300 ring-4 ring-primary-brand/20 dark:ring-orange-400/20 scale-105"
+                  ? "bg-primary-brand text-white border-primary-brand dark:bg-orange-400 dark:border-orange-300 ring-2 sm:ring-4 ring-primary-brand/20 dark:ring-orange-400/20 scale-105"
                   : currentStep > 2
                   ? "bg-emerald-500 text-white border-emerald-500 dark:bg-emerald-600 dark:border-emerald-500"
                   : "bg-white text-zinc-400 border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700"
               }`}>
-                {currentStep > 2 ? <Check className="w-5 h-5" strokeWidth={3} /> : <Sparkles className="w-4.5 h-4.5" strokeWidth={2.5} />}
+                {currentStep > 2 ? <Check className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={3} /> : <Sparkles className="w-4 h-4 sm:w-4.5 sm:h-4.5" strokeWidth={2.5} />}
               </div>
-              <span className={`text-[10px] font-extrabold tracking-widest uppercase transition-colors duration-300 ${
+              <span className={`text-[9px] sm:text-[10px] font-extrabold tracking-wider uppercase transition-colors duration-300 ${
                 currentStep === 2
                   ? "text-primary-brand dark:text-orange-400"
                   : currentStep > 2
@@ -347,16 +347,16 @@ function OrderCreate({
                 if (currentStep === 2 && validateStep2()) setCurrentStep(3);
                 else if (currentStep === 1 && validateStep1() && validateStep2()) setCurrentStep(3);
               }}
-              className="relative z-10 flex flex-col items-center gap-1.5 focus:outline-none cursor-pointer group"
+              className="relative z-10 flex flex-col items-center gap-1 focus:outline-none cursor-pointer group"
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-305 border shadow-sm ${
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-305 border shadow-sm ${
                 currentStep === 3
-                  ? "bg-primary-brand text-white border-primary-brand dark:bg-orange-400 dark:border-orange-300 ring-4 ring-primary-brand/20 dark:ring-orange-400/20 scale-105"
+                  ? "bg-primary-brand text-white border-primary-brand dark:bg-orange-400 dark:border-orange-300 ring-2 sm:ring-4 ring-primary-brand/20 dark:ring-orange-400/20 scale-105"
                   : "bg-white text-zinc-400 border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700"
               }`}>
-                <Calculator className="w-4.5 h-4.5" strokeWidth={2.5} />
+                <Calculator className="w-4 h-4 sm:w-4.5 sm:h-4.5" strokeWidth={2.5} />
               </div>
-              <span className={`text-[10px] font-extrabold tracking-widest uppercase transition-colors duration-300 ${
+              <span className={`text-[9px] sm:text-[10px] font-extrabold tracking-wider uppercase transition-colors duration-300 ${
                 currentStep === 3
                   ? "text-primary-brand dark:text-orange-400"
                   : "text-zinc-400 dark:text-zinc-550"
@@ -565,19 +565,116 @@ function OrderCreate({
                 className="grid grid-cols-1 gap-6"
               >
                 {/* Cake details and weights */}
-                <section className="bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-2xl space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-sweet-pink" />
-                    <h3 className="text-xs font-bold text-sweet-pink uppercase tracking-wider">
-                      Cake Composition
-                    </h3>
+                <section className="bg-zinc-50/70 dark:bg-zinc-900/40 p-3 sm:p-4 rounded-2xl space-y-3 border border-zinc-200/70 dark:border-zinc-800 text-left">
+                  {/* Card Header (Compact single line) */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-sweet-pink shrink-0" />
+                      <h3 className="text-xs font-bold text-sweet-pink uppercase tracking-wider">
+                        Cake Composition
+                      </h3>
+                    </div>
+
+                    <button 
+                      type="button"
+                      onClick={() => handleNavigate("/recipes")}
+                      className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-2 py-0.5 rounded-lg border border-amber-200/60 dark:border-amber-800/50 cursor-pointer active:scale-95 transition-all flex items-center gap-1 group whitespace-nowrap"
+                      title="Open Recipes catalog to add or edit flavors"
+                    >
+                      <span>From Recipes</span>
+                      <span className="text-[9px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform">↗</span>
+                    </button>
                   </div>
 
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-start">
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between min-h-[22px]">
-                        <label className="text-xs font-bold text-zinc-550">Shape</label>
+                  {/* 1. FLAVOR (Full Width, Compact) */}
+                  <div className="flex flex-col gap-1 text-left">
+                    <div className="flex items-center justify-between min-h-[18px]">
+                      <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300">
+                        Flavor / Recipe
+                      </label>
+                      {formData.cakeFlavor && (
+                        <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
+                          {matchingRecipe ? "Linked Recipe" : "Custom Flavor"}
+                        </span>
+                      )}
+                    </div>
+                    <Select
+                      styles={customSelectStyles}
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      placeholder="Select recipe flavor..."
+                      value={formData.cakeFlavor ? { value: formData.cakeFlavor, label: formData.cakeFlavor } : null}
+                      options={dynamicFlavors}
+                      onChange={(opt) => {
+                        const selectedFlavor = opt?.value || "";
+                        const match = recipes.find(
+                          (r: any) => r.name.trim().toLowerCase() === selectedFlavor.trim().toLowerCase()
+                        );
+                        
+                        let newWeight = formData.cakeWeight;
+                        if (match && !editingOrderId) {
+                          const unit = (match.yieldUnit || "kg").toLowerCase();
+                          const yieldVal = match.stdYield;
+                          
+                          const isOneKg = (yieldVal === 1000 && unit === "g") || (yieldVal === 1 && unit === "kg");
+                          
+                          if (isOneKg) {
+                            newWeight = "1.0 kg";
+                          } else {
+                            if (unit === "kg" || unit === "g") {
+                              const weightInKg = unit === "g" ? yieldVal / 1000 : yieldVal;
+                              newWeight = `${weightInKg.toFixed(1)} kg`;
+                            } else {
+                              newWeight = `${yieldVal} ${match.yieldUnit}`;
+                            }
+                          }
+                        }
+                        
+                        setFormData({
+                          ...formData,
+                          cakeFlavor: selectedFlavor,
+                          cakeWeight: newWeight
+                        });
+                      }}
+                    />
+                    {formData.cakeFlavor && (
+                      <div className="text-[10px] leading-none pt-0.5">
+                        {recipes.some((r: any) => r.name.trim().toLowerCase() === formData.cakeFlavor.trim().toLowerCase()) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const match = recipes.find(
+                                (r: any) => r.name.trim().toLowerCase() === formData.cakeFlavor.trim().toLowerCase()
+                              );
+                              if (match?.id) handleNavigate(`/recipes/${match.id}`);
+                              else handleNavigate("/recipes");
+                            }}
+                            className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline cursor-pointer active:scale-95 transition-all text-left inline-flex items-center gap-1"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                            <span>Linked to Recipe for exact profit</span>
+                            <span className="text-[8px] opacity-70">↗</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleNavigate("/recipes")}
+                            className="text-zinc-400 hover:text-primary-brand dark:hover:text-amber-400 hover:underline cursor-pointer active:scale-95 transition-all text-left inline-flex items-center gap-1"
+                          >
+                            <span>Mapped to Recipes catalog ↗</span>
+                          </button>
+                        )}
                       </div>
+                    )}
+                  </div>
+
+                  {/* 2. SHAPE & WEIGHT (Side-by-side 2 Columns) */}
+                  <div className="grid grid-cols-2 gap-2.5 items-start">
+                    {/* Shape Dropdown */}
+                    <div className="flex flex-col gap-1 text-left">
+                      <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300">
+                        Shape
+                      </label>
                       <Select
                         styles={customSelectStyles}
                         menuPortalTarget={document.body}
@@ -592,100 +689,24 @@ function OrderCreate({
                         ]}
                         onChange={(opt) => setFormData({ ...formData, cakeShape: opt?.value || "Round" })}
                       />
+                      {formData.cakeShape === "Custom" && (
+                        <div className="pt-1">
+                          <FastInput
+                            type="text"
+                            placeholder="e.g. Star, Number 5..."
+                            value={formData.cakeShape === "Custom" ? "" : formData.cakeShape}
+                            onChange={(val) => setFormData({ ...formData, cakeShape: val || "Custom" })}
+                            className="bg-white dark:bg-zinc-800 text-xs p-2 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand text-zinc-850 dark:text-zinc-150 text-left w-full shadow-2xs"
+                          />
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex flex-col gap-1.5 text-left">
-                      <div className="flex items-center justify-between min-h-[22px]">
-                        <label className="text-xs font-bold text-zinc-555">Flavor</label>
-                        <button 
-                          type="button"
-                          onClick={() => handleNavigate("/recipes")}
-                          className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-1.5 py-0.5 rounded border border-amber-200/50 dark:border-amber-800/40 cursor-pointer active:scale-95 transition-all flex items-center gap-1 group"
-                          title="Open Recipes catalog to add or edit flavors"
-                        >
-                          <span>From Recipes</span>
-                          <span className="text-[9px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform">↗</span>
-                        </button>
-                      </div>
-                      <Select
-                        styles={customSelectStyles}
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        placeholder="Select recipe flavor..."
-                        value={formData.cakeFlavor ? { value: formData.cakeFlavor, label: formData.cakeFlavor } : null}
-                        options={dynamicFlavors}
-                        onChange={(opt) => {
-                          const selectedFlavor = opt?.value || "";
-                          const match = recipes.find(
-                            (r: any) => r.name.trim().toLowerCase() === selectedFlavor.trim().toLowerCase()
-                          );
-                          
-                          let newWeight = formData.cakeWeight;
-                          if (match && !editingOrderId) {
-                            const unit = (match.yieldUnit || "kg").toLowerCase();
-                            const yieldVal = match.stdYield;
-                            
-                            const isOneKg = (yieldVal === 1000 && unit === "g") || (yieldVal === 1 && unit === "kg");
-                            
-                            if (isOneKg) {
-                              newWeight = "1.0 kg";
-                            } else {
-                              if (unit === "kg" || unit === "g") {
-                                const weightInKg = unit === "g" ? yieldVal / 1000 : yieldVal;
-                                newWeight = `${weightInKg.toFixed(1)} kg`;
-                              } else {
-                                newWeight = `${yieldVal} ${match.yieldUnit}`;
-                              }
-                            }
-                          }
-                          
-                          setFormData({
-                            ...formData,
-                            cakeFlavor: selectedFlavor,
-                            cakeWeight: newWeight
-                          });
-                        }}
-                      />
-                      <div className="min-h-[16px] text-[10px] text-zinc-400 dark:text-zinc-500 leading-tight">
-                        {formData.cakeFlavor && recipes.some((r: any) => r.name.trim().toLowerCase() === formData.cakeFlavor.trim().toLowerCase()) ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const match = recipes.find(
-                                (r: any) => r.name.trim().toLowerCase() === formData.cakeFlavor.trim().toLowerCase()
-                              );
-                              if (match?.id) {
-                                handleNavigate(`/recipes/${match.id}`);
-                              } else {
-                                handleNavigate("/recipes");
-                              }
-                            }}
-                            className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline cursor-pointer active:scale-95 transition-all text-left flex items-center gap-1 group"
-                            title="View recipe details and ingredients"
-                          >
-                            <span>✓ Linked to Recipe for exact profit</span>
-                            <span className="text-[9px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform">↗</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleNavigate("/recipes")}
-                            className="text-zinc-500 hover:text-primary-brand dark:hover:text-amber-400 hover:underline cursor-pointer active:scale-95 transition-all text-left flex items-center gap-1 group"
-                            title="Open Recipes catalog"
-                          >
-                            <span>Mapped to your Recipes catalog</span>
-                            <span className="text-[9px] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform">↗</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between min-h-[22px]">
-                        <label className="text-xs font-bold text-zinc-555 truncate">
-                          {recipeUnit === "Pieces" ? "Quantity" : "Weight"} {recipeUnit && `(${recipeUnit})`}
-                        </label>
-                      </div>
+                    {/* Weight Dropdown */}
+                    <div className="flex flex-col gap-1 text-left">
+                      <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300 truncate">
+                        {recipeUnit === "Pieces" ? "Quantity" : "Weight"} {recipeUnit && `(${recipeUnit})`}
+                      </label>
                       <Select
                         styles={customSelectStyles}
                         menuPortalTarget={document.body}
@@ -706,68 +727,82 @@ function OrderCreate({
                         }}
                       />
                       {isCustomWeight && (
-                        <div className="mt-1.5">
+                        <div className="pt-1">
                           <FastInput
                             type="text"
-                            placeholder={recipeUnit === "Pieces" ? "e.g. 15 Pieces" : "e.g. 1.5 kg"}
+                            placeholder={recipeUnit === "Pieces" ? "e.g. 15 Pcs" : "e.g. 1.5 kg"}
                             value={formData.cakeWeight}
                             onChange={(val) => setFormData({ ...formData, cakeWeight: val })}
-                            className="bg-white dark:bg-zinc-800 text-xs p-2 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand text-zinc-850 dark:text-zinc-150 text-left w-full"
+                            className="bg-white dark:bg-zinc-800 text-xs p-2 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-brand text-zinc-850 dark:text-zinc-150 text-left w-full shadow-2xs"
                           />
                         </div>
                       )}
                     </div>
-
-                    {/* Egg / Eggless toggles */}
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between min-h-[22px]">
-                        <label className="text-xs font-bold text-zinc-555">Preference</label>
-                      </div>
-                      <div className="flex items-center gap-3 h-[42px]">
-                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                          <input
-                            type="radio"
-                            name="preference"
-                            value="Egg"
-                            checked={formData.preference === "Egg"}
-                            onChange={() => setFormData({ ...formData, preference: "Egg" })}
-                            className="text-primary-brand focus:ring-primary-brand border-zinc-305 accent-primary-brand cursor-pointer"
-                          />
-                          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Egg</span>
-                        </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                          <input
-                            type="radio"
-                            name="preference"
-                            value="Eggless"
-                            checked={formData.preference === "Eggless"}
-                            onChange={() => setFormData({ ...formData, preference: "Eggless" })}
-                            className="text-primary-brand focus:ring-primary-brand border-zinc-305 accent-primary-brand cursor-pointer"
-                          />
-                          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Eggless</span>
-                        </label>
-                      </div>
-                    </div>
                   </div>
 
-                  {/* Cake Layers */}
-                  <div className="flex flex-col gap-1.5 pt-2">
-                    <label className="text-xs font-bold text-zinc-500">Layers (Select Tier)</label>
-                    <div className="grid grid-cols-3 gap-2 pb-1">
-                      {(["Single", "Double Tier", "Triple Tier"] as const).map((lvl) => (
+                  {/* 3. DIETARY PREFERENCE & LAYERS (Side-by-side 2 Columns) */}
+                  <div className="grid grid-cols-2 gap-2.5 items-start pt-0.5">
+                    {/* Dietary Preference Toggle */}
+                    <div className="flex flex-col gap-1 text-left">
+                      <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300">
+                        Preference
+                      </label>
+                      <div className="grid grid-cols-2 p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-zinc-200/70 dark:border-zinc-700 gap-1 h-[42px] items-center">
                         <button
-                          key={lvl}
                           type="button"
-                          onClick={() => setFormData({ ...formData, layers: lvl })}
-                          className={`px-2 py-2 text-xs font-semibold rounded-full border transition-all cursor-pointer text-center truncate ${
-                            formData.layers === lvl
-                              ? "bg-primary-brand text-white border-primary-brand dark:bg-orange-400 dark:border-orange-300"
-                              : "bg-white dark:bg-zinc-800 text-zinc-655 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                          onClick={() => setFormData({ ...formData, preference: "Egg" })}
+                          className={`flex items-center justify-center gap-1 h-[34px] px-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                            formData.preference === "Egg"
+                              ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs border border-zinc-200/80 dark:border-zinc-600"
+                              : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
                           }`}
                         >
-                          {lvl}
+                          <span className="text-xs">🥚</span>
+                          <span>Egg</span>
                         </button>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, preference: "Eggless" })}
+                          className={`flex items-center justify-center gap-1 h-[34px] px-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                            formData.preference === "Eggless"
+                              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 shadow-xs border border-emerald-300 dark:border-emerald-700"
+                              : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                          }`}
+                        >
+                          <span className="text-xs">🌱</span>
+                          <span>Eggless</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Layers Toggle (3 Compact Buttons) */}
+                    <div className="flex flex-col gap-1 text-left">
+                      <label className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300 truncate">
+                        Layers (Tier)
+                      </label>
+                      <div className="grid grid-cols-3 p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-zinc-200/70 dark:border-zinc-700 gap-1 h-[42px] items-center">
+                        {[
+                          { lvl: "Single", label: "Single" },
+                          { lvl: "Double Tier", label: "Double" },
+                          { lvl: "Triple Tier", label: "Triple" },
+                        ].map((t) => {
+                          const active = formData.layers === t.lvl;
+                          return (
+                            <button
+                              key={t.lvl}
+                              type="button"
+                              onClick={() => setFormData({ ...formData, layers: t.lvl as any })}
+                              className={`flex items-center justify-center h-[34px] px-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer truncate ${
+                                active
+                                  ? "bg-primary-brand text-white shadow-xs dark:bg-orange-500"
+                                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                              }`}
+                            >
+                              <span>{t.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </section>

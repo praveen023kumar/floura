@@ -95,6 +95,20 @@ function OrdersList({
     viewTab,
   });
 
+  const orderStats = React.useMemo(() => {
+    let active = 0;
+    let pending = 0;
+    let inProgress = 0;
+    let ready = 0;
+    for (const o of orders || []) {
+      if (o.status === "Pending") pending++;
+      if (["Ordered Ingredients", "Processing", "Decorating"].includes(o.status)) inProgress++;
+      if (o.status === "Ready for Pickup") ready++;
+      if (!["Completed", "Cancelled"].includes(o.status)) active++;
+    }
+    return { active, pending, inProgress, ready, total: (orders || []).length };
+  }, [orders]);
+
   const [mobileFiltersOpen, setMobileFiltersOpen] = React.useState(false);
   const [calSelectedDate, setCalSelectedDate] = React.useState<string | null>(null);
 
@@ -373,9 +387,14 @@ function OrdersList({
       {/* ── HEADER ── */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate">
-            Client Event Orders
-          </h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate">
+              Client Event Orders
+            </h2>
+            <span className="text-[10px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 shrink-0">
+              {filteredCount} {filteredCount === 1 ? 'Order' : 'Orders'}
+            </span>
+          </div>
           <p className="hidden sm:block text-xs text-zinc-550 font-sans mt-0.5">
             Track special cake reservations and pick-up milestones.
           </p>
@@ -486,16 +505,116 @@ function OrdersList({
         </AnimatePresence>
 
         {/* Main content */}
-        <div className="lg:col-span-9 space-y-6">
-          {/* Control row: list/calendar toggle */}
-          <div className="flex items-center gap-2">
-              <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1">
+        <div className="lg:col-span-9 space-y-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-800 shadow-xs flex flex-col min-h-[350px]">
+            {/* ── STATS TILES ── */}
+            <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setFilter("active");
+                  setDateFilter("all");
+                  setPaymentFilter("all");
+                  setSearchTerm("");
+                }}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  filter === "active"
+                    ? "bg-zinc-100 dark:bg-zinc-800 ring-1.5 ring-zinc-400 dark:ring-zinc-600 shadow-2xs"
+                    : "bg-zinc-50/80 dark:bg-zinc-800/40 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider truncate">
+                    Active
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-700 dark:bg-zinc-300 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 leading-none">
+                  {orderStats.active}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilter("Pending")}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  filter === "Pending"
+                    ? "bg-amber-100/80 dark:bg-amber-950/40 ring-1.5 ring-amber-400 shadow-2xs"
+                    : "bg-amber-50/60 dark:bg-amber-950/20 hover:bg-amber-100/60 dark:hover:bg-amber-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-amber-700/80 dark:text-amber-300/80 uppercase tracking-wider truncate">
+                    Pending
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-amber-600 dark:text-amber-400 tracking-tight mt-1 leading-none">
+                  {orderStats.pending}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilter("Processing")}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  filter === "Processing"
+                    ? "bg-sky-100/80 dark:bg-sky-950/40 ring-1.5 ring-sky-400 shadow-2xs"
+                    : "bg-sky-50/60 dark:bg-sky-950/20 hover:bg-sky-100/60 dark:hover:bg-sky-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-sky-700/80 dark:text-sky-300/80 uppercase tracking-wider truncate">
+                    In Progress
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-sky-600 dark:text-sky-400 tracking-tight mt-1 leading-none">
+                  {orderStats.inProgress}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilter("Ready for Pickup")}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  filter === "Ready for Pickup"
+                    ? "bg-teal-100/80 dark:bg-teal-950/40 ring-1.5 ring-teal-400 shadow-2xs"
+                    : "bg-teal-50/60 dark:bg-teal-950/20 hover:bg-teal-100/60 dark:hover:bg-teal-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-teal-700/80 dark:text-teal-300/80 uppercase tracking-wider truncate">
+                    Ready
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-teal-600 dark:text-teal-400 tracking-tight mt-1 leading-none">
+                  {orderStats.ready}
+                </div>
+              </button>
+            </div>
+
+            {/* Control row: search & view toggle */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-4 items-stretch sm:items-center justify-between">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-550" />
+                <input
+                  type="text"
+                  placeholder="Search orders (ID, customer name, flavor, event type)..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-755 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-500 font-medium"
+                />
+              </div>
+
+              <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-1 shrink-0 self-start sm:self-auto">
                 <button
                   id="orders-view-list-btn"
                   type="button"
                   onClick={() => setViewTab("list")}
                   aria-pressed={viewTab === "list"}
-                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     viewTab === "list"
                       ? "bg-white dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100 shadow-sm"
                       : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
@@ -513,7 +632,7 @@ function OrdersList({
                     setDateFilter("all");
                   }}
                   aria-pressed={viewTab === "calendar"}
-                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     viewTab === "calendar"
                       ? "bg-white dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100 shadow-sm"
                       : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
@@ -523,25 +642,11 @@ function OrdersList({
                   Calendar
                 </button>
               </div>
-          </div>
+            </div>
 
-          {/* Search (list view only) */}
-          {viewTab === "list" && (
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                <input
-                  type="text"
-                  placeholder="Search orders (ID, customer name, flavor, event type)..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-white dark:bg-zinc-800 text-sm pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-400"
-                />
-              </div>
-          )}
-
-          {/* Active filter chips */}
-          {((viewTab === "list" && (filter !== "active" || dateFilter !== "all")) || (viewTab === "calendar" && filter !== "active")) && (
-              <div className="flex flex-wrap items-center gap-1.5">
+            {/* Active filter chips */}
+            {((viewTab === "list" && (filter !== "active" || dateFilter !== "all" || searchTerm.trim())) || (viewTab === "calendar" && filter !== "active")) && (
+              <div className="flex flex-wrap items-center gap-1.5 mb-4 animate-fade-in">
                 {filter !== "active" && (
                   <button
                     type="button"
@@ -550,7 +655,6 @@ function OrdersList({
                   >
                     {statusOptions.find((o) => o.value === filter)?.label ?? filter}
                     <X className="w-3 h-3" aria-hidden="true" />
-                    <span className="sr-only">Remove status filter</span>
                   </button>
                 )}
                 {viewTab === "list" && dateFilter !== "all" && (
@@ -561,18 +665,27 @@ function OrdersList({
                   >
                     {dateFilterOptions.find((d) => d.value === dateFilter)?.label}
                     <X className="w-3 h-3" aria-hidden="true" />
-                    <span className="sr-only">Remove date filter</span>
+                  </button>
+                )}
+                {searchTerm.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    Search: "{searchTerm}"
+                    <X className="w-3 h-3" aria-hidden="true" />
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-wider cursor-pointer transition-colors ml-1"
+                  className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-wider cursor-pointer transition-colors ml-1"
                 >
                   Clear all
                 </button>
               </div>
-          )}
+            )}
 
         {/* ── LIST VIEW ─────────────────────────────────────────────────────────── */}
         <AnimatePresence mode="wait">
@@ -584,65 +697,55 @@ function OrdersList({
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.18 }}
             >
-               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="space-y-3 flex-1">
                 {loading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
+                  Array.from({ length: 4 }).map((_, i) => (
                     <div
                       key={`skeleton-${i}`}
-                      className="bg-white dark:bg-zinc-800 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-700/60 shadow-sm animate-pulse flex flex-col gap-3"
+                      className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 animate-pulse space-y-3"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2.5 min-w-0 w-full">
-                          <div className="w-9 h-9 rounded-xl bg-zinc-200 dark:bg-zinc-700 shrink-0 animate-pulse" />
-                          <div className="min-w-0 w-full space-y-2">
-                            <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
-                            <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2 animate-pulse" />
-                            <div className="h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded w-1/3 animate-pulse" />
-                          </div>
-                        </div>
+                      <div className="flex justify-between items-center">
+                        <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-1/3"></div>
+                        <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-16"></div>
                       </div>
-                      <div className="flex flex-col gap-1.5 pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/4 animate-pulse" />
-                          <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-1/5 animate-pulse" />
-                        </div>
-                        <div className="h-4 bg-zinc-205 dark:bg-zinc-700 rounded w-1/4 rounded-full animate-pulse" />
+                      <div className="h-3 bg-zinc-100 dark:bg-zinc-850 rounded w-1/5"></div>
+                      <div className="grid grid-cols-3 gap-4 pt-1">
+                        <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+                        <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+                        <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
                       </div>
                     </div>
                   ))
                 ) : paginatedOrders.length > 0 ? (
                   paginatedOrders.map((o) => {
                     const statusInfo = getStatusColors(o.status);
+                    const paidAmt = calculatePaidAmount(o.paymentHistory);
+                    const pmtStatus = o.paymentStatus || getPaymentStatus(o.totalAmount, paidAmt);
                     return (
                       <div
                         key={o.id}
-                        role="button"
-                        tabIndex={0}
                         onClick={() => onNavigate?.(`/orders/${o.id}`)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            onNavigate?.(`/orders/${o.id}`);
-                          }
-                        }}
-                        aria-label={`View details for ${o.customerName}'s order`}
-                        className={`bg-white dark:bg-zinc-800 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-700/60 border-l-4 ${statusInfo.border} shadow-sm select-none flex flex-col gap-3 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary-brand focus-visible:ring-offset-2`}
+                        className="bg-white dark:bg-zinc-900 rounded-2xl p-3.5 sm:p-4 border border-zinc-200/80 dark:border-zinc-800 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer text-left group space-y-2.5"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-serif text-sm font-bold shrink-0 ${statusInfo.accentBg}`}>
+                        {/* Row 1: Customer Avatar, Name, ID & Flavor, and Status Pill */}
+                        <div className="flex items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-serif text-xs font-bold shrink-0 ${statusInfo.accentBg}`}>
                               {o.customerName ? o.customerName.charAt(0).toUpperCase() : "?"}
                             </div>
-                            <div className="min-w-0">
-                              <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate">{o.customerName}</h4>
-                              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{o.cakeFlavor}</p>
-                              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono mt-0.5 flex items-center gap-0.5">
-                                <Hash className="w-2.5 h-2.5" aria-hidden="true" />
-                                {getOrderSeqId(o.id, orders)}
-                              </p>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 tracking-tight group-hover:text-primary-brand dark:group-hover:text-orange-400 transition-colors truncate">
+                                {o.customerName || "Unnamed Client"}
+                              </h4>
+                              <div className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono flex items-center gap-1 truncate mt-0.5">
+                                <span className="font-bold text-zinc-600 dark:text-zinc-300 shrink-0">#{getOrderSeqId(o.id, orders)}</span>
+                                <span className="shrink-0">•</span>
+                                <span className="truncate text-zinc-500 dark:text-zinc-400">{o.cakeFlavor || "Custom Cake"}</span>
+                              </div>
                             </div>
                           </div>
 
+                          {/* Compact Status Pill */}
                           <div className="relative shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
                             <select
                               id={`status-select-${o.id}`}
@@ -656,121 +759,122 @@ function OrdersList({
                                   onUpdateOrderStatus(o.id, val);
                                 }
                               }}
-                              className={`text-[10px] pl-2.5 pr-6 py-1.5 rounded-full font-bold uppercase tracking-wider outline-none cursor-pointer border border-transparent transition-all hover:opacity-90 appearance-none bg-no-repeat shrink-0 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary-brand ${statusInfo.bg}`}
+                              className={`text-[9px] sm:text-[10px] pl-2 pr-5 py-0.5 sm:py-1 rounded-full font-bold uppercase tracking-wider outline-none cursor-pointer border border-transparent transition-all hover:opacity-90 appearance-none bg-no-repeat w-[86px] sm:w-auto truncate ${statusInfo.bg}`}
                             >
                               <option value="Pending">Pending</option>
-                              <option value="Ordered Ingredients">Ingredients Ordered</option>
+                              <option value="Ordered Ingredients">Ingredients</option>
                               <option value="Processing">Processing</option>
                               <option value="Decorating">Decorating</option>
-                              <option value="Ready for Pickup">Ready for Pickup</option>
+                              <option value="Ready for Pickup">Ready</option>
                               <option value="Completed">Completed</option>
                               <option value="Cancelled">Cancelled</option>
                             </select>
-                            <ChevronDown className="w-3 h-3 absolute right-2 pointer-events-none opacity-70" />
+                            <ChevronDown className="w-2.5 h-2.5 absolute right-1.5 pointer-events-none opacity-70" />
                           </div>
                         </div>
 
-                        <div className="flex flex-col gap-1.5 pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                                {formatDate(o.deliveryDate || o.eventDate)}
+                        {/* Row 2: Metrics and Actions */}
+                        <div className="pt-2 flex items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800/60">
+                          <div className="grid grid-cols-3 gap-2 sm:gap-4 flex-1 min-w-0">
+                            <div className="min-w-0">
+                              <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-bold truncate">
+                                DELIVERY
                               </span>
-                              {o.deliveryTime && (
-                                <span className="flex items-center gap-0.5 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-700/60 px-1.5 py-0.5 rounded-md">
-                                  <Clock className="w-2.5 h-2.5" aria-hidden="true" />
-                                  {o.deliveryTime}
+                              <div className="flex items-center gap-1 min-w-0 mt-0.5">
+                                <span className="text-[11px] sm:text-xs font-bold text-zinc-850 dark:text-zinc-150 font-sans truncate block">
+                                  {o.deliveryDate || o.eventDate ? formatDate(o.deliveryDate || o.eventDate) : "—"}
                                 </span>
-                              )}
+                                {o.deliveryTime && (
+                                  <span className="hidden md:inline-flex items-center gap-0.5 text-[8px] font-semibold text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1 py-0.2 rounded">
+                                    {o.deliveryTime}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <span className="text-sm font-serif font-bold text-primary-brand dark:text-amber-400">
-                              {formatPrice(o.totalAmount)}
-                            </span>
+
+                            <div className="min-w-0">
+                              <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-bold truncate">
+                                PAYMENT
+                              </span>
+                              <span className="text-[11px] sm:text-xs font-bold font-sans mt-0.5 block truncate">
+                                {pmtStatus === "Fully Paid" ? (
+                                  <span className="text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" /> Paid
+                                  </span>
+                                ) : pmtStatus === "Partially Paid" ? (
+                                  <span className="text-amber-600 dark:text-amber-400 inline-flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" /> Partial
+                                  </span>
+                                ) : (
+                                  <span className="text-rose-600 dark:text-rose-400 inline-flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" /> Unpaid
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+
+                            <div className="min-w-0">
+                              <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-bold truncate">
+                                AMOUNT
+                              </span>
+                              <span className="text-xs sm:text-sm font-bold text-primary-brand dark:text-orange-400 font-serif block mt-0.5 truncate">
+                                {formatPrice(o.totalAmount)}
+                              </span>
+                            </div>
                           </div>
-                          {(() => {
-                            const paidAmt = calculatePaidAmount(o.paymentHistory);
-                            const pmtStatus = o.paymentStatus || getPaymentStatus(o.totalAmount, paidAmt);
-                            if (pmtStatus === "Fully Paid") {
-                              return (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full w-fit">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                  Fully Paid
-                                </span>
-                              );
-                            } else if (pmtStatus === "Partially Paid") {
-                              return (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full w-fit">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                  Partially Paid
-                                </span>
-                              );
-                            } else {
-                              return (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 px-2 py-0.5 rounded-full w-fit">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                  Unpaid
-                                </span>
-                              );
-                            }
-                          })()}
-                        </div>
 
-                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            aria-label={`Modify ${o.customerName}'s order`}
-                            onClick={() => handleStartEdit(o)}
-                            className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary-brand"
-                          >
-                            <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
-                          </button>
-
-                          {o.status !== "Completed" && o.status !== "Cancelled" ? (
+                          <div className="flex items-center gap-1 shrink-0 ml-1" onClick={(e) => e.stopPropagation()}>
                             <button
-                              id={`next-phase-btn-${o.id}`}
-                              onClick={() => {
-                                const stages: Order["status"][] = ["Pending", "Ordered Ingredients", "Processing", "Decorating", "Ready for Pickup", "Completed"];
-                                const nextIdx = stages.indexOf(o.status) + 1;
-                                if (nextIdx < stages.length) {
-                                  let nextStatus = stages[nextIdx];
-                                  if (nextStatus === "Completed") {
-                                    setCompletingOrder(o);
-                                  } else {
-                                    onUpdateOrderStatus(o.id, nextStatus);
-                                  }
-                                }
-                              }}
-                              className="bg-primary-brand text-white hover:bg-opacity-95 py-1.5 px-3 rounded-lg text-[11px] font-bold cursor-pointer transition-all active:scale-95 inline-flex items-center gap-1 shadow-sm whitespace-nowrap"
+                              type="button"
+                              aria-label={`Modify ${o.customerName}'s order`}
+                              onClick={() => handleStartEdit(o)}
+                              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                              title="Modify order"
                             >
-                              <span>Next stage</span>
-                              <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                              <Pencil className="w-3.5 h-3.5" />
                             </button>
-                          ) : (
-                            <span className="text-[10px] text-zinc-400 dark:text-zinc-400 font-bold uppercase tracking-wider whitespace-nowrap">
-                              Archived
-                            </span>
-                          )}
+
+                            {o.status !== "Completed" && o.status !== "Cancelled" ? (
+                              <button
+                                id={`next-phase-btn-${o.id}`}
+                                onClick={() => {
+                                  const stages: Order["status"][] = ["Pending", "Ordered Ingredients", "Processing", "Decorating", "Ready for Pickup", "Completed"];
+                                  const nextIdx = stages.indexOf(o.status) + 1;
+                                  if (nextIdx < stages.length) {
+                                    let nextStatus = stages[nextIdx];
+                                    if (nextStatus === "Completed") {
+                                      setCompletingOrder(o);
+                                    } else {
+                                      onUpdateOrderStatus(o.id, nextStatus);
+                                    }
+                                  }
+                                }}
+                                className="hidden sm:inline-flex items-center gap-1 bg-primary-brand hover:bg-opacity-95 text-white py-1 px-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all active:scale-95 shadow-xs whitespace-nowrap"
+                              >
+                                <span>Next</span>
+                                <ChevronRight className="w-3 h-3" />
+                              </button>
+                            ) : null}
+
+                            <ChevronRight className="w-4 h-4 text-zinc-300 dark:text-zinc-650 group-hover:text-primary-brand dark:group-hover:text-orange-400 group-hover:translate-x-0.5 transition-all" />
+                          </div>
                         </div>
                       </div>
                     );
                   })
                 ) : (
-                  <div className="col-span-1 md:col-span-2 flex flex-col items-center gap-4 text-center py-14 px-4">
-                    <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                      <Search className="w-5 h-5 text-zinc-400" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300">No orders match these filters</p>
-                      <p className="text-xs text-zinc-400 dark:text-zinc-500 max-w-xs">
-                        Try a different search term, clear the filters, or create a new order.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {(filter !== "all" || dateFilter !== "all" || searchTerm) && (
+                  <div className="flex flex-col items-center justify-center py-12 text-zinc-400 text-sm">
+                    <Search className="w-12 h-12 text-zinc-350 dark:text-zinc-700 mx-auto mb-3 opacity-60" />
+                    <p className="font-bold text-zinc-500 dark:text-zinc-450">No Orders Discovered</p>
+                    <p className="text-xs text-zinc-400 dark:text-zinc-550 mt-1 max-w-[280px] text-center font-sans">
+                      There are no orders matching your selected filters or search keyword.
+                    </p>
+                    <div className="flex items-center gap-2 mt-4">
+                      {(filter !== "active" || dateFilter !== "all" || searchTerm) && (
                         <button
                           type="button"
                           onClick={clearAllFilters}
-                          className="text-xs font-bold px-3.5 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary-brand"
+                          className="text-xs font-bold px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-750 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                         >
                           Clear filters
                         </button>
@@ -778,9 +882,9 @@ function OrdersList({
                       <button
                         type="button"
                         onClick={() => handleSetViewMode("form")}
-                        className="text-xs font-bold px-3.5 py-2 rounded-lg bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary-brand"
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white transition-colors cursor-pointer"
                       >
-                        New order spec
+                        New order
                       </button>
                     </div>
                   </div>
@@ -938,17 +1042,23 @@ function OrdersList({
                     transition={{ duration: 0.18 }}
                     className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-sm"
                   >
-                    <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-100 dark:border-zinc-700/60 bg-zinc-50 dark:bg-zinc-800/80">
-                      <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-100 font-sans">
-                        {new Date(calSelectedDate + "T00:00:00").toLocaleDateString(undefined, {
-                          weekday: "long", month: "long", day: "numeric"
-                        })}
-                      </h4>
+                    <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-zinc-150 dark:border-zinc-700/60 bg-zinc-50/70 dark:bg-zinc-800/80">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary-brand animate-pulse" />
+                        <h4 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 font-sans">
+                          {new Date(calSelectedDate + "T00:00:00").toLocaleDateString(undefined, {
+                            weekday: "long", month: "long", day: "numeric"
+                          })}
+                        </h4>
+                        <span className="text-[10px] font-semibold text-zinc-400 bg-zinc-100 dark:bg-zinc-700/60 px-1.5 py-0.5 rounded-full">
+                          {ordersOnSelectedDate.length} {ordersOnSelectedDate.length === 1 ? "order" : "orders"}
+                        </span>
+                      </div>
                       <button
                         type="button"
                         aria-label="Close day details"
                         onClick={() => setCalSelectedDate(null)}
-                        className="p-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-400 cursor-pointer"
+                        className="p-1 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer transition-colors"
                       >
                         <X className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
@@ -956,6 +1066,11 @@ function OrdersList({
                     <div className="divide-y divide-zinc-100 dark:divide-zinc-700/60">
                       {ordersOnSelectedDate.map((o) => {
                         const si = getStatusColors(o.status);
+                        const paidAmt = calculatePaidAmount(o.paymentHistory);
+                        const pmtStatus = o.paymentStatus || getPaymentStatus(o.totalAmount, paidAmt);
+                        const d = new Date((o.deliveryDate || o.eventDate) + "T00:00:00");
+                        const weekdayStr = isNaN(d.getTime()) ? "---" : d.toLocaleDateString(undefined, { weekday: "short" });
+                        const dayNum = isNaN(d.getTime()) ? "--" : d.getDate();
                         return (
                           <div
                             key={o.id}
@@ -963,17 +1078,71 @@ function OrdersList({
                             tabIndex={0}
                             onClick={() => onNavigate?.(`/orders/${o.id}`)}
                             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.(`/orders/${o.id}`); } }}
-                            className={`flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors border-l-4 ${si.border}`}
+                            aria-label={`Open ${o.customerName || "Walk-in Guest"}'s order`}
+                            className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-brand"
                           >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-100 truncate">{o.customerName}</span>
-                                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${si.bg}`}>{o.status}</span>
-                              </div>
-                              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">{o.cakeFlavor} · {o.eventType}</p>
+                            {/* Modern Calendar Tile */}
+                            <div className="flex flex-col items-center justify-center bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/20 rounded-xl w-10 h-10 sm:w-11 sm:h-11 shrink-0 text-center shadow-2xs">
+                              <span className="text-[9px] font-extrabold uppercase tracking-wider text-primary-brand dark:text-orange-400 leading-none">
+                                {weekdayStr}
+                              </span>
+                              <span className="text-sm sm:text-base font-extrabold text-zinc-800 dark:text-zinc-100 font-sans leading-none mt-1">
+                                {dayNum}
+                              </span>
                             </div>
-                            <span className="text-sm font-serif font-bold text-primary-brand dark:text-amber-400 shrink-0">{formatPrice(o.totalAmount)}</span>
-                            <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />
+
+                            {/* Order Details */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate group-hover:text-primary-brand dark:group-hover:text-orange-400 transition-colors">
+                                  {o.customerName || "Walk-in Guest"}
+                                </span>
+                                <span className="text-[10px] font-mono font-bold text-zinc-400 dark:text-zinc-500 shrink-0">
+                                  #{getOrderSeqId(o.id, orders)}
+                                </span>
+                              </div>
+
+                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5 font-medium">
+                                {o.cakeFlavor || "Custom Cake"}{o.eventType ? ` · ${o.eventType}` : ""}
+                              </p>
+
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                {o.deliveryTime && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-700/60 px-1.5 py-0.5 rounded">
+                                    <Clock className="w-2.5 h-2.5" />
+                                    {o.deliveryTime}
+                                  </span>
+                                )}
+                                <span className="text-[10px] font-bold">
+                                  {pmtStatus === "Fully Paid" ? (
+                                    <span className="text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" /> Paid
+                                    </span>
+                                  ) : pmtStatus === "Partially Paid" ? (
+                                    <span className="text-amber-600 dark:text-amber-400 inline-flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" /> Partial
+                                    </span>
+                                  ) : (
+                                    <span className="text-rose-600 dark:text-rose-400 inline-flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" /> Unpaid
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Status & Price */}
+                            <div className="flex flex-col items-end gap-1 shrink-0 text-right">
+                              <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${si.bg}`}>
+                                {o.status}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs sm:text-sm font-serif font-bold text-primary-brand dark:text-orange-400">
+                                  {formatPrice(o.totalAmount)}
+                                </span>
+                                <ChevronRight className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600 group-hover:text-primary-brand dark:group-hover:text-orange-400 group-hover:translate-x-0.5 transition-all" />
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
@@ -985,14 +1154,16 @@ function OrdersList({
               {/* Full Month order list (Active view month) */}
               <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-sm mt-6">
                 {/* Panel header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 dark:border-zinc-700/60 bg-zinc-50 dark:bg-zinc-800/80">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4 text-primary-brand dark:text-orange-400" />
+                <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-zinc-150 dark:border-zinc-700/60 bg-zinc-50/70 dark:bg-zinc-800/80">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-primary-brand/10 dark:bg-orange-400/10 flex items-center justify-center text-primary-brand dark:text-orange-400">
+                      <CalendarDays className="w-4 h-4" />
+                    </div>
                     <div>
-                      <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-sans">
+                      <h4 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 font-sans leading-tight">
                         Deliveries in {calMonthNames[calMonth]} {calYear}
                       </h4>
-                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
                         {ordersInActiveMonth.length} delivery{ordersInActiveMonth.length !== 1 ? " slots" : ""}
                       </p>
                     </div>
@@ -1013,6 +1184,9 @@ function OrdersList({
                       const si = getStatusColors(o.status);
                       const paidAmt = calculatePaidAmount(o.paymentHistory);
                       const pmtStatus = o.paymentStatus || getPaymentStatus(o.totalAmount, paidAmt);
+                      const d = new Date((o.deliveryDate || o.eventDate) + "T00:00:00");
+                      const weekdayStr = isNaN(d.getTime()) ? "---" : d.toLocaleDateString(undefined, { weekday: "short" });
+                      const dayNum = isNaN(d.getTime()) ? "--" : d.getDate();
                       return (
                         <div
                           key={o.id}
@@ -1020,50 +1194,70 @@ function OrdersList({
                           tabIndex={0}
                           onClick={() => onNavigate?.(`/orders/${o.id}`)}
                           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.(`/orders/${o.id}`); } }}
-                          aria-label={`Open ${o.customerName}'s order`}
-                          className={`flex items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors border-l-4 ${si.border} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-brand`}
+                          aria-label={`Open ${o.customerName || "Walk-in Guest"}'s order`}
+                          className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-brand"
                         >
-                          {/* Date circle */}
-                          <div className="flex flex-col items-center justify-center bg-zinc-100 dark:bg-zinc-700 rounded-xl px-2 py-1 min-w-[48px] shrink-0 text-center">
-                            <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-                              {(() => {
-                                const d = new Date((o.deliveryDate || o.eventDate) + "T00:00:00");
-                                return d.toLocaleDateString(undefined, { weekday: "short" });
-                              })()}
+                          {/* Modern Calendar Tile */}
+                          <div className="flex flex-col items-center justify-center bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/20 rounded-xl w-10 h-10 sm:w-11 sm:h-11 shrink-0 text-center shadow-2xs">
+                            <span className="text-[9px] font-extrabold uppercase tracking-wider text-primary-brand dark:text-orange-400 leading-none">
+                              {weekdayStr}
                             </span>
-                            <span className="text-sm font-extrabold text-zinc-700 dark:text-zinc-200">
-                              {(() => {
-                                const d = new Date((o.deliveryDate || o.eventDate) + "T00:00:00");
-                                return d.getDate();
-                              })()}
+                            <span className="text-sm sm:text-base font-extrabold text-zinc-800 dark:text-zinc-100 font-sans leading-none mt-1">
+                              {dayNum}
                             </span>
                           </div>
 
-                          {/* Info */}
+                          {/* Order Details */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-bold text-zinc-800 dark:text-zinc-100 truncate">{o.customerName}</span>
-                              <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${si.bg}`}>{o.status}</span>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate group-hover:text-primary-brand dark:group-hover:text-orange-400 transition-colors">
+                                {o.customerName || "Walk-in Guest"}
+                              </span>
+                              <span className="text-[10px] font-mono font-bold text-zinc-400 dark:text-zinc-500 shrink-0">
+                                #{getOrderSeqId(o.id, orders)}
+                              </span>
                             </div>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">{o.cakeFlavor} · {o.eventType}</p>
-                            <div className="flex items-center gap-2 mt-1">
+
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5 font-medium">
+                              {o.cakeFlavor || "Custom Cake"}{o.eventType ? ` · ${o.eventType}` : ""}
+                            </p>
+
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
                               {o.deliveryTime && (
-                                <span className="flex items-center gap-0.5 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500">
-                                  <Clock className="w-2.5 h-2.5" />{o.deliveryTime}
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-700/60 px-1.5 py-0.5 rounded">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  {o.deliveryTime}
                                 </span>
                               )}
-                              <span className={`text-[10px] font-bold ${
-                                pmtStatus === "Fully Paid" ? "text-emerald-600 dark:text-emerald-400" :
-                                pmtStatus === "Partially Paid" ? "text-amber-600 dark:text-amber-400" :
-                                "text-rose-600 dark:text-rose-400"
-                              }`}>{pmtStatus}</span>
+                              <span className="text-[10px] font-bold">
+                                {pmtStatus === "Fully Paid" ? (
+                                  <span className="text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" /> Paid
+                                  </span>
+                                ) : pmtStatus === "Partially Paid" ? (
+                                  <span className="text-amber-600 dark:text-amber-400 inline-flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" /> Partial
+                                  </span>
+                                ) : (
+                                  <span className="text-rose-600 dark:text-rose-400 inline-flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" /> Unpaid
+                                  </span>
+                                )}
+                              </span>
                             </div>
                           </div>
 
-                          {/* Amount + chevron */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-sm font-serif font-bold text-primary-brand dark:text-amber-400">{formatPrice(o.totalAmount)}</span>
-                            <ChevronRight className="w-4 h-4 text-zinc-400" />
+                          {/* Status & Price */}
+                          <div className="flex flex-col items-end gap-1 shrink-0 text-right">
+                            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${si.bg}`}>
+                              {o.status}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs sm:text-sm font-serif font-bold text-primary-brand dark:text-orange-400">
+                                {formatPrice(o.totalAmount)}
+                              </span>
+                              <ChevronRight className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600 group-hover:text-primary-brand dark:group-hover:text-orange-400 group-hover:translate-x-0.5 transition-all" />
+                            </div>
                           </div>
                         </div>
                       );
@@ -1073,10 +1267,10 @@ function OrdersList({
               </div>
 
               {/* Legend */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
+              <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-4 p-3 bg-zinc-50/70 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200/60 dark:border-zinc-700/60 text-[11px]">
                 {(Object.entries(STATUS_DOT) as [Order["status"], string][]).filter(([s]) => s !== "Cancelled").map(([status, dot]) => (
-                  <span key={status} className="flex items-center gap-1.5 text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
-                    <span className={`w-2 h-2 rounded-full ${dot}`} />
+                  <span key={status} className="flex items-center gap-1.5 text-[10px] text-zinc-600 dark:text-zinc-400 font-semibold">
+                    <span className={`w-2 h-2 rounded-full ${dot} shrink-0`} />
                     {status}
                   </span>
                 ))}
@@ -1180,6 +1374,7 @@ function OrdersList({
           </div>
         )}
         </div>
+      </div>
       </div>
 
       {/* ----------------- ORDER COMPLETION & PROFIT ANALYTICS MODAL ----------------- */}

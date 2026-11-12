@@ -11,16 +11,19 @@ import { getStatusColors } from "../utils/orderStatus";
 import {
   AlertTriangle,
   Plus,
+  PlusCircle,
   Edit2,
   ChevronLeft,
   ChevronRight,
   Search,
   SlidersHorizontal,
+  Filter,
+  Pencil,
   X,
   Inbox
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { formatPrice } from "../utils/format";
+import { formatPrice, formatDate } from "../utils/format";
 
 interface InventoryListViewProps {
   onUpdateInventoryItem?: (item: InventoryItem) => Promise<any>;
@@ -41,6 +44,7 @@ function InventoryListView({
     dynamicCategories,
     lowStockCount,
     lowStockItemsList,
+    inventoryItems,
     paginatedInventory,
     filteredCount,
     inventoryCurrentPage,
@@ -52,6 +56,9 @@ function InventoryListView({
   } = useInventory({
     onUpdateInventoryItem,
   });
+
+  const totalItemsCount = inventoryItems?.length || 0;
+  const inStockCount = Math.max(0, totalItemsCount - lowStockCount);
 
   // Load recipes and active orders for usage tracking inside the modal
   const { data: recipes = [] } = useQuery<Recipe[]>({
@@ -239,12 +246,16 @@ function InventoryListView({
       {/* ── HEADER ── */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate flex items-center gap-2">
-            <span>📦</span>
-            Baking Inventories
-          </h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate">
+              Baking Inventory
+            </h2>
+            <span className="text-[10px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 shrink-0">
+              {filteredCount} {filteredCount === 1 ? 'Item' : 'Items'}
+            </span>
+          </div>
           <p className="hidden sm:block text-xs text-zinc-550 font-sans mt-0.5">
-            Real-time baking raw material measurements, alerts, and supplier metrics.
+            Manage ingredients and stock levels
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -265,7 +276,7 @@ function InventoryListView({
             type="button"
             onClick={() => onNavigate?.("/inventory/new")}
             className="w-10 h-10 rounded-full bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all active:scale-95 shrink-0"
-            title="Add Product"
+            title="Register Raw Ingredient"
           >
             <Plus className="w-5 h-5" />
           </button>
@@ -292,16 +303,16 @@ function InventoryListView({
               transition={{ type: "tween", duration: 0.25 }}
               role="dialog"
               aria-modal="true"
-              aria-label="Filter products"
+              aria-label="Filter ingredients"
               className="lg:hidden fixed inset-y-0 left-0 z-50 w-[85vw] max-w-xs bg-white dark:bg-zinc-800 shadow-2xl flex flex-col text-left"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 dark:border-zinc-700 shrink-0">
-                <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-105 font-sans">Filters</h3>
+                <h3 className="text-sm font-bold text-zinc-805 dark:text-zinc-105 font-sans">Filters</h3>
                 <button
                   type="button"
                   aria-label="Close filters"
                   onClick={() => setMobileFiltersOpen(false)}
-                  className="p-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-400 cursor-pointer"
+                  className="p-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-405 cursor-pointer"
                 >
                   <X className="w-5 h-5" aria-hidden="true" />
                 </button>
@@ -314,7 +325,7 @@ function InventoryListView({
                   <button
                     type="button"
                     onClick={clearAllFilters}
-                    className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-665 dark:text-zinc-305 hover:bg-zinc-50 dark:hover:bg-zinc-700 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                    className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-665 dark:text-zinc-305 hover:bg-zinc-55 dark:hover:bg-zinc-700 rounded-xl text-xs font-bold cursor-pointer transition-colors"
                   >
                     Clear all
                   </button>
@@ -332,29 +343,7 @@ function InventoryListView({
         )}
       </AnimatePresence>
 
-      {/* Purchase Order Alert Notification */}
-      {lowStockItemsList.length > 0 && (
-        <section className="w-full">
-          <div className="bg-orange-50 dark:bg-orange-955/20 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-orange-100 dark:border-orange-900/30 shadow-sm leading-snug">
-            <div className="flex items-center gap-3">
-              <div className="bg-orange-100 dark:bg-orange-900/30 p-2.5 rounded-xl text-orange-700 dark:text-orange-400 shrink-0">
-                <AlertTriangle className="w-5 h-5 animate-pulse" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-orange-850 dark:text-orange-300">
-                  Low Stock Alert: {lowStockItemsList.length} core baking ingredients are below minimum threshold limit!
-                </p>
-                <p className="text-[11px] text-orange-700 dark:text-orange-400 font-medium mt-0.5">
-                  Suggested replenishment:{" "}
-                  {lowStockItemsList.map((i) => `${i.name} (${i.minStockLevel * 1.5}${i.unit})`).join(", ")}
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Main Stock Layout */}
+      {/* Main Inventory Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Desktop Side Filters Card */}
         <aside className="hidden lg:block lg:col-span-3 bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-150 dark:border-zinc-850 shadow-xs">
@@ -375,25 +364,89 @@ function InventoryListView({
           {renderFilterGroups()}
         </aside>
 
-        {/* Right side: Stock Items grid */}
+        {/* Right side: Stock Items */}
         <div className="lg:col-span-9 space-y-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-800 shadow-xs flex flex-col min-h-[350px]">
-            <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4 flex justify-between items-center">
-              <span className="text-xs font-bold text-zinc-500 dark:text-zinc-555 uppercase tracking-wider">
-                CURRENT STOCK ITEMS ({filteredCount})
-              </span>
+            {/* ── STATS TILES ── */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOnlyLowStock(false);
+                  setSelectedCategory("All");
+                  setSearchTerm("");
+                }}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  !showOnlyLowStock && selectedCategory === "All" && !searchTerm
+                    ? "bg-zinc-100 dark:bg-zinc-800 ring-1.5 ring-zinc-400 dark:ring-zinc-600 shadow-2xs"
+                    : "bg-zinc-50/80 dark:bg-zinc-800/40 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider truncate">
+                    Total
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-700 dark:bg-zinc-300 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 leading-none">
+                  {totalItemsCount}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOnlyLowStock(false);
+                  setSelectedCategory("All");
+                }}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  !showOnlyLowStock
+                    ? "bg-emerald-100/80 dark:bg-emerald-950/40 ring-1.5 ring-emerald-400 shadow-2xs"
+                    : "bg-emerald-50/60 dark:bg-emerald-950/20 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-emerald-700/80 dark:text-emerald-300/80 uppercase tracking-wider truncate">
+                    In Stock
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-emerald-600 dark:text-emerald-400 tracking-tight mt-1 leading-none">
+                  {inStockCount}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowOnlyLowStock(!showOnlyLowStock)}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  showOnlyLowStock
+                    ? "bg-rose-100/80 dark:bg-rose-950/40 ring-1.5 ring-rose-400 shadow-2xs"
+                    : "bg-rose-50/60 dark:bg-rose-950/20 hover:bg-rose-100/60 dark:hover:bg-rose-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-rose-700/80 dark:text-rose-300/80 uppercase tracking-wider truncate">
+                    Low Stock
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-rose-600 dark:text-rose-400 tracking-tight mt-1 leading-none">
+                  {lowStockCount}
+                </div>
+              </button>
             </div>
 
-            {/* Search Input */}
+            {/* ── SEARCH INPUT ── */}
             <div className="mb-4">
               <div className="relative">
-                <Search className="w-4.5 h-4.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-550" />
                 <input
                   type="text"
-                  placeholder="Search name, supplier..."
+                  placeholder="Search ingredients..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-zinc-50 dark:bg-zinc-950 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-500 font-medium"
+                  className="w-full bg-zinc-50 dark:bg-zinc-850/80 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700/80 text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary-brand/30 dark:focus:ring-orange-500/30 transition-all font-medium"
                 />
               </div>
             </div>
@@ -425,7 +478,7 @@ function InventoryListView({
                   <button
                     type="button"
                     onClick={() => setShowOnlyLowStock(false)}
-                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
                   >
                     <span>Low Stock Only</span>
                     <X className="w-3 h-3" aria-hidden="true" />
@@ -434,279 +487,220 @@ function InventoryListView({
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-655 hover:underline px-1.5 cursor-pointer"
+                  className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-600 hover:underline px-1.5 cursor-pointer"
                 >
                   Clear all
                 </button>
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-1 pb-3">
-              {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={`skeleton-${i}`}
-                    className="bg-white dark:bg-zinc-850 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-750/70 hover:border-zinc-250 dark:hover:bg-zinc-800/80 hover:shadow-sm transition-all flex flex-col justify-between h-full relative animate-pulse"
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-1/3 animate-pulse" />
-                      <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-1/4 rounded-full animate-pulse" />
-                    </div>
-                    <div className="flex-1 flex flex-col justify-between gap-4">
-                      <div className="space-y-2">
-                        <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
-                        <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2 animate-pulse" />
-                      </div>
-                      <div className="space-y-2.5">
-                        <div className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-full h-1.5 overflow-hidden animate-pulse" />
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="h-8 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse" />
-                          <div className="h-8 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
-                      <div className="h-10 bg-zinc-200 dark:bg-zinc-700 rounded-xl w-32 animate-pulse" />
-                      <div className="w-10 h-10 rounded-xl bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
-                    </div>
-                  </div>
-                ))
-              ) : paginatedInventory.length > 0 ? (
-                paginatedInventory.map((item) => {
-                  const isLow = item.quantity < item.minStockLevel;
-                  const fillPercent = Math.min((item.quantity / (item.minStockLevel * 2)) * 100, 100);
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="bg-white dark:bg-zinc-850 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-750/70 hover:border-zinc-250 dark:hover:bg-zinc-800/80 hover:shadow-sm transition-all flex flex-col justify-between h-full relative"
-                    >
-                      <div
-                        className="flex-1 flex flex-col justify-between cursor-pointer group"
-                        onClick={() => setSelectedTrackItem(item)}
-                      >
-                        {/* Card Header: Category & Stock Status badge */}
-                        <div className="flex items-center justify-between gap-2 mb-3">
-                          <span className="text-[10px] font-bold text-zinc-550 dark:text-zinc-400 uppercase tracking-widest bg-zinc-100 dark:bg-zinc-900 px-2.5 py-0.5 rounded-md">
-                            {item.category}
-                          </span>
-                          {isLow ? (
-                            <span className="bg-rose-50 text-rose-600 dark:bg-rose-955/30 dark:text-rose-400 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider flex items-center gap-1.5 border border-rose-100 dark:border-rose-900/20">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                              Low Stock
-                            </span>
-                          ) : (
-                            <span className="bg-emerald-50 text-emerald-600 dark:bg-emerald-955/20 dark:text-emerald-400 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider flex items-center gap-1.5 border border-emerald-100 dark:border-emerald-900/10">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                              In Stock
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Card Body: Title, Supplier and stock progress status */}
-                        <div className="flex-1 flex flex-col justify-between gap-4">
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-100 tracking-tight text-left leading-tight group-hover:text-primary-brand dark:group-hover:text-orange-400 transition-colors">
-                              {item.name}
-                            </h4>
-                            {item.supplier && (
-                              <p className="text-[11px] text-zinc-400 dark:text-zinc-500 text-left font-medium">
-                                Supplier: {item.supplier}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Progress bar and metrics */}
-                          <div className="space-y-2.5">
-                            <div className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-full h-1.5 overflow-hidden">
-                              <div
-                                className={`h-full ${isLow ? "bg-rose-500" : "bg-emerald-500"} rounded-full transition-all duration-300`}
-                                style={{ width: `${Math.max(5, fillPercent)}%` }}
-                              ></div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="bg-zinc-50/60 dark:bg-zinc-900/25 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800/40 text-left">
-                                <span className="block text-[8px] uppercase tracking-wider font-extrabold text-zinc-400 dark:text-zinc-500">Min Limit</span>
-                                <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                  {item.minStockLevel} {item.unit}
-                                </span>
-                              </div>
-                              <div className="bg-zinc-50/60 dark:bg-zinc-900/25 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800/40 text-left">
-                                <span className="block text-[8px] uppercase tracking-wider font-extrabold text-zinc-400 dark:text-zinc-500">Total Value</span>
-                                <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                  {formatPrice(item.costPrice * item.quantity)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Card Footer: Quantity controller & Edit details */}
-                      <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
-                        <div className="bg-zinc-50 dark:bg-zinc-900/40 rounded-xl p-1 flex items-center gap-1 border border-zinc-100 dark:border-zinc-800 shadow-inner">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQuantity(item, -1)}
-                            className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-750 flex items-center justify-center text-sm text-zinc-600 dark:text-zinc-300 font-extrabold shadow-xs active:scale-90 transition-all cursor-pointer"
-                            title="Decrease quantity by 1"
-                          >
-                            -
-                          </button>
-
-                          <div className="px-3.5 text-center min-w-[68px] flex flex-col items-center justify-center">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={editingQuantities[item.id] !== undefined ? editingQuantities[item.id] : String(item.quantity)}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (val === "" || /^\d*\.?\d*$/.test(val)) {
-                                  setEditingQuantities(prev => ({ ...prev, [item.id]: val }));
-                                }
-                              }}
-                              onFocus={(e) => {
-                                setEditingQuantities(prev => ({ ...prev, [item.id]: String(item.quantity) }));
-                                setTimeout(() => e.target.select(), 0);
-                              }}
-                              onBlur={() => handleCommitQuantity(item)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  handleCommitQuantity(item);
-                                  (e.target as HTMLInputElement).blur();
-                                }
-                              }}
-                              className="w-14 text-center text-sm font-bold text-zinc-800 dark:text-zinc-50 bg-transparent border-0 border-b border-transparent focus:border-primary-brand dark:focus:border-orange-500 focus:bg-zinc-100 dark:focus:bg-zinc-850 rounded px-1 py-0.5 leading-tight focus:outline-none transition-all"
-                            />
-                            <span className="block text-[8px] uppercase tracking-wider font-bold text-zinc-550 mt-0.5">
-                              {item.unit}
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQuantity(item, 1)}
-                            className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-750 flex items-center justify-center text-sm text-zinc-600 dark:text-zinc-300 font-extrabold shadow-xs active:scale-90 transition-all cursor-pointer"
-                            title="Increase quantity by 1"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        {/* Edit Details Action button */}
-                        <button
-                          type="button"
-                          onClick={() => onNavigate?.("/inventory/new", { state: { item } })}
-                          className="w-10 h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 hover:bg-primary-brand hover:text-white dark:hover:bg-orange-500 dark:hover:text-white text-zinc-505 dark:text-zinc-400 border border-zinc-150 dark:border-zinc-800 flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95"
-                          title="Edit Product Details"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="col-span-full flex flex-col items-center justify-center py-12 text-zinc-400 text-sm">
-                  <Inbox className="w-12 h-12 text-zinc-350 dark:text-zinc-700 mx-auto mb-3 opacity-60" />
-                  <p className="font-bold text-zinc-500 dark:text-zinc-450">No Stock Records Discovered</p>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-550 mt-1 max-w-[280px] text-center">
-                    There are no items matching your selected categories or search keyword.
-                  </p>
-                </div>
-              )}
+            {/* ── INGREDIENTS LIST ── */}
+            <div className="space-y-3 flex-1">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={`skeleton-${i}`}
+              className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 animate-pulse space-y-3"
+            >
+              <div className="flex justify-between items-center">
+                <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-1/3"></div>
+                <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-16"></div>
+              </div>
+              <div className="h-3 bg-zinc-100 dark:bg-zinc-850 rounded w-1/5"></div>
+              <div className="grid grid-cols-3 gap-4 pt-1">
+                <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+                <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+                <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+              </div>
             </div>
+          ))
+        ) : paginatedInventory.length > 0 ? (
+          paginatedInventory.map((item) => {
+            const isLow = item.quantity < item.minStockLevel;
 
-            {/* Pagination controls for Inventory */}
-            {filteredCount > 0 && (
-              <div className="flex flex-row items-center justify-between gap-3 pt-5 mt-6 border-t border-zinc-150/60 dark:border-zinc-800/80 w-full select-none">
-                {/* Showing details */}
-                <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium whitespace-nowrap">
-                  <span className="hidden sm:inline">Showing </span>
-                  <span className="font-semibold text-zinc-800 dark:text-zinc-200">{(inventoryCurrentPage - 1) * inventoryItemsPerPage + 1}</span>–
-                  <span className="font-semibold text-zinc-800 dark:text-zinc-200">{Math.min(inventoryCurrentPage * inventoryItemsPerPage, filteredCount)}</span> of{" "}
-                  <span className="font-semibold text-zinc-800 dark:text-zinc-200">{filteredCount}</span>
-                  <span className="hidden sm:inline"> items</span>
-                  <span className="sm:hidden"> items</span>
+            return (
+              <div
+                key={item.id}
+                onClick={() => setSelectedTrackItem(item)}
+                className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer text-left group"
+              >
+                {/* Row 1: Name and Badge */}
+                <div className="flex items-center justify-between gap-3">
+                  <h4 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight group-hover:text-primary-brand dark:group-hover:text-orange-400 transition-colors truncate">
+                    {item.name}
+                  </h4>
+                  {isLow ? (
+                    <span className="shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400">
+                      Low stock
+                    </span>
+                  ) : (
+                    <span className="shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400">
+                      In stock
+                    </span>
+                  )}
                 </div>
 
-                {/* Page buttons and Desktop Select container */}
-                <div className="flex items-center gap-3">
-                  {/* Page buttons */}
-                  <div className="flex items-center bg-zinc-50 dark:bg-zinc-900/60 p-0.5 rounded-xl border border-zinc-150/50 dark:border-zinc-800/80 shadow-sm">
-                    <button
-                      onClick={() => setInventoryCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={inventoryCurrentPage === 1}
-                      className="p-1 rounded-lg text-zinc-500 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-850 hover:text-zinc-800 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed"
-                      title="Previous Page"
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                    </button>
+                {/* Row 2: Category */}
+                <p className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mt-0.5">
+                  {item.category || "GENERAL"}
+                </p>
 
-                    {Array.from({ length: inventoryTotalPages }, (_, i) => i + 1).map((pageNum) => {
-                      if (inventoryTotalPages > 4) {
-                        const isCurrent = inventoryCurrentPage === pageNum;
-                        const isFirstOrLast = pageNum === 1 || pageNum === inventoryTotalPages;
-                        const isNear = Math.abs(pageNum - inventoryCurrentPage) <= 1;
+                {/* Row 3: Metrics & Action */}
+                <div className="mt-3 pt-1 flex items-center justify-between gap-2">
+                  <div className="grid grid-cols-3 gap-4 sm:gap-8 flex-1">
+                    <div>
+                      <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
+                        STOCK
+                      </span>
+                      <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-sans">
+                        {item.quantity} {item.unit}
+                      </span>
+                    </div>
 
-                        if (!isCurrent && !isFirstOrLast && !isNear) {
-                          if (pageNum === 2 || pageNum === inventoryTotalPages - 1) {
-                            return (
-                              <span key={pageNum} className="w-6 h-6 flex items-center justify-center text-zinc-400 dark:text-zinc-605 text-[10px] font-semibold">
-                                ...
-                              </span>
-                            );
-                          }
-                          return null;
-                        }
-                      }
+                    <div>
+                      <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
+                        MINIMUM
+                      </span>
+                      <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-sans">
+                        {item.minStockLevel} {item.unit}
+                      </span>
+                    </div>
 
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setInventoryCurrentPage(pageNum)}
-                          className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
-                            inventoryCurrentPage === pageNum
-                              ? "bg-primary-brand text-white shadow-sm"
-                              : "text-zinc-650 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-850 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-
-                    <button
-                      onClick={() => setInventoryCurrentPage(prev => Math.min(prev + 1, inventoryTotalPages))}
-                      disabled={inventoryCurrentPage === inventoryTotalPages || inventoryTotalPages === 0}
-                      className="p-1 rounded-lg text-zinc-500 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-855 hover:text-zinc-800 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed"
-                      title="Next Page"
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    <div>
+                      <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
+                        VALUE
+                      </span>
+                      <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-sans">
+                        {formatPrice(item.costPrice * item.quantity)}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Desktop show select */}
-                  <div className="hidden md:flex items-center gap-2">
-                    <span className="text-xs text-zinc-400 dark:text-zinc-505 font-medium">Show</span>
-                    <select
-                      value={inventoryItemsPerPage}
-                      onChange={(e) => {
-                        setInventoryItemsPerPage(Number(e.target.value));
-                        setInventoryCurrentPage(1);
-                      }}
-                      className="text-xs px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-medium outline-none focus:ring-1 focus:ring-primary-brand/35 shadow-sm cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-all"
-                    >
-                      <option value={10}>10 per page</option>
-                      <option value={20}>20 per page</option>
-                      <option value={50}>50 per page</option>
-                      <option value={100}>100 per page</option>
-                    </select>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigate?.("/inventory/new", { state: { item } });
+                    }}
+                    className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer shrink-0"
+                    title="Edit ingredient"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-            )}
+            );
+          })
+        ) : (
+          <div className="flex flex-col items-center justify-center py-12 text-zinc-400 text-sm">
+            <Inbox className="w-12 h-12 text-zinc-350 dark:text-zinc-700 mx-auto mb-3 opacity-60" />
+            <p className="font-bold text-zinc-500 dark:text-zinc-450">No Stock Records Discovered</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-550 mt-1 max-w-[280px] text-center">
+              There are no items matching your selected categories or search keyword.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── PAGINATION CONTROLS ── */}
+      {filteredCount > 0 && (
+        <div className="flex flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-150/60 dark:border-zinc-800/80 w-full select-none">
+          {/* Showing details */}
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium whitespace-nowrap">
+            <span className="hidden sm:inline">Showing </span>
+            <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+              {(inventoryCurrentPage - 1) * inventoryItemsPerPage + 1}
+            </span>
+            –
+            <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+              {Math.min(inventoryCurrentPage * inventoryItemsPerPage, filteredCount)}
+            </span>{" "}
+            of <span className="font-semibold text-zinc-800 dark:text-zinc-200">{filteredCount}</span>
+            <span className="hidden sm:inline"> items</span>
+            <span className="sm:hidden"> items</span>
+          </div>
+
+          {/* Page buttons */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center bg-zinc-50 dark:bg-zinc-900/60 p-0.5 rounded-xl border border-zinc-150/50 dark:border-zinc-800/80 shadow-sm">
+              <button
+                onClick={() => setInventoryCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={inventoryCurrentPage === 1}
+                className="p-1 rounded-lg text-zinc-500 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-850 hover:text-zinc-800 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed"
+                title="Previous Page"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+
+              {Array.from({ length: inventoryTotalPages }, (_, i) => i + 1).map((pageNum) => {
+                if (inventoryTotalPages > 4) {
+                  const isCurrent = inventoryCurrentPage === pageNum;
+                  const isFirstOrLast = pageNum === 1 || pageNum === inventoryTotalPages;
+                  const isNear = Math.abs(pageNum - inventoryCurrentPage) <= 1;
+
+                  if (!isCurrent && !isFirstOrLast && !isNear) {
+                    if (pageNum === 2 || pageNum === inventoryTotalPages - 1) {
+                      return (
+                        <span
+                          key={pageNum}
+                          className="w-6 h-6 flex items-center justify-center text-zinc-400 dark:text-zinc-600 text-[10px] font-semibold"
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+                    return null;
+                  }
+                }
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setInventoryCurrentPage(pageNum)}
+                    className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
+                      inventoryCurrentPage === pageNum
+                        ? "bg-primary-brand text-white shadow-sm"
+                        : "text-zinc-650 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-850 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              <button
+                onClick={() =>
+                  setInventoryCurrentPage((prev) => Math.min(prev + 1, inventoryTotalPages))
+                }
+                disabled={inventoryCurrentPage === inventoryTotalPages || inventoryTotalPages === 0}
+                className="p-1 rounded-lg text-zinc-500 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-855 hover:text-zinc-800 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed"
+                title="Next Page"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Desktop show select */}
+            <div className="hidden md:flex items-center gap-2">
+              <span className="text-xs text-zinc-400 dark:text-zinc-505 font-medium">Show</span>
+              <select
+                value={inventoryItemsPerPage}
+                onChange={(e) => {
+                  setInventoryItemsPerPage(Number(e.target.value));
+                  setInventoryCurrentPage(1);
+                }}
+                className="text-xs px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-medium outline-none focus:ring-1 focus:ring-primary-brand/35 shadow-sm cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-all"
+              >
+                <option value={10}>10 per page</option>
+                <option value={20}>20 per page</option>
+                <option value={50}>50 per page</option>
+                <option value={100}>100 per page</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
           </div>
         </div>
       </div>
@@ -866,7 +860,7 @@ function InventoryListView({
                                   <span className="mx-1.5 text-zinc-300 dark:text-zinc-700">•</span>
                                   <span>Qty: {order.cakeWeight}</span>
                                   <span className="mx-1.5 text-zinc-300 dark:text-zinc-700">•</span>
-                                  <span>Delivery: {order.deliveryDate}</span>
+                                  <span>Delivery: {formatDate(order.deliveryDate)}</span>
                                 </div>
                               </div>
                               <div className="text-left sm:text-right shrink-0">

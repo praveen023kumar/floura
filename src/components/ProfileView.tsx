@@ -1,7 +1,7 @@
 // File Path: /src/components/ProfileView.tsx
 import React, { useState, useEffect, memo } from "react";
 import { memoWithData } from "../utils/memo";
-import { User, Shield, Store, Mail, Phone, MapPin, Check, Edit2, Sparkles, Camera } from "lucide-react";
+import { User, Shield, Store, Mail, Phone, MapPin, Check, Edit2, Sparkles, Camera, Lock } from "lucide-react";
 import { motion } from "motion/react";
 import Avatar, { AVATAR_PRESETS } from "./Avatar";
 import { setPreference } from "../db";
@@ -192,13 +192,24 @@ function ProfileView({ user, onUpdateProfile, bakeryProfile, onUpdateBakeryProfi
                 </div>
 
                 {/* Primary Email */}
-                <div className="flex flex-col gap-1.5 text-left bg-zinc-50 dark:bg-zinc-800/30 p-3 rounded-xl border border-zinc-150 dark:border-zinc-800/80">
-                  <label className="text-xs font-bold text-zinc-400 dark:text-zinc-500">Primary Email (Account ID)</label>
-                  <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-zinc-400 shrink-0" />
-                    <span>{user?.email || "No primary email linked"}</span>
-                    <span className="ml-auto bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">Locked</span>
-                  </span>
+                <div className="flex flex-col gap-1.5 text-left">
+                  <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400">
+                    Primary Email (Account ID)
+                  </label>
+                  <div className="flex items-center justify-between gap-3 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 p-2.5 sm:p-3 rounded-xl">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-zinc-200/60 dark:bg-zinc-700/60 flex items-center justify-center shrink-0">
+                        <Mail className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate select-all">
+                        {user?.email || "No primary email linked"}
+                      </span>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 bg-zinc-200/60 dark:bg-zinc-700/60 px-2 py-0.5 rounded-md shrink-0">
+                      <Lock className="w-2.5 h-2.5" />
+                      Locked
+                    </span>
+                  </div>
                 </div>
 
                 {/* Secondary Contact Email */}
@@ -284,7 +295,7 @@ function ProfileView({ user, onUpdateProfile, bakeryProfile, onUpdateBakeryProfi
               )}
               <button
                 type="submit"
-                className="bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white font-bold text-xs px-6 py-3 rounded-full shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-2"
+                className="bg-primary-brand hover:bg-primary-brand-dark dark:bg-primary-brand dark:hover:bg-primary-brand-dark text-white font-bold text-xs px-6 py-3 rounded-full shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-2"
               >
                 <Check className="w-4 h-4 text-white" /> Save Setup Profile
               </button>

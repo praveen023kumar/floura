@@ -28,6 +28,7 @@ function RecipesView({ onNavigate }: RecipesViewProps) {
     dynamicCategories,
     paginatedRecipes,
     filteredCount,
+    recipeList,
     recipesCurrentPage,
     setRecipesCurrentPage,
     recipesItemsPerPage,
@@ -37,6 +38,8 @@ function RecipesView({ onNavigate }: RecipesViewProps) {
     onAddRecipe: async () => {},
     initialViewMode: "list",
   });
+
+  const totalRecipesCount = recipeList?.length || 0;
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -77,14 +80,36 @@ function RecipesView({ onNavigate }: RecipesViewProps) {
     </div>
   );
 
+  const getCategoryStyles = (category: string) => {
+    const cat = category?.toLowerCase() || "";
+    if (cat.includes("cake")) {
+      return "bg-pink-50 text-pink-700 border-pink-100 dark:bg-pink-950/20 dark:text-pink-400 dark:border-pink-900/30";
+    }
+    if (cat.includes("cookie") || cat.includes("biscuit")) {
+      return "bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-900/30";
+    }
+    if (cat.includes("bread") || cat.includes("dough")) {
+      return "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30";
+    }
+    if (cat.includes("pastry") || cat.includes("tart")) {
+      return "bg-violet-50 text-violet-700 border-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:border-violet-900/30";
+    }
+    return "bg-zinc-50 text-zinc-650 border-zinc-150 dark:bg-zinc-800/30 dark:text-zinc-400 dark:border-zinc-700/30";
+  };
+
   return (
     <div className="space-y-6 text-left">
       {/* ── HEADER ── */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate">
-            Recipe Book
-          </h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate">
+              Recipe Book
+            </h2>
+            <span className="text-[10px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 shrink-0">
+              {filteredCount} {filteredCount === 1 ? 'Recipe' : 'Recipes'}
+            </span>
+          </div>
           <p className="hidden sm:block text-xs text-zinc-550 font-sans mt-0.5">
             Manage sweet formulations and calculate volumetric yield scaling in real-time.
           </p>
@@ -200,16 +225,66 @@ function RecipesView({ onNavigate }: RecipesViewProps) {
         {/* Recipes grid right side */}
         <div className="lg:col-span-9 space-y-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-800 shadow-xs flex flex-col min-h-[350px]">
-            <div className="border-b border-zinc-100 dark:border-zinc-800/80 pb-3.5 mb-4 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-primary-brand dark:bg-orange-400" />
-                <span className="text-xs font-bold text-zinc-650 dark:text-zinc-300 uppercase tracking-wider">
-                  Formulation Archives
-                </span>
+            {/* ── STATS TILES ── */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory("All");
+                  setSearchTerm("");
+                }}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  selectedCategory === "All" && !searchTerm
+                    ? "bg-zinc-100 dark:bg-zinc-800 ring-1.5 ring-zinc-400 dark:ring-zinc-600 shadow-2xs"
+                    : "bg-zinc-50/80 dark:bg-zinc-800/40 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider truncate">
+                    Total
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-700 dark:bg-zinc-300 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 leading-none">
+                  {totalRecipesCount}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory("All");
+                }}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  selectedCategory !== "All" || searchTerm
+                    ? "bg-emerald-100/80 dark:bg-emerald-950/40 ring-1.5 ring-emerald-400 shadow-2xs"
+                    : "bg-emerald-50/60 dark:bg-emerald-950/20 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-emerald-700/80 dark:text-emerald-300/80 uppercase tracking-wider truncate">
+                    Filtered
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-emerald-600 dark:text-emerald-400 tracking-tight mt-1 leading-none">
+                  {filteredCount}
+                </div>
+              </button>
+
+              <div
+                className="p-2 sm:p-2.5 rounded-xl text-left flex flex-col justify-between bg-amber-50/60 dark:bg-amber-950/20"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-amber-700/80 dark:text-amber-300/80 uppercase tracking-wider truncate">
+                    Categories
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-primary-brand dark:text-orange-400 tracking-tight mt-1 leading-none">
+                  {dynamicCategories.length}
+                </div>
               </div>
-              <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-150 dark:border-zinc-700/60 text-zinc-500 dark:text-zinc-400">
-                {filteredCount} {filteredCount === 1 ? 'Recipe' : 'Recipes'}
-              </span>
             </div>
 
             {/* Search Input */}
@@ -259,107 +334,111 @@ function RecipesView({ onNavigate }: RecipesViewProps) {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-1 pb-3">
+            <div className="space-y-3 flex-1">
               {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
+                Array.from({ length: 4 }).map((_, i) => (
                   <div
                     key={`skeleton-${i}`}
-                    className="bg-white dark:bg-zinc-850 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-750/70 shadow-sm flex flex-col justify-between select-none animate-pulse"
+                    className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 animate-pulse space-y-3"
                   >
-                    <div className="flex gap-4">
-                      {/* Image Box Skeleton */}
-                      <div className="w-22 h-22 rounded-xl bg-zinc-200 dark:bg-zinc-800 shrink-0 animate-pulse" />
-                      {/* Details Skeleton */}
-                      <div className="flex-1 flex flex-col justify-between py-0.5 space-y-2">
-                        <div className="space-y-1.5">
-                          <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/3 animate-pulse" />
-                          <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
-                        </div>
-                        <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/4 animate-pulse" />
-                      </div>
+                    <div className="flex justify-between items-center">
+                      <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-1/3"></div>
+                      <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-16"></div>
                     </div>
-                    {/* Footer Info Skeleton */}
-                    <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-700/60 flex justify-between items-center">
-                      <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/4 animate-pulse" />
-                      <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/5 animate-pulse" />
+                    <div className="h-3 bg-zinc-100 dark:bg-zinc-850 rounded w-1/5"></div>
+                    <div className="grid grid-cols-3 gap-4 pt-1">
+                      <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+                      <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+                      <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
                     </div>
                   </div>
                 ))
               ) : paginatedRecipes.length > 0 ? (
                 paginatedRecipes.map((r) => {
-                  // Dynamic category tag styles
-                  const getCategoryStyles = (category: string) => {
-                    const cat = category?.toLowerCase() || "";
-                    if (cat.includes("cake")) {
-                      return "bg-pink-50 text-pink-700 border-pink-100 dark:bg-pink-950/20 dark:text-pink-400 dark:border-pink-900/30";
-                    }
-                    if (cat.includes("cookie") || cat.includes("biscuit")) {
-                      return "bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-900/30";
-                    }
-                    if (cat.includes("bread") || cat.includes("dough")) {
-                      return "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30";
-                    }
-                    if (cat.includes("pastry") || cat.includes("tart")) {
-                      return "bg-violet-50 text-violet-700 border-violet-100 dark:bg-violet-950/20 dark:text-violet-400 dark:border-violet-900/30";
-                    }
-                    return "bg-zinc-50 text-zinc-650 border-zinc-150 dark:bg-zinc-800/30 dark:text-zinc-400 dark:border-zinc-700/30";
-                  };
-
                   return (
                     <div
                       key={r.id}
                       onClick={() => onNavigate(`/recipes/${r.id}`)}
-                      className="group cursor-pointer bg-white dark:bg-zinc-850/80 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-750/70 hover:border-primary-brand/40 dark:hover:border-orange-400/40 hover:bg-zinc-50/30 dark:hover:bg-zinc-800/40 hover:shadow-lg hover:shadow-primary-brand/5 dark:hover:shadow-orange-500/5 hover:-translate-y-0.5 active:scale-99 transition-all duration-300 flex flex-col justify-between select-none animate-fadeIn"
+                      className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer text-left group"
                     >
-                      <div className="flex gap-4">
-                        {/* Image Box */}
-                        <div className="w-22 h-22 rounded-xl overflow-hidden bg-zinc-50 dark:bg-zinc-900 shrink-0 border border-zinc-150 dark:border-zinc-800 shadow-inner relative">
-                          <img
-                            src={(r.imageBase64?.startsWith("data:image/") ? r.imageBase64 : undefined) || r.imageUrl || "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=300"}
-                            alt={r.name}
-                            className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=300";
-                            }}
-                          />
-                        </div>
-                        {/* Details */}
-                        <div className="flex-1 flex flex-col text-left justify-between min-w-0 py-0.5">
-                          <div className="space-y-1">
-                            <span className={`self-start inline-flex px-2 py-0.5 text-[8px] font-bold uppercase rounded border tracking-wider font-sans ${getCategoryStyles(r.category)}`}>
-                              {r.category}
-                            </span>
-                            <h4 className="text-sm font-extrabold text-zinc-805 dark:text-zinc-100 leading-snug group-hover:text-primary-brand dark:group-hover:text-orange-400 transition-colors truncate">
-                              {r.name}
-                            </h4>
+                      {/* Row 1: Image, Name and Category Badge */}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-50 dark:bg-zinc-900 shrink-0 border border-zinc-150 dark:border-zinc-800 shadow-inner relative">
+                            <img
+                              src={(r.imageBase64?.startsWith("data:image/") ? r.imageBase64 : undefined) || r.imageUrl || "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=300"}
+                              alt={r.name}
+                              className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=300";
+                              }}
+                            />
                           </div>
-                          <div className="text-[10px] text-zinc-500 font-sans mt-1.5 flex items-center gap-1.5">
-                            <span>Base Yield:</span>
-                            <span className="font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900/50 px-1.5 py-0.5 rounded border border-zinc-150/60 dark:border-zinc-800">
+                          <h4 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight group-hover:text-primary-brand dark:group-hover:text-orange-400 transition-colors truncate">
+                            {r.name}
+                          </h4>
+                        </div>
+                        <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold ${getCategoryStyles(r.category)}`}>
+                          {r.category}
+                        </span>
+                      </div>
+
+                      {/* Row 2: Secondary info */}
+                      <p className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mt-1">
+                        {r.ingredients?.length || 0} INGREDIENTS {r.allergens && r.allergens.length > 0 ? `• ${r.allergens.join(", ")}` : ""}
+                      </p>
+
+                      {/* Row 3: Metrics & Action */}
+                      <div className="mt-3 pt-1 flex items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800/60">
+                        <div className="grid grid-cols-3 gap-4 sm:gap-8 flex-1">
+                          <div>
+                            <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
+                              BASE YIELD
+                            </span>
+                            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-sans">
                               {r.stdYield} {r.yieldUnit}
                             </span>
                           </div>
-                        </div>
-                      </div>
 
-                      {/* Footer Info */}
-                      <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-700/60 flex justify-between items-center">
-                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium font-sans flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          {r.ingredients?.length || 0} Ingredients
-                        </span>
-                        <span className="text-[10px] font-bold text-primary-brand dark:text-orange-400 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform duration-250">
-                          Open Recipe & Scale <ChevronRight className="w-3.5 h-3.5" />
-                        </span>
+                          <div>
+                            <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-550 font-semibold">
+                              INGREDIENTS
+                            </span>
+                            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-sans">
+                              {r.ingredients?.length || 0} items
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
+                              SCALING
+                            </span>
+                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-sans">
+                              Enabled
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onNavigate(`/recipes/${r.id}`);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-primary-brand dark:hover:text-orange-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer shrink-0"
+                          title="Open Recipe"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div className="col-span-full flex flex-col items-center justify-center py-12 text-zinc-400 text-sm">
+                <div className="flex flex-col items-center justify-center py-12 text-zinc-400 text-sm">
                   <Inbox className="w-12 h-12 text-zinc-350 dark:text-zinc-700 mx-auto mb-3 opacity-60" />
-                  <p className="font-bold text-zinc-550 dark:text-zinc-450">No Recipe Formulas Found</p>
+                  <p className="font-bold text-zinc-500 dark:text-zinc-450">No Recipe Formulas Found</p>
                   <p className="text-xs text-zinc-400 dark:text-zinc-550 mt-1 max-w-[280px] text-center font-sans">
                     There are no recipes matching your selected category filters or search keywords.
                   </p>

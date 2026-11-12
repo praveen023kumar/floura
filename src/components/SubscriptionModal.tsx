@@ -299,7 +299,7 @@ export default function SubscriptionModal({
               type="button"
               onClick={handlePay}
               disabled={loading}
-              className="flex-2 py-3 px-4 rounded-xl font-bold text-xs bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 active:scale-98 text-white shadow-lg shadow-primary-brand/25 dark:shadow-orange-500/20 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+              className="flex-2 py-3 px-4 rounded-xl font-bold text-xs bg-primary-brand hover:bg-primary-brand-dark dark:bg-primary-brand dark:hover:bg-primary-brand-dark active:scale-98 text-white shadow-lg shadow-primary-brand/25 dark:shadow-pink-500/20 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <>

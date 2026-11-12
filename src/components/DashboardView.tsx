@@ -17,7 +17,7 @@ import {
   Check,
   Clock
 } from "lucide-react";
-import { formatPrice } from "../utils/format";
+import { formatPrice, formatDate } from "../utils/format";
 import { useDashboard } from "../hooks/useDashboard";
 import { type Order, type ChecklistItem } from "../types";
 import { getStatusColors } from "../utils/orderStatus";
@@ -570,14 +570,14 @@ function DashboardView({
                           {order.customerName}
                         </h4>
                         <p className="text-[9px] font-semibold text-zinc-400 dark:text-zinc-500 mt-0.5">
-                          {order.cakeFlavor} Cake ({order.cakeWeight})
+                          {order.cakeFlavor?.toLowerCase().endsWith("cake") ? order.cakeFlavor : `${order.cakeFlavor || "Custom"} Cake`} ({order.cakeWeight})
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-[9px] font-bold text-zinc-450 dark:text-zinc-500">
-                        {order.deliveryDate} at {order.deliveryTime || "04:00 pm"}
+                        {formatDate(order.deliveryDate || order.eventDate)} at {order.deliveryTime || "04:00 pm"}
                       </span>
 
                       <button 

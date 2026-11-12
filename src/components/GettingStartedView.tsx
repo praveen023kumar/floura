@@ -192,7 +192,7 @@ function GettingStartedView({ user, onUpdateProfile, onUpdateBakeryProfile, onLo
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full sm:w-1/2 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-400 dark:hover:bg-orange-500 text-white font-bold text-xs py-3.5 rounded-xl shadow-md transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
+                className="w-full sm:w-1/2 bg-primary-brand hover:bg-primary-brand-dark dark:bg-primary-brand dark:hover:bg-primary-brand-dark text-white font-bold text-xs py-3.5 rounded-xl shadow-md transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
               >
                 {saving ? "Initializing..." : "Save & Start Baking"}
                 <ArrowRight className="w-3.5 h-3.5" />

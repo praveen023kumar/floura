@@ -5,6 +5,7 @@ import feedbackRoutes from "./feedback.routes";
 import syncRoutes from "./sync.routes";
 import securityRoutes from "./security.routes";
 import publicRecipeRoutes from "./publicRecipe.routes";
+import publicOrderRoutes from "./publicOrder.routes";
 import paymentRoutes from "./payment.routes";
 import { getResolvedFirebaseConfig } from "../controllers/auth.controller";
 
@@ -45,5 +46,6 @@ router.use("/", feedbackRoutes); // maps /feedbacks and /admin/feedbacks
 router.use("/", syncRoutes);     // maps /sync, /fetch, /orders
 router.use("/admin/security", securityRoutes); // maps /admin/security/metrics, /admin/security/logs
 router.use("/", publicRecipeRoutes); // maps /public/recipes and /admin/public-recipes
+router.use("/public/orders", publicOrderRoutes); // maps /public/orders/meta/:orderId and /public/orders/verify
 
 export default router;

@@ -179,7 +179,7 @@ export default function ReauthView({
               type="button"
               onClick={() => handleSendOtp(activeEmail)}
               disabled={authenticating}
-              className="w-full flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white py-3.5 px-6 rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-wider"
+              className="w-full flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-primary-brand-dark dark:bg-primary-brand dark:hover:bg-primary-brand-dark text-white py-3.5 px-6 rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-wider"
             >
               {isSendingOtp ? (
                 <>
@@ -218,7 +218,7 @@ export default function ReauthView({
               <button
                 type="submit"
                 disabled={isVerifyingOtp || otpCode.trim().length !== 6}
-                className="w-full flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 text-white py-3 px-6 rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-wider"
+                className="w-full flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-primary-brand-dark dark:bg-primary-brand dark:hover:bg-primary-brand-dark text-white py-3 px-6 rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer font-bold text-xs uppercase tracking-wider"
               >
                 {isVerifyingOtp ? (
                   <>

@@ -81,6 +81,7 @@ import SubscriptionBlockedView from "./components/SubscriptionBlockedView";
 import ReauthView from "./components/ReauthView";
 import DownloadsView from "./components/DownloadsView";
 import DemoLoginView from "./components/DemoLoginView";
+import PublicOrderTrackingView from "./components/PublicOrderTrackingView";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -315,10 +316,11 @@ function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
     <RecipeCreateView 
       onAddRecipe={handleAddRecipe}
       onUpdateRecipe={handleUpdateRecipe}
+      onAddInventoryItem={handleAddInventoryItem}
       recipeToEdit={location.state?.recipe}
       onNavigate={navigate}
     />
-  ), [handleAddRecipe, handleUpdateRecipe, location.state?.recipe, navigate]);
+  ), [handleAddRecipe, handleUpdateRecipe, handleAddInventoryItem, location.state?.recipe, navigate]);
 
   const recipeDetailViewElement = useMemo(() => (
     <RecipeDetailView
@@ -424,7 +426,7 @@ function MainAppContent({ initialUser, onLogout, onUserUpdate }: {
             
             <button
               onClick={() => window.location.reload()}
-              className="w-full py-3.5 px-6 bg-primary-brand hover:bg-orange-600 dark:bg-orange-550 dark:hover:bg-orange-650 text-white font-sans font-semibold rounded-2xl shadow-lg shadow-orange-500/20 active:scale-98 transition-all cursor-pointer border-none outline-none"
+              className="w-full py-3.5 px-6 bg-primary-brand hover:bg-primary-brand-dark dark:bg-primary-brand dark:hover:bg-primary-brand-dark text-white font-sans font-semibold rounded-2xl shadow-lg shadow-pink-500/20 active:scale-98 transition-all cursor-pointer border-none outline-none"
             >
               Refresh and Continue
             </button>
@@ -997,6 +999,8 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode, onUser
                            location.pathname === "/demo-login" ||
                            location.pathname.startsWith("/calculator") ||
                            location.pathname.startsWith("/downloads") ||
+                           location.pathname.startsWith("/track") ||
+                           location.pathname.startsWith("/orders/track") ||
                            location.pathname.startsWith("/admin");
       if (!isPublicPath) {
         navigate("/", { replace: true });
@@ -1082,6 +1086,21 @@ function AppContentGate({ user, onLogin, onLogout, darkMode, setDarkMode, onUser
           darkMode={darkMode}
           setDarkMode={setDarkMode}
         />
+      </Suspense>
+    );
+  }
+
+  // 0. Public Order Tracking Page (/track/:orderId or /orders/track/:orderId) - No authentication required
+  if (location.pathname.startsWith("/track") || location.pathname.startsWith("/orders/track")) {
+    return (
+      <Suspense fallback={<LoadingSignIn />}>
+        <Routes>
+          <Route path="/track/:orderId" element={<PublicOrderTrackingView />} />
+          <Route path="/orders/track/:orderId" element={<PublicOrderTrackingView />} />
+          <Route path="/track" element={<PublicOrderTrackingView />} />
+          <Route path="/orders/track" element={<PublicOrderTrackingView />} />
+          <Route path="*" element={<Navigate to="/track" replace />} />
+        </Routes>
       </Suspense>
     );
   }

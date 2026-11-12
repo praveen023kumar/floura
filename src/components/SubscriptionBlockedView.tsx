@@ -285,7 +285,7 @@ export default function SubscriptionBlockedView({
             type="button"
             onClick={handleRazorpayPay}
             disabled={paying}
-            className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-primary-brand hover:bg-primary-brand-dark dark:bg-orange-500 dark:hover:bg-orange-600 active:scale-98 text-white shadow-lg shadow-primary-brand/25 dark:shadow-orange-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-primary-brand hover:bg-primary-brand-dark dark:bg-primary-brand dark:hover:bg-primary-brand-dark active:scale-98 text-white shadow-lg shadow-primary-brand/25 dark:shadow-pink-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
           >
             {paying ? (
               <>

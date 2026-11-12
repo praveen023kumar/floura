@@ -688,7 +688,7 @@ export default function LandingPage({ user, onLogin, onLogout, darkMode, setDark
                   setDownloadTimestamp(freshTime);
                   e.currentTarget.href = `/downloads/floura-v1.0.0.apk?t=${freshTime}`;
                 }}
-                className="flex items-center gap-3 bg-primary-brand hover:bg-orange-600 text-white py-3.5 px-6 rounded-2xl shadow-md shadow-orange-500/20 active:scale-98 transition-all select-none cursor-pointer"
+                className="flex items-center gap-3 bg-primary-brand hover:bg-primary-brand-dark text-white py-3.5 px-6 rounded-2xl shadow-md shadow-pink-500/20 active:scale-98 transition-all select-none cursor-pointer"
                 aria-label="Direct Download Android APK"
               >
                 <Download className="w-5 h-5 shrink-0" />

@@ -26,10 +26,12 @@ import {
   Clock,
   HelpCircle,
   Download,
-  UserPlus
+  UserPlus,
+  Printer
 } from "lucide-react";
 import LegalModal from "./LegalModal";
 import SubscriptionModal from "./SubscriptionModal";
+import { PrinterSettingsModal } from "./PrinterSettingsModal";
 import { useMore } from "../hooks/useMore";
 import Avatar from "./Avatar";
 import { getApiUrl, getDeviceId } from "../utils/api";
@@ -89,6 +91,7 @@ function MoreView({
     user?.subscription_status || null
   );
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
 
   useEffect(() => {
     if (user?.subscription_expires_at) {
@@ -576,6 +579,14 @@ function MoreView({
                   Sync Now
                 </button>
               </div>
+
+              {/* Thermal Printer & Auto-Connect Invoicing */}
+              <MenuItem
+                icon={Printer}
+                title="Thermal Printer & Invoicing"
+                description="Auto-connect and configure ESC/POS Bluetooth receipt printers"
+                onClick={() => setIsPrinterModalOpen(true)}
+              />
             </MenuSection>
 
             {/* SUPPORT & INFORMATION */}
@@ -687,6 +698,14 @@ function MoreView({
         isOpen={activeModal !== null}
         type={activeModal}
         onClose={() => setActiveModal(null)}
+      />
+
+      {/* ========================================================
+          BLUETOOTH THERMAL PRINTER SETTINGS MODAL
+      ======================================================== */}
+      <PrinterSettingsModal
+        isOpen={isPrinterModalOpen}
+        onClose={() => setIsPrinterModalOpen(false)}
       />
     </>
   );

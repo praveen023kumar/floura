@@ -1,5 +1,4 @@
-// File Path: /src/components/LeadsView.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Search,
@@ -18,7 +17,10 @@ import {
   Sparkles,
   ArrowUpRight,
   Send,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown
 } from "lucide-react";
 import { useLeads } from "../hooks/useLeads";
 import { type Lead, type LeadChannel, type LeadStatus } from "../types";
@@ -323,161 +325,52 @@ export default function LeadsView({ onSync, bakeryName }: LeadsViewProps) {
     }
   };
 
-  return (
+  // Filter & Pagination state
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [leadsCurrentPage, setLeadsCurrentPage] = useState(1);
+  const [leadsItemsPerPage, setLeadsItemsPerPage] = useState(10);
+
+  useEffect(() => {
+    setLeadsCurrentPage(1);
+  }, [searchTerm, statusFilter, channelFilter, sortBy]);
+
+  const activeFilterCount =
+    (statusFilter !== "All" ? 1 : 0) +
+    (channelFilter !== "All" ? 1 : 0) +
+    (searchTerm.trim() ? 1 : 0);
+
+  const clearAllFilters = () => {
+    setStatusFilter("All");
+    setChannelFilter("All");
+    setSearchTerm("");
+    setSortBy("lastSpoke-newest");
+  };
+
+  const paginatedLeads = filteredLeads.slice(
+    (leadsCurrentPage - 1) * leadsItemsPerPage,
+    leadsCurrentPage * leadsItemsPerPage
+  );
+  const leadsTotalPages = Math.ceil(filteredLeads.length / leadsItemsPerPage) || 1;
+
+  const renderFilterGroups = () => (
     <div className="space-y-6">
-      {/* Header Segments */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold font-serif text-zinc-900 dark:text-zinc-50">
-              Lead Management
-            </h1>
-            <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-pink-100 dark:bg-pink-950/60 text-primary-brand dark:text-pink-400 border border-pink-200 dark:border-pink-850">
-              CRM
-            </span>
-          </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Track customer inquiries from Instagram, WhatsApp & phone. Nurture prospects and convert to orders.
-          </p>
-        </div>
-
-        <button
-          onClick={openAddModal}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary-brand hover:bg-pink-700 text-white text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Lead / Inquiry</span>
-        </button>
-      </div>
-
-      {/* Follow-up Attention Alert */}
-      {(stats.overdueFollowUps > 0 || stats.followUpsDueToday > 0) && (
-        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-2xl p-3.5 px-4 flex flex-wrap items-center justify-between gap-3 text-xs shadow-2xs">
-          <div className="flex items-center gap-2.5 text-zinc-800 dark:text-zinc-200">
-            <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span>
-              {stats.overdueFollowUps > 0 && (
-                <strong className="text-rose-600 dark:text-rose-400 mr-2 font-bold">
-                  ⚠️ {stats.overdueFollowUps} overdue follow-up{stats.overdueFollowUps > 1 ? "s" : ""}
-                </strong>
-              )}
-              {stats.followUpsDueToday > 0 && (
-                <strong className="text-amber-700 dark:text-amber-400 font-bold">
-                  🔔 {stats.followUpsDueToday} follow-up{stats.followUpsDueToday > 1 ? "s" : ""} scheduled for today
-                </strong>
-              )}
-            </span>
-          </div>
+      {/* Status Filter */}
+      <div>
+        <h3 className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider font-sans mb-2.5">
+          Inquiry Status
+        </h3>
+        <div className="space-y-1">
           <button
-            onClick={() => setSortBy("nextContact-soonest")}
-            className="text-[11px] font-bold text-primary-brand dark:text-pink-400 hover:underline cursor-pointer ml-auto"
-          >
-            Sort by Follow-up Due &rarr;
-          </button>
-        </div>
-      )}
-
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="bg-white dark:bg-zinc-800/80 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs">
-          <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
-            Total Inquiries
-          </span>
-          <span className="text-xl font-bold font-serif text-zinc-800 dark:text-zinc-100 mt-1 block">
-            {stats.total}
-          </span>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-800/80 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs">
-          <span className="text-[11px] font-bold text-amber-500 uppercase tracking-wider block">
-            In Discussion
-          </span>
-          <span className="text-xl font-bold font-serif text-amber-600 dark:text-amber-400 mt-1 block">
-            {stats.inDiscussion}
-          </span>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-800/80 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs">
-          <span className="text-[11px] font-bold text-purple-500 uppercase tracking-wider block">
-            Quotes Sent
-          </span>
-          <span className="text-xl font-bold font-serif text-purple-600 dark:text-purple-400 mt-1 block">
-            {stats.quotationSent}
-          </span>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-800/80 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/60 shadow-2xs">
-          <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider block">
-            Converted
-          </span>
-          <span className="text-xl font-bold font-serif text-emerald-600 dark:text-emerald-400 mt-1 block">
-            {stats.converted}
-          </span>
-        </div>
-      </div>
-
-      {/* Filter & Search Bar */}
-      <div className="bg-white dark:bg-zinc-800/80 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/60 space-y-3.5 shadow-2xs">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-grow">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by prospect name, WhatsApp, Instagram handle, notes..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-primary-brand"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 text-xs"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <select
-              value={channelFilter}
-              onChange={(e) => setChannelFilter(e.target.value as any)}
-              className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand cursor-pointer"
-            >
-              <option value="All">All Channels</option>
-              {CHANNELS.map((ch) => (
-                <option key={ch} value={ch}>
-                  {ch}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand cursor-pointer"
-            >
-              <option value="lastSpoke-newest">Last Spoke: Recent First</option>
-              <option value="nextContact-soonest">Next Follow-up: Soonest First</option>
-              <option value="updated-newest">Updated: Recent First</option>
-              <option value="created-newest">Created: Recent First</option>
-              <option value="budget-highest">Budget: High to Low</option>
-              <option value="name-az">Name: A to Z</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Status Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <button
+            type="button"
             onClick={() => setStatusFilter("All")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
               statusFilter === "All"
                 ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs"
-                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                : "text-zinc-650 dark:text-zinc-350 hover:bg-zinc-50 dark:hover:bg-zinc-800"
             }`}
           >
-            All Inquiries ({stats.total})
+            <span>All Inquiries</span>
+            <span className="text-[10px] font-bold opacity-70">{stats.total}</span>
           </button>
           {STATUSES.map((st) => {
             const count =
@@ -490,264 +383,723 @@ export default function LeadsView({ onSync, bakeryName }: LeadsViewProps) {
                 : st === "Converted"
                 ? stats.converted
                 : stats.lost;
+            const isSelected = statusFilter === st;
             return (
               <button
                 key={st}
+                type="button"
                 onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  statusFilter === st
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                  isSelected
                     ? "bg-primary-brand text-white shadow-xs"
-                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    : "text-zinc-650 dark:text-zinc-350 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                 }`}
               >
-                {st} ({count})
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[st]?.dot || 'bg-zinc-400'}`} />
+                  <span>{st}</span>
+                </div>
+                <span className="text-[10px] font-bold opacity-70">{count}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Leads List / Cards */}
-      {isLoading ? (
-        <div className="p-12 text-center text-xs text-zinc-400 animate-pulse">
-          Loading inquiries...
-        </div>
-      ) : filteredLeads.length === 0 ? (
-        <div className="bg-white dark:bg-zinc-800/50 p-12 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-700/60 text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-pink-50 dark:bg-pink-950/40 text-primary-brand dark:text-pink-400 mx-auto flex items-center justify-center">
-            <Instagram className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-zinc-800 dark:text-zinc-200">
-            No leads found
-          </h3>
-          <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-            {searchTerm || statusFilter !== "All" || channelFilter !== "All"
-              ? "No inquiries match your current search and filter criteria."
-              : "Capture prospects who message you on Instagram or WhatsApp to easily follow up and turn them into paying cake orders."}
-          </p>
+      {/* Channel Filter */}
+      <div className="pt-5 border-t border-zinc-100 dark:border-zinc-800">
+        <h3 className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider font-sans mb-2.5">
+          Channel
+        </h3>
+        <div className="space-y-1">
           <button
-            onClick={openAddModal}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-brand text-white text-xs font-bold shadow-xs hover:bg-pink-700 transition-all cursor-pointer"
+            type="button"
+            onClick={() => setChannelFilter("All")}
+            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+              channelFilter === "All"
+                ? "bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400"
+                : "text-zinc-650 dark:text-zinc-350 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            <span>Add First Lead</span>
+            <span>All Channels</span>
           </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredLeads.map((lead) => {
-            const badge = getChannelBadge(lead.channel);
-            const ChannelIcon = badge.icon;
-            const statusConfig = STATUS_COLORS[lead.status] || STATUS_COLORS["New Inquiry"];
-
+          {CHANNELS.map((ch) => {
+            const isSelected = channelFilter === ch;
             return (
-              <motion.div
-                key={lead.id}
-                layout
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white dark:bg-zinc-800 rounded-2xl p-5 border border-zinc-200/90 dark:border-zinc-700/70 shadow-2xs hover:shadow-sm transition-all flex flex-col justify-between gap-4"
+              <button
+                key={ch}
+                type="button"
+                onClick={() => setChannelFilter(ch)}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                  isSelected
+                    ? "bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 font-bold"
+                    : "text-zinc-650 dark:text-zinc-350 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                }`}
               >
-                <div>
-                  {/* Top Bar: Channel Badge + Status Dropdown */}
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border ${badge.bg}`}
-                    >
-                      <ChannelIcon className="w-3.5 h-3.5 shrink-0" />
-                      <span>{lead.channel}</span>
-                    </span>
-
-                    {/* Status updater */}
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${statusConfig.dot}`} />
-                      <select
-                        value={lead.status}
-                        onChange={(e) => handleUpdateLead(lead.id, { status: e.target.value as LeadStatus })}
-                        className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary-brand ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
-                      >
-                        {STATUSES.map((st) => (
-                          <option key={st} value={st}>
-                            {st}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Prospect Name & Handles */}
-                  <div className="space-y-1">
-                    <h3 className="text-base font-bold font-serif text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
-                      <span>{lead.name}</span>
-                      {lead.estimatedBudget !== undefined && lead.estimatedBudget > 0 && (
-                        <span className="text-xs font-mono font-bold text-primary-brand dark:text-pink-400">
-                          {formatPrice(lead.estimatedBudget)}
-                        </span>
-                      )}
-                    </h3>
-
-                    {/* Contact Badges */}
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      {lead.instagramHandle && (
-                        <button
-                          onClick={() => openInstagram(lead.instagramHandle)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-pink-600 dark:text-pink-400 hover:underline cursor-pointer bg-pink-50/50 dark:bg-pink-950/30 px-2 py-0.5 rounded-md"
-                          title="Open Instagram Profile"
-                        >
-                          <Instagram className="w-3 h-3" />
-                          <span>@{lead.instagramHandle}</span>
-                          <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-                        </button>
-                      )}
-
-                      {lead.whatsappNumber && (
-                        <button
-                          onClick={() => openWhatsApp(lead.whatsappNumber, lead.name)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer bg-emerald-50/50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-md"
-                          title="Chat on WhatsApp"
-                        >
-                          <MessageCircle className="w-3 h-3" />
-                          <span>{lead.whatsappNumber}</span>
-                        </button>
-                      )}
-
-                      {lead.phone && !lead.whatsappNumber && (
-                        <a
-                          href={`tel:${lead.phone}`}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer bg-blue-50/50 dark:bg-blue-950/30 px-2 py-0.5 rounded-md"
-                        >
-                          <Phone className="w-3 h-3" />
-                          <span>{lead.phone}</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Notes Snippet */}
-                  {lead.notes && (
-                    <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-150 dark:border-zinc-800 line-clamp-2">
-                      {lead.notes}
-                    </p>
-                  )}
-
-                  {/* Last Spoke & Next Contact Indicators */}
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>Last spoke: <strong>{formatRelativeDays(lead.lastSpokeDate)}</strong></span>
-                      </span>
-                      <button
-                        onClick={() => handleUpdateLead(lead.id, { lastSpokeDate: new Date().toISOString().split("T")[0] })}
-                        className="text-[10px] font-bold text-primary-brand dark:text-pink-400 hover:underline cursor-pointer"
-                        title="Update last spoke date to today"
-                      >
-                        Spoke Today
-                      </button>
-                    </div>
-
-                    {/* Next Follow-up Indicator */}
-                    {lead.nextContactDate ? (
-                      (() => {
-                        const badge = formatNextContactBadge(lead.nextContactDate);
-                        if (!badge) return null;
-                        return (
-                          <div className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl border text-[11px] font-bold ${badge.badgeClass}`}>
-                            <span className="flex items-center gap-1.5">
-                              <span className={`w-2 h-2 rounded-full ${badge.dotClass}`} />
-                              <span>{badge.text}</span>
-                            </span>
-                            {badge.subtext && <span className="text-[10px] font-semibold opacity-80">{badge.subtext}</span>}
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <div className="flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500 pt-0.5">
-                        <span className="text-[10px] italic">No next follow-up scheduled</span>
-                        <button
-                          onClick={() => {
-                            const d = new Date();
-                            d.setDate(d.getDate() + 2);
-                            handleUpdateLead(lead.id, { nextContactDate: d.toISOString().split("T")[0] });
-                          }}
-                          className="text-[10px] font-bold text-zinc-500 hover:text-primary-brand dark:hover:text-pink-400 cursor-pointer"
-                          title="Schedule follow-up for 2 days from now"
-                        >
-                          + Set in 2 Days
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Footer Action Buttons */}
-                <div className="pt-3 border-t border-zinc-100 dark:border-zinc-700/60 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    {/* WhatsApp Quick Chat */}
-                    {lead.whatsappNumber && (
-                      <button
-                        onClick={() => openWhatsApp(lead.whatsappNumber, lead.name)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold transition-all shadow-2xs active:scale-95 cursor-pointer"
-                        title="Open WhatsApp chat with pre-written inquiry greeting"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        <span>WhatsApp</span>
-                      </button>
-                    )}
-
-                    {/* Instagram Profile */}
-                    {lead.instagramHandle && (
-                      <button
-                        onClick={() => openInstagram(lead.instagramHandle)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:opacity-90 text-white text-[11px] font-bold transition-all shadow-2xs active:scale-95 cursor-pointer"
-                        title="Open Instagram Profile"
-                      >
-                        <Instagram className="w-3.5 h-3.5" />
-                        <span>Instagram</span>
-                      </button>
-                    )}
-
-                    {/* Convert to Customer */}
-                    {lead.status !== "Converted" && (
-                      <button
-                        onClick={() => openConvertModal(lead)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-[11px] font-bold transition-all active:scale-95 cursor-pointer"
-                        title="Add to Customer directory"
-                      >
-                        <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
-                        <span className="hidden sm:inline">Convert</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Edit and Delete */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => openEditModal(lead)}
-                      className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/60 transition-colors cursor-pointer"
-                      title="Edit Lead"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Remove inquiry for "${lead.name}"?`)) {
-                          handleDeleteLead(lead.id);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                      title="Delete Lead"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
+                <span>{ch}</span>
+              </button>
             );
           })}
         </div>
-      )}
+      </div>
+
+      {/* Sort By */}
+      <div className="pt-5 border-t border-zinc-100 dark:border-zinc-800">
+        <h3 className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider font-sans mb-2.5">
+          Sort By
+        </h3>
+        <div className="space-y-1">
+          {[
+            { id: "lastSpoke-newest", label: "Last Spoke: Recent First" },
+            { id: "nextContact-soonest", label: "Follow-up: Soonest First" },
+            { id: "updated-newest", label: "Updated: Recent First" },
+            { id: "created-newest", label: "Created: Recent First" },
+            { id: "budget-highest", label: "Budget: High to Low" },
+            { id: "name-az", label: "Name: A to Z" },
+          ].map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setSortBy(s.id as any)}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                sortBy === s.id
+                  ? "bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 font-bold"
+                  : "text-zinc-650 dark:text-zinc-350 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <span>{s.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* ── HEADER ── */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate">
+              Lead Management
+            </h1>
+            <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-pink-100 dark:bg-pink-950/60 text-primary-brand dark:text-pink-400 border border-pink-200 dark:border-pink-850 shrink-0">
+              CRM
+            </span>
+            <span className="text-[10px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 shrink-0">
+              {filteredLeads.length} {filteredLeads.length === 1 ? 'Inquiry' : 'Inquiries'}
+            </span>
+          </div>
+          <p className="hidden sm:block text-xs text-zinc-550 font-sans mt-0.5">
+            Track customer inquiries from Instagram, WhatsApp & phone. Nurture prospects and convert to orders.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(true)}
+            className="lg:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-bold text-zinc-700 dark:text-zinc-200 cursor-pointer shadow-xs active:scale-95 transition-all"
+          >
+            <Filter className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-primary-brand text-white text-[9px] flex items-center justify-center font-bold">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={openAddModal}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary-brand hover:bg-opacity-95 text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Lead</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── MAIN 12-COL LAYOUT ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Desktop Filter Desk */}
+        <aside className="hidden lg:block lg:col-span-3 bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-150 dark:border-zinc-850 shadow-xs">
+          <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4 flex justify-between items-center">
+            <span className="text-xs font-bold text-zinc-808 dark:text-zinc-105 uppercase tracking-wider">
+              Filter Desk
+            </span>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-[10px] font-bold text-primary-brand dark:text-orange-400 hover:underline cursor-pointer"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+          {renderFilterGroups()}
+        </aside>
+
+        {/* Mobile / tablet slide-in filter drawer */}
+        <AnimatePresence>
+          {mobileFiltersOpen && (
+            <>
+              <motion.div
+                key="filter-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setMobileFiltersOpen(false)}
+                className="lg:hidden fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50"
+              />
+              <motion.div
+                key="filter-drawer"
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", damping: 28, stiffness: 280 }}
+                className="lg:hidden fixed inset-y-0 left-0 w-[300px] bg-white dark:bg-zinc-850 z-50 shadow-2xl flex flex-col border-r border-zinc-200 dark:border-zinc-700"
+              >
+                <div className="px-5 py-4 border-b border-zinc-150 dark:border-zinc-700 flex justify-between items-center shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-zinc-500" />
+                    <span className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-sans">
+                      Filter Leads
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMobileFiltersOpen(false)}
+                    className="p-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-400 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="px-5 py-4 overflow-y-auto custom-scrollbar flex-1">
+                  {renderFilterGroups()}
+                </div>
+                <div className="px-5 py-4 border-t border-zinc-100 dark:border-zinc-700 shrink-0 flex gap-2">
+                  {activeFilterCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearAllFilters}
+                      className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setMobileFiltersOpen(false)}
+                    className="flex-1 py-2.5 bg-primary-brand hover:bg-opacity-95 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-sm"
+                  >
+                    Show results
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* Right Main Content */}
+        <div className="lg:col-span-9 space-y-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-800 shadow-xs flex flex-col min-h-[350px]">
+            {/* Follow-up Attention Alert */}
+            {(stats.overdueFollowUps > 0 || stats.followUpsDueToday > 0) && (
+              <div className="mb-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl p-3 px-3.5 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+                <div className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200">
+                  <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>
+                    {stats.overdueFollowUps > 0 && (
+                      <strong className="text-rose-600 dark:text-rose-400 mr-2 font-bold">
+                        ⚠️ {stats.overdueFollowUps} overdue follow-up{stats.overdueFollowUps > 1 ? "s" : ""}
+                      </strong>
+                    )}
+                    {stats.followUpsDueToday > 0 && (
+                      <strong className="text-amber-700 dark:text-amber-400 font-bold">
+                        🔔 {stats.followUpsDueToday} due today
+                      </strong>
+                    )}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSortBy("nextContact-soonest")}
+                  className="text-[10px] font-bold text-primary-brand dark:text-pink-400 hover:underline cursor-pointer ml-auto"
+                >
+                  Sort by Due &rarr;
+                </button>
+              </div>
+            )}
+
+            {/* ── STATS TILES ── */}
+            <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-4">
+              <button
+                type="button"
+                onClick={() => setStatusFilter("All")}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  statusFilter === "All"
+                    ? "bg-zinc-100 dark:bg-zinc-800 ring-1.5 ring-zinc-400 dark:ring-zinc-600 shadow-2xs"
+                    : "bg-zinc-50/80 dark:bg-zinc-800/40 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider truncate">
+                    Total
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-700 dark:bg-zinc-300 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 leading-none">
+                  {stats.total}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatusFilter("In Discussion")}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  statusFilter === "In Discussion"
+                    ? "bg-amber-100/80 dark:bg-amber-950/40 ring-1.5 ring-amber-400 shadow-2xs"
+                    : "bg-amber-50/60 dark:bg-amber-950/20 hover:bg-amber-100/60 dark:hover:bg-amber-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-amber-700/80 dark:text-amber-300/80 uppercase tracking-wider truncate">
+                    In Discussion
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-amber-600 dark:text-amber-400 tracking-tight mt-1 leading-none">
+                  {stats.inDiscussion}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatusFilter("Quotation Sent")}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  statusFilter === "Quotation Sent"
+                    ? "bg-purple-100/80 dark:bg-purple-950/40 ring-1.5 ring-purple-400 shadow-2xs"
+                    : "bg-purple-50/60 dark:bg-purple-950/20 hover:bg-purple-100/60 dark:hover:bg-purple-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-purple-700/80 dark:text-purple-300/80 uppercase tracking-wider truncate">
+                    Quotes Sent
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-purple-600 dark:text-purple-400 tracking-tight mt-1 leading-none">
+                  {stats.quotationSent}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStatusFilter("Converted")}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  statusFilter === "Converted"
+                    ? "bg-emerald-100/80 dark:bg-emerald-950/40 ring-1.5 ring-emerald-400 shadow-2xs"
+                    : "bg-emerald-50/60 dark:bg-emerald-950/20 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-emerald-700/80 dark:text-emerald-300/80 uppercase tracking-wider truncate">
+                    Converted
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-emerald-600 dark:text-emerald-400 tracking-tight mt-1 leading-none">
+                  {stats.converted}
+                </div>
+              </button>
+            </div>
+
+            {/* Search input */}
+            <div className="relative mb-4">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-550" />
+              <input
+                type="text"
+                placeholder="Search leads (prospect name, WhatsApp, Instagram handle, notes)..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-zinc-50 dark:bg-zinc-950 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-755 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand font-medium"
+              />
+            </div>
+
+            {/* Active filter chips */}
+            {(statusFilter !== "All" || channelFilter !== "All" || searchTerm.trim()) && (
+              <div className="flex flex-wrap items-center gap-1.5 mb-4 animate-fade-in">
+                {statusFilter !== "All" && (
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("All")}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    Status: {statusFilter}
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+                {channelFilter !== "All" && (
+                  <button
+                    type="button"
+                    onClick={() => setChannelFilter("All")}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    Channel: {channelFilter}
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+                {searchTerm.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    Search: "{searchTerm}"
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-wider cursor-pointer transition-colors ml-1"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+
+            {/* Compact Leads Cards List */}
+            <div className="space-y-3 flex-1">
+              {isLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={`skeleton-${i}`}
+                    className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 animate-pulse space-y-3"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-1/3"></div>
+                      <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-16"></div>
+                    </div>
+                    <div className="h-3 bg-zinc-100 dark:bg-zinc-850 rounded w-1/5"></div>
+                    <div className="grid grid-cols-3 gap-4 pt-1">
+                      <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+                      <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+                      <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+                    </div>
+                  </div>
+                ))
+              ) : paginatedLeads.length > 0 ? (
+                paginatedLeads.map((lead) => {
+                  const badge = getChannelBadge(lead.channel);
+                  const ChannelIcon = badge.icon;
+                  const statusConfig = STATUS_COLORS[lead.status] || STATUS_COLORS["New Inquiry"];
+                  const nextContact = formatNextContactBadge(lead.nextContactDate);
+
+                  return (
+                    <div
+                      key={lead.id}
+                      className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-all text-left group"
+                    >
+                      {/* Row 1: Channel + Name & Status Dropdown */}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${badge.bg}`}
+                            title={`Channel: ${lead.channel}`}
+                          >
+                            <ChannelIcon className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight group-hover:text-primary-brand dark:group-hover:text-orange-400 transition-colors truncate">
+                              {lead.name}
+                            </h4>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                              {lead.instagramHandle && (
+                                <button
+                                  type="button"
+                                  onClick={() => openInstagram(lead.instagramHandle)}
+                                  className="text-[10px] text-pink-600 dark:text-pink-400 font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
+                                >
+                                  @{lead.instagramHandle}
+                                  <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                                </button>
+                              )}
+                              {lead.whatsappNumber && (
+                                <button
+                                  type="button"
+                                  onClick={() => openWhatsApp(lead.whatsappNumber, lead.name)}
+                                  className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
+                                >
+                                  {lead.whatsappNumber}
+                                </button>
+                              )}
+                              {lead.phone && !lead.whatsappNumber && (
+                                <a
+                                  href={`tel:${lead.phone}`}
+                                  className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold hover:underline"
+                                >
+                                  {lead.phone}
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status dropdown */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={`w-2 h-2 rounded-full ${statusConfig.dot}`} />
+                          <select
+                            value={lead.status}
+                            onChange={(e) => handleUpdateLead(lead.id, { status: e.target.value as LeadStatus })}
+                            className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary-brand ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
+                          >
+                            {STATUSES.map((st) => (
+                              <option key={st} value={st}>
+                                {st}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Notes snippet if present */}
+                      {lead.notes && (
+                        <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950 p-2 rounded-xl border border-zinc-150 dark:border-zinc-800/80 line-clamp-1 font-sans">
+                          {lead.notes}
+                        </p>
+                      )}
+
+                      {/* Row 2: Metrics and Actions */}
+                      <div className="mt-3 pt-2 flex items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800/60">
+                        <div className="grid grid-cols-3 gap-3 sm:gap-6 flex-1">
+                          <div>
+                            <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
+                              LAST SPOKE
+                            </span>
+                            <span className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 font-sans truncate block">
+                              {formatRelativeDays(lead.lastSpokeDate)}
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
+                              NEXT FOLLOW-UP
+                            </span>
+                            <div className="mt-0.5">
+                              {nextContact ? (
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${nextContact.badgeClass}`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${nextContact.dotClass}`} />
+                                  <span className="truncate max-w-[120px]">{nextContact.text}</span>
+                                </span>
+                              ) : (
+                                <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500 italic">
+                                  Not set
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
+                              EST. BUDGET
+                            </span>
+                            <span className="text-sm font-bold text-primary-brand dark:text-orange-400 font-serif">
+                              {lead.estimatedBudget !== undefined && lead.estimatedBudget > 0
+                                ? formatPrice(lead.estimatedBudget)
+                                : "—"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {lead.whatsappNumber && (
+                            <button
+                              type="button"
+                              onClick={() => openWhatsApp(lead.whatsappNumber, lead.name)}
+                              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
+                              title="Chat on WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {lead.instagramHandle && (
+                            <button
+                              type="button"
+                              onClick={() => openInstagram(lead.instagramHandle)}
+                              className="p-1.5 rounded-lg text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-950/40 transition-colors cursor-pointer"
+                              title="Instagram Profile"
+                            >
+                              <Instagram className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {lead.status !== "Converted" && (
+                            <button
+                              type="button"
+                              onClick={() => openConvertModal(lead)}
+                              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
+                              title="Convert to Customer"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(lead)}
+                            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                            title="Edit Lead"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Remove inquiry for "${lead.name}"?`)) {
+                                handleDeleteLead(lead.id);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            title="Delete Lead"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-zinc-400 text-sm">
+                  <Search className="w-12 h-12 text-zinc-350 dark:text-zinc-700 mx-auto mb-3 opacity-60" />
+                  <p className="font-bold text-zinc-500 dark:text-zinc-450">No Leads Discovered</p>
+                  <p className="text-xs text-zinc-400 dark:text-zinc-550 mt-1 max-w-[280px] text-center font-sans">
+                    There are no leads matching your selected filters or search keyword.
+                  </p>
+                  <div className="flex items-center gap-2 mt-4">
+                    {(statusFilter !== "All" || channelFilter !== "All" || searchTerm) && (
+                      <button
+                        type="button"
+                        onClick={clearAllFilters}
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-750 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={openAddModal}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-primary-brand hover:bg-opacity-95 text-white transition-colors cursor-pointer"
+                    >
+                      New Lead
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pagination controls for Leads */}
+            {filteredLeads.length > 0 && (
+              <div className="flex flex-row items-center justify-between gap-3 pt-5 mt-6 border-t border-zinc-200/60 dark:border-zinc-800/80 w-full">
+                {/* Showing details */}
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium whitespace-nowrap">
+                  <span className="hidden sm:inline">Showing </span>
+                  <span className="font-semibold text-zinc-800 dark:text-zinc-200">{(leadsCurrentPage - 1) * leadsItemsPerPage + 1}</span>–
+                  <span className="font-semibold text-zinc-800 dark:text-zinc-200">{Math.min(leadsCurrentPage * leadsItemsPerPage, filteredLeads.length)}</span> of{" "}
+                  <span className="font-semibold text-zinc-800 dark:text-zinc-200">{filteredLeads.length}</span>
+                  <span className="hidden sm:inline"> inquiries</span>
+                  <span className="sm:hidden"> leads</span>
+                </div>
+
+                {/* Page buttons and Desktop Select container */}
+                <div className="flex items-center gap-3">
+                  {/* Page buttons */}
+                  <div className="flex items-center bg-zinc-50 dark:bg-zinc-900/60 p-0.5 rounded-xl border border-zinc-200/50 dark:border-zinc-800/80 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setLeadsCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={leadsCurrentPage === 1}
+                      aria-label="Previous page"
+                      className="p-1 rounded-lg text-zinc-500 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-900 hover:text-zinc-800 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed"
+                      title="Previous Page"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+
+                    {Array.from({ length: leadsTotalPages }, (_, i) => i + 1).map((pageNum) => {
+                      if (leadsTotalPages > 4) {
+                        const isCurrent = leadsCurrentPage === pageNum;
+                        const isFirst = pageNum === 1;
+                        const isLast = pageNum === leadsTotalPages;
+                        const isAdjacent = Math.abs(pageNum - leadsCurrentPage) <= 1;
+
+                        if (!isCurrent && !isFirst && !isLast && !isAdjacent) {
+                          if (pageNum === 2 || pageNum === leadsTotalPages - 1) {
+                            return <span key={pageNum} className="px-1 text-[10px] text-zinc-400">...</span>;
+                          }
+                          return null;
+                        }
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          onClick={() => setLeadsCurrentPage(pageNum)}
+                          aria-label={`Page ${pageNum}`}
+                          className={`w-6 h-6 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
+                            leadsCurrentPage === pageNum
+                              ? "bg-primary-brand text-white shadow-xs"
+                              : "text-zinc-650 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={() => setLeadsCurrentPage(prev => Math.min(prev + 1, leadsTotalPages))}
+                      disabled={leadsCurrentPage === leadsTotalPages || leadsTotalPages === 0}
+                      aria-label="Next page"
+                      className="p-1 rounded-lg text-zinc-500 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-900 hover:text-zinc-800 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer disabled:cursor-not-allowed"
+                      title="Next Page"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Desktop show select */}
+                  <div className="hidden md:flex items-center gap-2">
+                    <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">Show</span>
+                    <select
+                      aria-label="Leads per page"
+                      value={leadsItemsPerPage}
+                      onChange={(e) => {
+                        setLeadsItemsPerPage(Number(e.target.value));
+                        setLeadsCurrentPage(1);
+                      }}
+                      className="text-xs px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 font-medium outline-none focus:ring-1 focus:ring-primary-brand/35 shadow-sm cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all"
+                    >
+                      <option value={10}>10 per page</option>
+                      <option value={20}>20 per page</option>
+                      <option value={50}>50 per page</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Add / Edit Lead Modal */}
       <AnimatePresence>

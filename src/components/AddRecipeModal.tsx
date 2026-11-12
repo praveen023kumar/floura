@@ -3,18 +3,20 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import CreatableSelect from "react-select/creatable";
 import AsyncCreatableSelect from "react-select/async-creatable";
 import { customSelectStyles, tableSelectStyles } from "./customSelectStyles";
-import { type Recipe } from "../types";
+import { type Recipe, type InventoryItem } from "../types";
 import { useNavigate } from "react-router-dom";
 import { localDb } from "../db";
 import { X, Plus, Trash2, CheckCircle2, ImagePlus } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { compressImage, getBase64ByteSize } from "../utils/imageCompressor";
+import RegisterIngredientModal from "./RegisterIngredientModal";
 
 interface AddRecipeModalProps {
   isOpen: boolean;
   onClose: () => void;
   recipes: Recipe[];
   onAddRecipe: (recipe: Omit<Recipe, "id" | "updatedAt">) => Promise<any>;
+  onAddInventoryItem?: (item: Omit<InventoryItem, "id" | "updatedAt">) => Promise<any>;
 }
 
 export default function AddRecipeModal({
@@ -22,6 +24,7 @@ export default function AddRecipeModal({
   onClose,
   recipes,
   onAddRecipe,
+  onAddInventoryItem,
 }: AddRecipeModalProps) {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -38,6 +41,34 @@ export default function AddRecipeModal({
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [ingredientUnits, setIngredientUnits] = useState<Record<string, string>>({});
+
+  const [registerModalState, setRegisterModalState] = useState<{
+    isOpen: boolean;
+    initialName: string;
+    rowIndex: number;
+  }>({
+    isOpen: false,
+    initialName: "",
+    rowIndex: -1,
+  });
+
+  const handleOpenCreateIngredientModal = (name: string, rowIndex: number) => {
+    setRegisterModalState({
+      isOpen: true,
+      initialName: name,
+      rowIndex,
+    });
+  };
+
+  const handleIngredientRegistered = (newItem: InventoryItem) => {
+    if (registerModalState.rowIndex >= 0) {
+      handleIngredientChange(registerModalState.rowIndex, "name", newItem.name);
+    }
+    setIngredientUnits((prev) => ({
+      ...prev,
+      [newItem.name]: newItem.unit,
+    }));
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -406,6 +437,7 @@ export default function AddRecipeModal({
                         <tr key={idx}>
                           <td className="px-4 py-1.5">
                               <AsyncCreatableSelect
+                                key={`ing-select-${idx}-${item.name}-${ingredientUnits[item.name] || ""}`}
                                 required
                                 styles={tableSelectStyles}
                                 menuPortalTarget={document.body}
@@ -413,14 +445,22 @@ export default function AddRecipeModal({
                                 placeholder="Select ingredient..."
                                 loadOptions={loadIngredientOptions}
                                 defaultOptions
-                                cacheOptions
                                 value={item.name ? { 
                                   value: item.name, 
                                   label: ingredientUnits[item.name] 
                                     ? `${item.name} (${ingredientUnits[item.name]})` 
                                     : item.name 
                                 } : null}
-                                onChange={(opt) => handleIngredientChange(idx, "name", opt ? opt.value : "")}
+                                onChange={(opt: any) => {
+                                  if (opt?.__isNew__) {
+                                    handleOpenCreateIngredientModal(opt.value, idx);
+                                  } else {
+                                    handleIngredientChange(idx, "name", opt ? opt.value : "");
+                                  }
+                                }}
+                                onCreateOption={(inputValue) => {
+                                  handleOpenCreateIngredientModal(inputValue, idx);
+                                }}
                               />
                           </td>
                           <td className="px-4 py-1.5">
@@ -491,6 +531,14 @@ export default function AddRecipeModal({
           </motion.div>
         </div>
       )}
+
+      <RegisterIngredientModal
+        isOpen={registerModalState.isOpen}
+        initialName={registerModalState.initialName}
+        onClose={() => setRegisterModalState((prev) => ({ ...prev, isOpen: false }))}
+        onSuccess={handleIngredientRegistered}
+        onAddInventoryItem={onAddInventoryItem}
+      />
     </AnimatePresence>
   );
 }

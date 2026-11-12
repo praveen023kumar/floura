@@ -1,9 +1,10 @@
-// File Path: /src/components/CustomersListView.tsx
 import React, { useState, useMemo, useEffect, memo } from "react";
 import { memoWithData } from "../utils/memo";
 import { type Customer } from "../types";
 import { formatDate } from "../utils/format";
 import { useCustomers } from "../hooks/useCustomers";
+import { useQuery } from "@tanstack/react-query";
+import { localDb } from "../db";
 import {
   Search,
   Plus,
@@ -15,7 +16,8 @@ import {
   ChevronRight,
   SlidersHorizontal,
   X,
-  UserPlus
+  UserPlus,
+  Inbox
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Avatar from "./Avatar";
@@ -46,6 +48,30 @@ function CustomersListView({ locationState, onNavigate }: CustomersListViewProps
     handleWhatsApp,
     isLoading: loading,
   } = useCustomers();
+
+  const { data: customerCounts } = useQuery({
+    queryKey: ["customers", "metrics_counts"],
+    queryFn: async () => {
+      try {
+        const all = await localDb.customers.query(
+          "SELECT type, count(*) as count FROM customers WHERE isDeleted = 0 GROUP BY type"
+        );
+        let total = 0;
+        let frequent = 0;
+        let corporate = 0;
+        let standard = 0;
+        (all || []).forEach((row: any) => {
+          total += row.count;
+          if (row.type === "Frequent") frequent = row.count;
+          else if (row.type === "Corporate") corporate = row.count;
+          else standard += row.count;
+        });
+        return { total, frequent, corporate, standard };
+      } catch {
+        return { total: 0, frequent: 0, corporate: 0, standard: 0 };
+      }
+    }
+  });
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -142,9 +168,14 @@ function CustomersListView({ locationState, onNavigate }: CustomersListViewProps
       {/* ── HEADER ── */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate">
-            Client Database
-          </h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-lg sm:text-2xl font-bold font-serif text-primary-brand dark:text-orange-400 truncate">
+              Client Database
+            </h2>
+            <span className="text-[10px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 shrink-0">
+              {filteredCount} {filteredCount === 1 ? 'Client' : 'Clients'}
+            </span>
+          </div>
           <p className="hidden sm:block text-xs text-zinc-550 font-sans mt-0.5">
             Track client loyalties and coordinate messaging triggers easily.
           </p>
@@ -264,29 +295,111 @@ function CustomersListView({ locationState, onNavigate }: CustomersListViewProps
         </AnimatePresence>
 
         {/* Main content */}
-        <div className="lg:col-span-9 space-y-6">
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.18 }}
-            className="space-y-4"
-          >
+        <div className="lg:col-span-9 space-y-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-150 dark:border-zinc-800 shadow-xs flex flex-col min-h-[350px]">
+            {/* ── STATS TILES ── */}
+            <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterType("All");
+                  setSearchTerm("");
+                }}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  filterType === "All"
+                    ? "bg-zinc-100 dark:bg-zinc-800 ring-1.5 ring-zinc-400 dark:ring-zinc-600 shadow-2xs"
+                    : "bg-zinc-50/80 dark:bg-zinc-800/40 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider truncate">
+                    Total
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-700 dark:bg-zinc-300 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 leading-none">
+                  {customerCounts?.total ?? filteredCount}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilterType("Frequent")}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  filterType === "Frequent"
+                    ? "bg-pink-100/80 dark:bg-pink-950/40 ring-1.5 ring-pink-400 shadow-2xs"
+                    : "bg-pink-50/60 dark:bg-pink-950/20 hover:bg-pink-100/60 dark:hover:bg-pink-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-pink-700/80 dark:text-pink-300/80 uppercase tracking-wider truncate">
+                    Frequent
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-pink-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-pink-600 dark:text-pink-400 tracking-tight mt-1 leading-none">
+                  {customerCounts?.frequent ?? 0}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilterType("Corporate")}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  filterType === "Corporate"
+                    ? "bg-purple-100/80 dark:bg-purple-950/40 ring-1.5 ring-purple-400 shadow-2xs"
+                    : "bg-purple-50/60 dark:bg-purple-950/20 hover:bg-purple-100/60 dark:hover:bg-purple-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-purple-700/80 dark:text-purple-300/80 uppercase tracking-wider truncate">
+                    Corporate
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-purple-600 dark:text-purple-400 tracking-tight mt-1 leading-none">
+                  {customerCounts?.corporate ?? 0}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilterType("New")}
+                className={`p-2 sm:p-2.5 rounded-xl text-left transition-all cursor-pointer group flex flex-col justify-between ${
+                  filterType === "New"
+                    ? "bg-blue-100/80 dark:bg-blue-950/40 ring-1.5 ring-blue-400 shadow-2xs"
+                    : "bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-100/60 dark:hover:bg-blue-900/30"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-blue-700/80 dark:text-blue-300/80 uppercase tracking-wider truncate">
+                    New / Std
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                </div>
+                <div className="text-lg sm:text-2xl font-black font-sans text-blue-600 dark:text-blue-400 tracking-tight mt-1 leading-none">
+                  {customerCounts?.standard ?? 0}
+                </div>
+              </button>
+            </div>
+
             {/* Search row */}
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Search customers (ID, name, contact number)..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-white dark:bg-zinc-800 text-sm pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-850 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-400"
-              />
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-550" />
+                <input
+                  type="text"
+                  placeholder="Search customers (ID, name, contact number)..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 text-xs pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-755 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary-brand dark:focus:ring-orange-500 font-medium"
+                />
+              </div>
             </div>
 
             {/* Active filter chips */}
-            {(filterType !== "All" || sortBy !== "updated-newest") && (
-              <div className="flex flex-wrap items-center gap-1.5">
+            {(filterType !== "All" || sortBy !== "updated-newest" || searchTerm.trim()) && (
+              <div className="flex flex-wrap items-center gap-1.5 mb-4 animate-fade-in">
                 {filterType !== "All" && (
                   <button
                     type="button"
@@ -295,7 +408,6 @@ function CustomersListView({ locationState, onNavigate }: CustomersListViewProps
                   >
                     {filterType} Customers
                     <X className="w-3 h-3" aria-hidden="true" />
-                    <span className="sr-only">Remove type filter</span>
                   </button>
                 )}
                 {sortBy !== "updated-newest" && (
@@ -306,49 +418,45 @@ function CustomersListView({ locationState, onNavigate }: CustomersListViewProps
                   >
                     {sortOptions.find((o) => o.value === sortBy)?.label}
                     <X className="w-3 h-3" aria-hidden="true" />
-                    <span className="sr-only">Remove sort option</span>
+                  </button>
+                )}
+                {searchTerm.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary-brand-light dark:bg-primary-brand-dark/20 text-primary-brand dark:text-orange-400 pl-2.5 pr-1.5 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    Search: "{searchTerm}"
+                    <X className="w-3 h-3" aria-hidden="true" />
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-wider cursor-pointer transition-colors ml-1"
+                  className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 hover:text-zinc-600 dark:hover:text-zinc-300 uppercase tracking-wider cursor-pointer transition-colors ml-1"
                 >
                   Clear all
                 </button>
               </div>
             )}
 
-            {/* Profile database matching exact screenshots profiles */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-1 pb-3">
+            {/* Compact cards list */}
+            <div className="space-y-3 flex-1">
               {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
+                Array.from({ length: 4 }).map((_, i) => (
                   <div
                     key={`skeleton-${i}`}
-                    className="bg-white dark:bg-zinc-800 rounded-2xl p-5 border border-zinc-100 dark:border-zinc-700/60 shadow-sm flex flex-col gap-4 text-left animate-pulse"
+                    className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 animate-pulse space-y-3"
                   >
-                    <div className="flex gap-3">
-                      <div className="w-14 h-14 rounded-xl bg-zinc-200 dark:bg-zinc-700 shrink-0 animate-pulse" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
-                        <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2 animate-pulse" />
-                        <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/4 animate-pulse" />
-                      </div>
+                    <div className="flex justify-between items-center">
+                      <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-1/3"></div>
+                      <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-16"></div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 py-3 border-y border-zinc-100 dark:border-zinc-700/60">
-                      <div className="space-y-1.5">
-                        <div className="h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
-                        <div className="h-3.5 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2 animate-pulse" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <div className="h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3 animate-pulse" />
-                        <div className="h-3.5 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2 animate-pulse" />
-                      </div>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <div className="flex-1 h-8 bg-zinc-200 dark:bg-zinc-700 rounded-full animate-pulse" />
-                      <div className="flex-1 h-8 bg-zinc-200 dark:bg-zinc-700 rounded-full animate-pulse" />
-                      <div className="flex-1 h-8 bg-zinc-200 dark:bg-zinc-700 rounded-full animate-pulse" />
+                    <div className="h-3 bg-zinc-100 dark:bg-zinc-850 rounded w-1/5"></div>
+                    <div className="grid grid-cols-3 gap-4 pt-1">
+                      <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+                      <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
+                      <div className="h-8 bg-zinc-100 dark:bg-zinc-850 rounded"></div>
                     </div>
                   </div>
                 ))
@@ -356,113 +464,109 @@ function CustomersListView({ locationState, onNavigate }: CustomersListViewProps
                 paginatedCustomers.map((c) => (
                   <div
                     key={c.id}
-                    className="bg-white dark:bg-zinc-800 rounded-2xl p-5 border border-zinc-100 dark:border-zinc-700/60 shadow-sm flex flex-col gap-4 text-left hover:translate-y-[-2px] transition-transform duration-250 select-none"
+                    onClick={() => onNavigate?.(`/customers/${c.id}`)}
+                    className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer text-left group"
                   >
-                    <div className="flex justify-between items-start">
-                      <div className="flex gap-3">
+                    {/* Row 1: Avatar, Name and Type Badge */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <Avatar
                           avatarKey=""
                           name={c.name}
                           useIconFallback={true}
-                          className="w-14 h-14 rounded-xl border border-zinc-150 shadow-sm"
+                          className="w-9 h-9 rounded-xl border border-zinc-150 shadow-xs shrink-0"
                         />
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h3 className="font-serif font-bold text-sm text-zinc-800 dark:text-zinc-200">{c.name}</h3>
-                            <span className="text-[9px] bg-zinc-100 dark:bg-zinc-700/60 text-zinc-500 dark:text-zinc-400 font-mono px-1.5 py-0.5 rounded uppercase tracking-wider">
-                              {c.id}
-                            </span>
-                          </div>
-                          <p className="font-mono text-xs text-zinc-400 mt-0.5">{c.mobile}</p>
-                          <div className="mt-1">
-                            <span
-                              className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                                c.type === "Frequent"
-                                  ? "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400"
-                                  : c.type === "Corporate"
-                                  ? "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-400"
-                                  : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-                              }`}
-                            >
-                              {c.type}
-                            </span>
-                          </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight group-hover:text-primary-brand dark:group-hover:text-orange-400 transition-colors truncate">
+                            {c.name}
+                          </h4>
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
+                            {c.id} • {c.mobile}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="flex gap-1 items-center">
+                      <span
+                        className={`shrink-0 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                          c.type === "Frequent"
+                            ? "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400"
+                            : c.type === "Corporate"
+                            ? "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-400"
+                            : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                        }`}
+                      >
+                        {c.type}
+                      </span>
+                    </div>
+
+                    {/* Row 2: Metrics and Actions */}
+                    <div className="mt-3 pt-2 flex items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800/60">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-6 flex-1">
+                        <div>
+                          <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
+                            TOTAL ORDERS
+                          </span>
+                          <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-sans">
+                            {c.totalOrders} Orders
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
+                            MEMBER SINCE
+                          </span>
+                          <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-sans">
+                            {formatDate(c.memberSince)}
+                          </span>
+                        </div>
+
+                        <div className="hidden sm:block">
+                          <span className="block text-[9px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-semibold">
+                            ORDER HISTORY
+                          </span>
+                          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-sans">
+                            {customerOrderCounts[c.id] || 0} Records
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Quick contact actions + edit */}
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => handleCall(c.name, c.mobile)}
+                          title="Call"
+                          className="p-1.5 rounded-lg text-zinc-400 hover:text-primary-brand hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleWhatsApp(c.name, c.mobile)}
+                          title="WhatsApp"
+                          className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => onNavigate?.("/customers/new", { state: { customer: c } })}
                           title="Modify profile"
-                          className="p-1.5 rounded-lg text-zinc-400 hover:text-primary-brand dark:hover:text-pink-400 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 cursor-pointer transition-colors"
+                          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                         >
-                          <Edit className="w-4 h-4" />
+                          <Edit className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                    </div>
-
-                    {/* Stat parameters matching screenshots row alignments */}
-                    <div className="grid grid-cols-2 gap-4 py-3 border-y border-zinc-100 dark:border-zinc-700/60 font-sans">
-                      <div>
-                        <span className="text-[10px] text-zinc-400 uppercase tracking-tighter">Total Orders</span>
-                        <p className="text-sm font-bold text-primary-brand dark:text-orange-400 font-serif mt-0.5">
-                          {c.totalOrders} Orders
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-zinc-400 uppercase tracking-tighter">Member Since</span>
-                        <p className="text-xs text-zinc-600 dark:text-zinc-300 font-medium mt-0.5">
-                          {formatDate(c.memberSince)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Real phone, SMS, and WhatsApp actions */}
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => handleCall(c.name, c.mobile)}
-                        className="flex-1 bg-primary-brand text-white dark:bg-orange-400 py-2 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 hover:opacity-90 active:scale-95 shadow-xs cursor-pointer transition-all"
-                        title="Call Customer"
-                      >
-                        <Phone className="w-3 h-3" /> Call
-                      </button>
-
-                      <button
-                        onClick={() => handleSMS(c.name, c.mobile)}
-                        className="flex-1 bg-pink-50 text-pink-700 dark:bg-pink-950/25 dark:text-pink-300 py-2 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 hover:bg-pink-100 dark:hover:bg-pink-950/40 active:scale-95 cursor-pointer transition-all"
-                        title="Send SMS"
-                      >
-                        <MessageSquare className="w-3 h-3" /> SMS
-                      </button>
-
-                      <button
-                        onClick={() => handleWhatsApp(c.name, c.mobile)}
-                        className="flex-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/25 dark:text-emerald-300 py-2 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-950/40 active:scale-95 cursor-pointer transition-all"
-                        title="WhatsApp Chat"
-                      >
-                        <MessageCircle className="w-3 h-3" /> WhatsApp
-                      </button>
-                    </div>
-
-                    {/* View Profile & History link */}
-                    <div className="pt-3.5 text-center border-t border-zinc-100 dark:border-zinc-700/60 mt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onNavigate?.(`/customers/${c.id}`);
-                        }}
-                        className="text-[11px] font-bold text-primary-brand hover:text-primary-brand-dark dark:text-orange-400 dark:hover:text-orange-350 flex items-center justify-center gap-1 w-full py-1.5 cursor-pointer hover:underline transition-all"
-                      >
-                        View Full Profile & Order History ({customerOrderCounts[c.id] || 0})
-                        <span className="text-[10px]">&rarr;</span>
-                      </button>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="col-span-full text-center py-12 text-zinc-400 text-sm">
-                  No customers found matching search keywords.
+                <div className="flex flex-col items-center justify-center py-12 text-zinc-400 text-sm">
+                  <Inbox className="w-12 h-12 text-zinc-350 dark:text-zinc-700 mx-auto mb-3 opacity-60" />
+                  <p className="font-bold text-zinc-500 dark:text-zinc-450">No Customers Discovered</p>
+                  <p className="text-xs text-zinc-400 dark:text-zinc-550 mt-1 max-w-[280px] text-center font-sans">
+                    There are no customer records matching your selected filter or search keyword.
+                  </p>
                 </div>
               )}
             </div>
@@ -556,7 +660,7 @@ function CustomersListView({ locationState, onNavigate }: CustomersListViewProps
                 </div>
               </div>
             )}
-          </motion.div>
+          </div>
         </div>
       </div>
     </div>

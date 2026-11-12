@@ -27,11 +27,15 @@ import {
   Phone,
   RefreshCw,
   XCircle,
-  Calculator
+  Calculator,
+  Sliders,
+  ExternalLink
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useOrders } from "../hooks/useOrders";
 import { CompleteOrderModal } from "./CompleteOrderModal";
+import { PrinterSettingsModal } from "./PrinterSettingsModal";
+import { printOrderInvoice, getBluetoothPrinter, isDirectBluetoothPrintEnabled } from "../services/printer";
 
 interface OrderDetailProps {
   onAddOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<any>;
@@ -88,6 +92,26 @@ function OrderDetail({
 
   const [recipesList, setRecipesList] = useState<any[]>([]);
   const [inventoryList, setInventoryList] = useState<any[]>([]);
+  const [isPrinterModalOpen, setIsPrinterModalOpen] = useState<boolean>(false);
+  const [isPrinting, setIsPrinting] = useState<boolean>(false);
+
+  const handlePrintInvoice = async () => {
+    if (!selectedOrder) return;
+    setIsPrinting(true);
+    try {
+      await printOrderInvoice(
+        selectedOrder,
+        bakeryProfile,
+        getOrderSeqId(selectedOrder.id, orders)
+      );
+    } catch (err) {
+      console.error("[OrderDetail] Failed to print invoice:", err);
+      window.showToast?.("Printing failed. Opening dialog...", "warning");
+      window.print();
+    } finally {
+      setIsPrinting(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -198,7 +222,9 @@ function OrderDetail({
       ? order.venueAddress
       : "In-store pickup";
 
-    const message = `*${bakeryName} - Invoice* 🧾\n----------------------------------------\n*Invoice ID:* #${seqId}\n*Customer:* ${order.customerName}\n*Event Type:* ${order.eventType}\n*Delivery/Pickup:* ${formatDate(order.deliveryDate)} at ${order.deliveryTime || "09:00"}\n*Venue:* ${venueVal}\n\n*Cake Details:*\n• Flavor: ${order.cakeFlavor}\n• Shape: ${order.cakeShape}\n• Weight: ${order.cakeWeight}\n• Layers: ${order.layers}${order.cakeInscription ? `\n• Inscription: "${order.cakeInscription}"` : ""}\n\n*Financial Summary:*\n• Grand Total: ${currency}${totalVal.toFixed(2)}\n• Total Paid: ${currency}${paidVal.toFixed(2)}\n• *Balance Due: ${currency}${balanceVal.toFixed(2)}*\n\nThank you for choosing ${bakeryName}! 🍰`;
+    const trackingUrl = `${window.location.origin}/track/${order.id}`;
+
+    const message = `*${bakeryName} - Invoice* 🧾\n----------------------------------------\n*Invoice ID:* #${seqId}\n*Customer:* ${order.customerName}\n*Event Type:* ${order.eventType}\n*Delivery/Pickup:* ${formatDate(order.deliveryDate)} at ${order.deliveryTime || "09:00"}\n*Venue:* ${venueVal}\n\n*Cake Details:*\n• Flavor: ${order.cakeFlavor}\n• Shape: ${order.cakeShape}\n• Weight: ${order.cakeWeight}\n• Layers: ${order.layers}${order.cakeInscription ? `\n• Inscription: "${order.cakeInscription}"` : ""}\n\n*Financial Summary:*\n• Grand Total: ${currency}${totalVal.toFixed(2)}\n• Total Paid: ${currency}${paidVal.toFixed(2)}\n• *Balance Due: ${currency}${balanceVal.toFixed(2)}*\n\n📍 *Track Live Order Status:*\n${trackingUrl}\n\nThank you for choosing ${bakeryName}! 🍰`;
 
     // 1. Try Web Share API (supported on mobile and Safari) which can send image + caption natively
     let imageFile: File | null = null;
@@ -350,17 +376,26 @@ function OrderDetail({
                   <span>Modify Spec</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.print();
-                    window.showToast?.("Invoice Generated", "success");
-                  }}
-                  className="bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-205 py-2 px-3.5 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 cursor-pointer shadow-sm"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Invoice</span>
-                </button>
+                <div className="inline-flex items-center rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm bg-zinc-50 dark:bg-zinc-800 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={handlePrintInvoice}
+                    disabled={isPrinting}
+                    className="hover:bg-zinc-100 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-200 py-2 px-3.5 text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    title="Print Invoice"
+                  >
+                    <Printer className={`w-3.5 h-3.5 ${isPrinting ? "animate-pulse text-primary-brand dark:text-orange-400" : ""}`} />
+                    <span>{isPrinting ? "Printing..." : "Print Invoice"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsPrinterModalOpen(true)}
+                    className="border-l border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-750 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 p-2 text-xs transition-colors cursor-pointer"
+                    title="Thermal Printer Settings & Auto-Connect"
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
                 <button
                   type="button"
@@ -369,6 +404,20 @@ function OrderDetail({
                 >
                   <MessageCircle className="w-3.5 h-3.5" />
                   <span>Share WhatsApp</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const trackingUrl = `${window.location.origin}/track/${selectedOrder.id}`;
+                    navigator.clipboard.writeText(trackingUrl);
+                    window.showToast?.("📋 Customer live tracking link copied to clipboard!", "success");
+                  }}
+                  className="border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-200 py-2 px-3 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  title="Copy customer tracking link"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Tracking Link</span>
                 </button>
               </div>
             </div>
@@ -1114,6 +1163,12 @@ function OrderDetail({
         setDifficultiesText={setDifficultiesText}
         onSave={handleCompleteOrderSave}
         onClose={() => setCompletingOrder(null)}
+      />
+
+      {/* ----------------- BLUETOOTH THERMAL PRINTER SETTINGS MODAL ----------------- */}
+      <PrinterSettingsModal
+        isOpen={isPrinterModalOpen}
+        onClose={() => setIsPrinterModalOpen(false)}
       />
     </div>
   );

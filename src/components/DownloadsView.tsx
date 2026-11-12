@@ -202,7 +202,7 @@ export default function DownloadsView({
             {user ? (
               <button
                 onClick={() => navigate("/dashboard")}
-                className="flex items-center gap-1.5 bg-primary-brand hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-widest py-2.5 px-4 rounded-xl shadow-xs transition-all cursor-pointer active:scale-97"
+                className="flex items-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-2.5 px-4 rounded-xl shadow-xs transition-all cursor-pointer active:scale-97"
               >
                 <span>Go to Dashboard</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -210,7 +210,7 @@ export default function DownloadsView({
             ) : (
               <Link
                 to="/login"
-                className="flex items-center gap-1.5 bg-primary-brand hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-widest py-2.5 px-5 rounded-xl shadow-xs transition-all cursor-pointer active:scale-97"
+                className="flex items-center gap-1.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-widest py-2.5 px-5 rounded-xl shadow-xs transition-all cursor-pointer active:scale-97"
               >
                 <span>Launch Web App</span>
               </Link>
@@ -306,7 +306,7 @@ export default function DownloadsView({
                   onClick={() => setSelectedVersionTag(ver.version)}
                   className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
                     selectedVersionTag === ver.version
-                      ? "bg-primary-brand text-white shadow-md shadow-orange-500/20 scale-102"
+                      ? "bg-primary-brand text-white shadow-md shadow-pink-500/20 scale-102"
                       : "bg-white dark:bg-zinc-900 text-zinc-650 dark:text-zinc-400 border border-zinc-200/80 dark:border-zinc-800 hover:border-primary-brand/40"
                   }`}
                 >
@@ -365,7 +365,7 @@ export default function DownloadsView({
                     href={getDownloadUrlWithTime(recommendedPlatform.downloadUrl)}
                     download={recommendedPlatform.fileName}
                     onClick={(e) => handleDownloadClick(e, recommendedPlatform)}
-                    className="flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-orange-600 text-white font-bold text-sm py-3.5 px-6 rounded-2xl shadow-lg shadow-orange-500/25 active:scale-98 transition-all cursor-pointer text-center"
+                    className="flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-sm py-3.5 px-6 rounded-2xl shadow-lg shadow-pink-500/25 active:scale-98 transition-all cursor-pointer text-center"
                   >
                     <Download className="w-4 h-4" />
                     <span>Download {recommendedPlatform.fileType}</span>
@@ -373,7 +373,7 @@ export default function DownloadsView({
                 ) : (
                   <Link
                     to={recommendedPlatform.downloadUrl}
-                    className="flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-orange-600 text-white font-bold text-sm py-3.5 px-6 rounded-2xl shadow-lg shadow-orange-500/25 active:scale-98 transition-all cursor-pointer text-center"
+                    className="flex items-center justify-center gap-2.5 bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-sm py-3.5 px-6 rounded-2xl shadow-lg shadow-pink-500/25 active:scale-98 transition-all cursor-pointer text-center"
                   >
                     <ExternalLink className="w-4 h-4" />
                     <span>Open Floura Web</span>
@@ -498,7 +498,7 @@ export default function DownloadsView({
                       href={getDownloadUrlWithTime(platform.downloadUrl)}
                       download={platform.fileName}
                       onClick={(e) => handleDownloadClick(e, platform)}
-                      className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-primary-brand hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-orange-500/20 cursor-pointer active:scale-98"
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-primary-brand hover:bg-primary-brand-dark text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-pink-500/20 cursor-pointer active:scale-98"
                     >
                       <Download className="w-4 h-4" />
                       <span>Download {platform.fileType}</span>

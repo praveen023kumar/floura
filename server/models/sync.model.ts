@@ -54,7 +54,7 @@ function encryptRow(row: any): any {
   return encrypted;
 }
 
-function decryptRow(row: any): any {
+export function decryptRow(row: any): any {
   if (!row) return row;
   const decrypted: any = {};
   for (const [key, val] of Object.entries(row)) {

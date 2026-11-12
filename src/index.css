@@ -46,16 +46,22 @@
   --color-zinc-900: #0f172a;
   --color-zinc-950: #020617;
 
-  /* Map custom orange colors (used in dark mode components) to premium warm violet/lavender/indigo spectrum */
-  --color-orange-100: #e0e7ff;
-  --color-orange-300: #c7d2fe;
-  --color-orange-400: #a5b4fc;
-  --color-orange-500: #6366f1;
-  --color-orange-550: #4f46e5;
-  --color-orange-600: #4f46e5;
-  --color-orange-700: #3730a3;
-  --color-orange-800: #312e81;
-  --color-orange-900: #1e1b4b;
+  /* Map orange/accent tokens to Floura's raspberry/rose gold brand palette (matching 'Get Started' button) */
+  --color-orange-50: #fdf2f8;
+  --color-orange-100: #fce7f3;
+  --color-orange-200: #fbcfe8;
+  --color-orange-300: #f472b6;
+  --color-orange-400: #f472b6;
+  --color-orange-450: #db2777;
+  --color-orange-500: #be185d;
+  --color-orange-550: #9d174d;
+  --color-orange-600: #831843;
+  --color-orange-650: #701a35;
+  --color-orange-700: #831843;
+  --color-orange-800: #500724;
+  --color-orange-900: #500724;
+  --color-orange-950: #3b0518;
+  --color-orange-955: #3b0518;
 
   /* Map pink/sweet accents directly into vibrant raspberry and rose gold spectrum */
   --color-pink-50: #fdf2f8;
