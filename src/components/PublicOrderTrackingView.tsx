@@ -18,6 +18,7 @@ import {
   AlertCircle,
   MessageCircle,
   Printer,
+  RefreshCw,
   ChevronRight,
   Sparkles,
   ArrowRight,
@@ -101,18 +102,94 @@ export default function PublicOrderTrackingView() {
   const [phoneInput, setPhoneInput] = useState<string>("");
   const [verifyLoading, setVerifyLoading] = useState<boolean>(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   // Image modal preview
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // Fetch metadata on mount or orderId change
+  // Core function to verify phone and load fresh order from server
+  const verifyAndLoadOrder = async (phoneToUse: string, isSilent = false) => {
+    if (!effectiveOrderId) return;
+    if (!isSilent) setVerifyLoading(true);
+    setVerifyError(null);
+
+    try {
+      const res = await fetch(getApiUrl("/api/public/orders/verify"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: effectiveOrderId,
+          phone: phoneToUse,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        if (!isSilent) {
+          setVerifyError(data.error || "Mobile number does not match this order.");
+        } else {
+          // If stored phone is no longer valid, clear session
+          sessionStorage.removeItem(`floura_phone_${effectiveOrderId}`);
+          sessionStorage.removeItem(`floura_track_${effectiveOrderId}`);
+        }
+      } else {
+        setOrder(data.order);
+        setBakery(data.bakery);
+        setVerifyError(null);
+
+        // Cache phone and order details in sessionStorage
+        try {
+          sessionStorage.setItem(`floura_phone_${effectiveOrderId}`, phoneToUse);
+          sessionStorage.setItem(
+            `floura_track_${effectiveOrderId}`,
+            JSON.stringify({ order: data.order, bakery: data.bakery })
+          );
+        } catch {}
+      }
+    } catch (err) {
+      console.error("Verification error:", err);
+      if (!isSilent) {
+        setVerifyError("Verification request failed. Please check your connection and try again.");
+      }
+    } finally {
+      if (!isSilent) setVerifyLoading(false);
+      setLoading(false);
+    }
+  };
+
+  // Core function to fetch preview metadata
+  const fetchMeta = async (isSilent = false) => {
+    if (!effectiveOrderId) return;
+    if (!isSilent) setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(getApiUrl(`/api/public/orders/meta/${encodeURIComponent(effectiveOrderId)}`));
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Order not found. Please verify your tracking link.");
+        setMeta(null);
+      } else {
+        setMeta(data);
+        setError(null);
+      }
+    } catch (err) {
+      console.error("Meta fetch error:", err);
+      if (!isSilent) {
+        setError("Unable to connect to the bakery server. Please check your internet connection.");
+      }
+    } finally {
+      if (!isSilent) setLoading(false);
+    }
+  };
+
+  // Fetch data on mount and poll every 6 seconds for real-time status sync
   useEffect(() => {
     if (!effectiveOrderId) {
       setLoading(false);
       return;
     }
 
-    // Check if verified order is already stored in sessionStorage
+    // 1. Initial fast paint from cache if available
     try {
       const cached = sessionStorage.getItem(`floura_track_${effectiveOrderId}`);
       if (cached) {
@@ -121,39 +198,33 @@ export default function PublicOrderTrackingView() {
           (typeof parsed.order?.customerName === "string" && parsed.order.customerName.startsWith("__ENC__")) ||
           (typeof parsed.bakery?.bakeryName === "string" && parsed.bakery.bakeryName.startsWith("__ENC__"));
 
-        if (hasEncryptedData) {
-          sessionStorage.removeItem(`floura_track_${effectiveOrderId}`);
-        } else if (parsed.order && parsed.bakery) {
+        if (!hasEncryptedData && parsed.order && parsed.bakery) {
           setOrder(parsed.order);
           setBakery(parsed.bakery);
           setLoading(false);
-          return;
         }
       }
     } catch {}
 
-    const fetchMeta = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(getApiUrl(`/api/public/orders/meta/${encodeURIComponent(effectiveOrderId)}`));
-        const data = await res.json();
-        if (!res.ok) {
-          setError(data.error || "Order not found. Please verify your tracking link.");
-          setMeta(null);
-        } else {
-          setMeta(data);
-          setError(null);
-        }
-      } catch (err) {
-        console.error("Meta fetch error:", err);
-        setError("Unable to connect to the bakery server. Please check your internet connection.");
-      } finally {
-        setLoading(false);
-      }
-    };
+    // 2. Fetch fresh order or meta from server
+    const storedPhone = sessionStorage.getItem(`floura_phone_${effectiveOrderId}`);
+    if (storedPhone) {
+      verifyAndLoadOrder(storedPhone, true);
+    } else {
+      fetchMeta();
+    }
 
-    fetchMeta();
+    // 3. Real-time background sync poll (every 6 seconds)
+    const pollTimer = setInterval(() => {
+      const currentStoredPhone = sessionStorage.getItem(`floura_phone_${effectiveOrderId}`);
+      if (currentStoredPhone) {
+        verifyAndLoadOrder(currentStoredPhone, true);
+      } else {
+        fetchMeta(true);
+      }
+    }, 6000);
+
+    return () => clearInterval(pollTimer);
   }, [effectiveOrderId]);
 
   // Handle phone verification submit
@@ -167,41 +238,18 @@ export default function PublicOrderTrackingView() {
       return;
     }
 
-    setVerifyLoading(true);
-    setVerifyError(null);
+    await verifyAndLoadOrder(cleanInput, false);
+  };
 
-    try {
-      const res = await fetch(getApiUrl("/api/public/orders/verify"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: effectiveOrderId,
-          phone: cleanInput,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setVerifyError(data.error || "Mobile number does not match this order.");
-      } else {
-        setOrder(data.order);
-        setBakery(data.bakery);
-        setVerifyError(null);
-
-        // Cache in sessionStorage for refresh persistence
-        try {
-          sessionStorage.setItem(
-            `floura_track_${effectiveOrderId}`,
-            JSON.stringify({ order: data.order, bakery: data.bakery })
-          );
-        } catch {}
-      }
-    } catch (err) {
-      console.error("Verification error:", err);
-      setVerifyError("Verification request failed. Please check your connection and try again.");
-    } finally {
-      setVerifyLoading(false);
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    const storedPhone = sessionStorage.getItem(`floura_phone_${effectiveOrderId}`);
+    if (storedPhone) {
+      await verifyAndLoadOrder(storedPhone, true);
+    } else {
+      await fetchMeta(true);
     }
+    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   const handleManualSearch = (e: React.FormEvent) => {
@@ -323,6 +371,15 @@ export default function PublicOrderTrackingView() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer disabled:opacity-60"
+              title="Refresh Live Status"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-primary-brand dark:text-orange-400" : ""}`} />
+              <span className="hidden sm:inline">{isRefreshing ? "Checking..." : "Refresh"}</span>
+            </button>
             {order && (
               <button
                 onClick={() => window.print()}
